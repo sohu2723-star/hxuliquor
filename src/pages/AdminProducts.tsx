@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../lib/api'
 import type { Product } from '../lib/api'
+import { formatCurrency } from '../lib/format'
 import ProductList from '../components/ProductList'
 import ProductForm from '../components/ProductForm'
 

@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico'],
       manifest: {
-        name: 'Mini Mart POS',
-        short_name: 'Mini Mart POS',
-        description: 'Mini Mart Point of Sale System',
+        name: 'HXU Liquor POS',
+        short_name: 'HXU Liquor',
+        description: 'HXU Liquor Point of Sale System',
         theme_color: '#1f2937',
         background_color: '#ffffff',
         display: 'standalone',

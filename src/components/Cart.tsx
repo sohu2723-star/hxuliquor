@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import type { Product } from '../lib/api'
+import { formatCurrency } from '../lib/format'
 
 interface CartProps {
   items: { product: Product; quantity: number }[]
@@ -15,6 +17,8 @@ export default function Cart({
   onCheckout,
   requiresAgeCheck,
 }: CartProps) {
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
+
   const total = items.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
     0
@@ -38,15 +42,35 @@ export default function Cart({
                   <p className="font-medium">{product.name}</p>
                   <p className="text-sm text-gray-500">{product.category}</p>
                   <p className="font-semibold text-primary mt-1">
-                    Ks {product.price.toFixed(2)}
+                    {formatCurrency(product.price)}
                   </p>
                 </div>
-                <button
-                  onClick={() => onRemove(product.id)}
-                  className="text-red-600 hover:text-red-800 text-lg font-bold leading-none"
-                >
-                  ×
-                </button>
+                {pendingRemoveId === product.id ? (
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => {
+                        onRemove(product.id)
+                        setPendingRemoveId(null)
+                      }}
+                      className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+                    >
+                      Remove
+                    </button>
+                    <button
+                      onClick={() => setPendingRemoveId(null)}
+                      className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setPendingRemoveId(product.id)}
+                    className="text-red-600 hover:text-red-800 text-lg font-bold leading-none"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
 
               <div className="flex items-center justify-between mt-3">
@@ -67,7 +91,7 @@ export default function Cart({
                   </button>
                 </div>
                 <span className="font-semibold">
-                  Ks {(product.price * quantity).toFixed(2)}
+                  {formatCurrency(product.price * quantity)}
                 </span>
               </div>
             </div>
@@ -84,12 +108,12 @@ export default function Cart({
       <div className="border-t pt-4">
         <div className="flex justify-between text-lg font-bold mb-4">
           <span>Total</span>
-          <span>Ks {total.toFixed(2)}</span>
+          <span>{formatCurrency(total)}</span>
         </div>
         <button
           onClick={onCheckout}
-          disabled={items.length === 0 || requiresAgeCheck}
-          className="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+          disabled={items.length === 0}
+          className="w-full bg-primary text-white py-3 px-4 rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
         >
           Checkout
         </button>

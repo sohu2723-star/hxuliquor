@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
 import type { Product } from '../lib/api'
+import { formatCurrency } from '../lib/format'
 
 interface CheckoutProps {
   cart: { product: Product; quantity: number }[]
@@ -74,12 +75,12 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }:
                   <span>
                     {product.name} × {quantity}
                   </span>
-                  <span>Ks {(product.price * quantity).toFixed(2)}</span>
+                  <span>{formatCurrency(product.price * quantity)}</span>
                 </div>
               ))}
               <div className="border-t mt-2 pt-2 flex justify-between font-bold">
                 <span>Total</span>
-                <span>Ks {total.toFixed(2)}</span>
+                <span>{formatCurrency(total)}</span>
               </div>
             </div>
 
@@ -93,7 +94,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }:
                     onClick={() => setAgeVerified(true)}
                     className={`flex-1 py-2 px-4 rounded-md border ${
                       ageVerified
-                        ? 'bg-green-600 text-white border-green-600'
+                        ? 'bg-primary text-white border-primary'
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
@@ -137,9 +138,9 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }:
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+              className="w-full bg-primary text-white py-3 px-4 rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
-              {isSubmitting ? 'Processing...' : `Pay Ks ${total.toFixed(2)}`}
+              {isSubmitting ? 'Processing...' : `Pay ${formatCurrency(total)}`}
             </button>
           </div>
         </div>

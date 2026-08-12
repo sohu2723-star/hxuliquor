@@ -1,4 +1,5 @@
 import type { Product } from '../lib/api'
+import { formatCurrency } from '../lib/format'
 
 interface ProductListProps {
   products: Product[]
@@ -50,7 +51,7 @@ export default function ProductList({ products, onEdit, onDelete }: ProductListP
                 <td className="px-4 py-3 whitespace-nowrap font-medium">{product.name}</td>
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{product.barcode}</td>
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{product.category}</td>
-                <td className="px-4 py-3 whitespace-nowrap font-semibold">Ks {product.price.toFixed(2)}</td>
+                  <td className="px-4 py-3 whitespace-nowrap font-semibold">{formatCurrency(product.price)}</td>
                 <td className={`px-4 py-3 whitespace-nowrap font-medium ${product.stockQty <= product.lowStockThreshold ? 'text-red-600' : ''}`}>
                   {product.stockQty}
                   {product.stockQty <= product.lowStockThreshold && (
