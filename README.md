@@ -82,6 +82,7 @@ minimart-pos/
 ### Google Apps Script Permissions
 
 The script requires these OAuth scopes:
+
 - `https://www.googleapis.com/auth/drive` — Create folders and upload product images to Google Drive
 - `https://www.googleapis.com/auth/spreadsheets` — Read/write product, sales, and user data
 - `https://www.googleapis.com/auth/script.external_request` — Standard Apps Script scope
@@ -92,7 +93,7 @@ The script requires these OAuth scopes:
 cd minimart-pos
 npm install
 cp .env.example .env
-# Edit .env and set VITE_GAS_URL to your Apps Script Web App URL
+# Edit .env and set GAS_URL to your Apps Script Web App URL
 npm run dev
 ```
 
@@ -114,7 +115,7 @@ git push -u origin main
 2. Click **Add New...** > **Project**
 3. Import your `minimart-pos` GitHub repository
 4. Under **Environment Variables**, add:
-   - `VITE_GAS_URL` = your Apps Script Web App URL from Step 1
+   - `GAS_URL` = your Apps Script Web App URL from Step 1 (server-side only)
 5. Click **Deploy**
 
 Vercel will build and deploy your app. You will get a URL like `https://minimart-pos.vercel.app`.
@@ -134,6 +135,7 @@ When you update `gas/Code.gs`:
 ## Step 6: Testing Camera Scanning + PWA Install
 
 ### On Android:
+
 1. Open `https://your-app.vercel.app` in Chrome
 2. Grant camera permission when prompted
 3. Tap the **Scan** button to open the camera
@@ -142,6 +144,7 @@ When you update `gas/Code.gs`:
 6. Once installed, the app launches fullscreen like a native app
 
 ### On iOS:
+
 1. Open in Safari (not Chrome)
 2. Tap **Share** > **Add to Home Screen**
 3. Camera access works in standalone PWA mode on iOS 16.4+
@@ -168,6 +171,7 @@ When you update `gas/Code.gs`:
 ## When to Migrate to Supabase
 
 Consider migrating if:
+
 - You need sub-second API response times
 - You want real-time inventory sync across multiple devices
 - You need proper relational queries and reporting
@@ -178,9 +182,9 @@ For a single-location shop with <500 transactions/day, Apps Script is usually su
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `VITE_GAS_URL` | Google Apps Script Web App URL |
+| Variable  | Description                                             |
+| --------- | ------------------------------------------------------- |
+| `GAS_URL` | Google Apps Script Web App URL used by the Vercel proxy |
 
 ## License
 
