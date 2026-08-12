@@ -7,15 +7,18 @@
 1. Create a Google Sheet with tabs: `Products`, `Sales`, `SaleItems`, `Users`
 2. Go to [script.google.com](https://script.google.com/)
 3. Create a new project
-4. Paste `gas/Code.gs` into the editor
+4. Paste `gas/Code.gs` into the editor. Enable **Show "appsscript.json" manifest file in editor** in Project Settings and replace that manifest with `gas/appsscript.json`.
 5. Update `SHEET_ID` in the code with your Sheet ID
 
 ### First-Run Authorization
 
-On first execution, Apps Script will prompt for permissions. Grant:
+Select `authorizeServices`, click **Run**, and grant the deployment-owner account these permissions:
 
 - **Google Drive**: `https://www.googleapis.com/auth/drive`
 - **Google Sheets**: `https://www.googleapis.com/auth/spreadsheets`
+- **External requests**: `https://www.googleapis.com/auth/script.external_request`
+
+If Google login reports that `UrlFetchApp.fetch` is not permitted, run `authorizeServices` again and accept every consent prompt, then deploy a **New version**. The function must be authorized by the same account selected by **Execute as: Me**.
 
 ### Deploy
 

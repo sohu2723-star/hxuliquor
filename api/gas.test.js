@@ -66,3 +66,26 @@ test("forwards an allowed request and returns parsed JSON", async (context) => {
   assert.equal(response.headers["Cache-Control"], "no-store");
   assert.deepEqual(response.body, { success: true, user: { id: "1" } });
 });
+
+test("returns a useful message for a non-JSON Apps Script error", async (context) => {
+  const originalFetch = globalThis.fetch;
+  const originalUrl = process.env.GAS_URL;
+  context.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalUrl === undefined) delete process.env.GAS_URL;
+    else process.env.GAS_URL = originalUrl;
+  });
+
+  process.env.GAS_URL = "https://script.google.com/macros/s/deployment/exec";
+  globalThis.fetch = async () =>
+    new Response("<html>Sign in</html>", { status: 403 });
+
+  const response = createResponse();
+  await handler(
+    { method: "POST", query: { action: "googleLogin" }, body: "{}" },
+    response,
+  );
+
+  assert.equal(response.statusCode, 502);
+  assert.match(response.body.message, /deployment access and authorization/);
+});

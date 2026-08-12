@@ -53,9 +53,18 @@ export default async function handler(request, response) {
     const text = await upstream.text();
 
     if (!upstream.ok) {
+      let upstreamMessage;
+      try {
+        upstreamMessage = JSON.parse(text)?.message;
+      } catch {
+        // Google commonly returns an HTML sign-in/error page for a deployment
+        // whose access or execution identity is configured incorrectly.
+      }
       return response.status(502).json({
         success: false,
-        message: `Apps Script returned HTTP ${upstream.status}`,
+        message:
+          upstreamMessage ||
+          `Apps Script returned HTTP ${upstream.status}. Check the web app deployment access and authorization.`,
       });
     }
 
@@ -65,7 +74,8 @@ export default async function handler(request, response) {
     } catch {
       return response.status(502).json({
         success: false,
-        message: "Apps Script returned an invalid response",
+        message:
+          "Apps Script returned a non-JSON response. Check that GAS_URL is the deployed /exec URL and the web app access is set to Anyone.",
       });
     }
 

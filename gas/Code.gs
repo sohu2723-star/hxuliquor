@@ -9,6 +9,20 @@ const ss = SpreadsheetApp.openById(SHEET_ID);
 // The frontend reaches this web app through its same-origin Vercel proxy because
 // Apps Script ContentService responses cannot set arbitrary CORS headers.
 
+/**
+ * Run this function once from the Apps Script editor as the deployment owner.
+ * It deliberately touches every authorized service so Google displays the
+ * Drive, Sheets, and external-request consent prompts before the web app runs.
+ */
+function authorizeServices() {
+  SpreadsheetApp.openById(SHEET_ID).getName();
+  DriveApp.getRootFolder().getName();
+  UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=authorization-check', {
+    muteHttpExceptions: true
+  });
+  console.log('Required services are authorized. Redeploy the web app now.');
+}
+
 function doGet(e) {
   return handleRequest(e);
 }

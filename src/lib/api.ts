@@ -19,7 +19,14 @@ async function gasFetch(action: string, payload?: Json): Promise<Json> {
   })
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    let message = `HTTP ${response.status}: ${response.statusText}`
+    try {
+      const error = await response.json()
+      if (typeof error?.message === 'string') message = error.message
+    } catch {
+      // Keep the HTTP fallback when the proxy did not return JSON.
+    }
+    throw new Error(message)
   }
 
   const data = await response.json()

@@ -66,18 +66,20 @@ minimart-pos/
 
 1. Create a new Google Sheet with 4 tabs: `Products`, `Sales`, `SaleItems`, `Users`
 2. Go to [script.google.com](https://script.google.com/) and create a new project
-3. Delete any default code and paste the contents of `gas/Code.gs`
+3. Delete any default code and paste the contents of `gas/Code.gs`. In **Project Settings**, enable **Show "appsscript.json" manifest file in editor**, then replace it with `gas/appsscript.json`.
 4. Update `SHEET_ID` at the top of `Code.gs` with your Google Sheet ID (from the URL)
-5. On first run, you will be prompted to authorize. Grant the permissions:
+5. Select `authorizeServices` in the function menu and click **Run**. Sign in as the account that will own the deployment and grant the permissions:
    - **Google Drive**: `https://www.googleapis.com/auth/drive` (needed for image uploads)
    - **Google Sheets**: `https://www.googleapis.com/auth/spreadsheets` (to read/write data)
-   - **Basic**: `https://www.googleapis.com/auth/script.external_request` (if making external requests)
+   - **External requests**: `https://www.googleapis.com/auth/script.external_request` (required to validate Google ID tokens)
 6. Click **Deploy** > **New deployment**
 7. Select type: **Web app**
 8. Set **Execute as**: **Me**
 9. Set **Who has access**: **Anyone**
 10. Click **Deploy** and copy the Web App URL
 11. Keep this URL for the next step
+
+> **Google login permission error (မြန်မာ):** `You do not have permission to call UrlFetchApp.fetch` ဟုပြပါက Apps Script editor ထဲတွင် deployment ပိုင်ရှင် account ဖြင့် `authorizeServices` ကို တစ်ကြိမ် **Run** လုပ်ပြီး permission အားလုံးကို **Allow** နှိပ်ပါ။ ထို့နောက် **Deploy → Manage deployments → Edit → New version → Deploy** လုပ်ပါ။ `GAS_URL` သည် `/exec` ဖြင့်ဆုံးသော URL ဖြစ်ရမည်။ Google button ၏ Feature Policy/CSP စာတန်းများသည် Firefox ကပြသော Google iframe warnings ဖြစ်ပြီး login ပျက်ရသည့်အဓိကအကြောင်းမဟုတ်ပါ။
 
 ### Google Apps Script Permissions
 
