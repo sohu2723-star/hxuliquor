@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import POS from './pages/POS'
 import AdminProducts from './pages/AdminProducts'
 import AdminEmployees from './pages/AdminEmployees'
+import AdminDashboard from './pages/AdminDashboard'
 
 function ProtectedRoute({ children, adminOnly = false }: { children: React.JSX.Element; adminOnly?: boolean }) {
   const { user, isLoading } = useAuth()
@@ -31,6 +32,10 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route
+        path="/admin/dashboard"
+        element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>}
+      />
       <Route
         path="/admin/employees"
         element={<ProtectedRoute adminOnly><AdminEmployees /></ProtectedRoute>}

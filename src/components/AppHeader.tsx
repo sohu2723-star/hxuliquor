@@ -17,6 +17,7 @@ export default function AppHeader() {
         <Link className={linkClass('/pos')} to="/pos">Scan / Sale</Link>
         {user?.role === 'admin' && <Link className={linkClass('/admin/products')} to="/admin/products">Products</Link>}
         {user?.role === 'admin' && <Link className={linkClass('/admin/employees')} to="/admin/employees">Employees</Link>}
+        {user?.role === 'admin' && <Link className={linkClass('/admin/dashboard')} to="/admin/dashboard">Income</Link>}
         <button onClick={logout} className="px-3 py-2 text-sm text-red-700">Logout</button>
       </div>
     </header>

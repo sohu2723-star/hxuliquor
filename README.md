@@ -169,6 +169,8 @@ When you update `gas/Code.gs`:
 - **Tablet scanning:** Tap **Tablet Camera ဖြင့် Barcode Scan ဖတ်မည်**, allow camera access, and hold the product barcode inside the camera frame. The rear (`environment`) camera is requested automatically. If video does not appear, allow Camera under the browser's site settings and reload the page.
 - If the tablet has multiple cameras, choose the front or rear camera from the scanner camera list. The scanner recognizes QR, EAN-13/EAN-8, UPC-A/UPC-E, Code 128/39, ITF, Codabar, and Data Matrix codes.
 - Product data is cached on the tablet for five minutes so the POS list and product search reopen immediately. Adding, editing, or deleting a product clears this cache automatically; **Retry** forces a fresh download.
+- Products without codes can be sold by tapping their product card. For several unique codes belonging to one product, save them comma-separated; when codes share a stable prefix, save that prefix with a trailing `*` (for example `ABC123*`). Do not use a wildcard unless that prefix uniquely identifies the product.
+- Every successful POS scan beeps and adds one unit; scanning the same product again increases its quantity. Use `−`, `+`, or `×` in the cart to correct/remove items before checkout. Checkout deducts stock and feeds the admin **Income** daily/monthly revenue, estimated profit, and low-stock report.
 
 ## Known Apps Script Limitations
 

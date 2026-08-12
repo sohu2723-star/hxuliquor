@@ -86,6 +86,8 @@ export type SaleItem = {
   quantity: number
   unitPrice: number
   subtotal: number
+  unitCost: number
+  profit: number
 }
 
 export type Sale = {
@@ -173,6 +175,7 @@ export const api = {
     paymentMethod: string
   }): Promise<Sale> {
     const data = await gasFetch('createSale', payload)
+    clearProductCache()
     return data.sale as Sale
   },
 

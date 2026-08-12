@@ -52,7 +52,9 @@ export default function Scanner({ onScan }: ScannerProps) {
       scannerRef.current = scanner
       await scanner.start(
         selected,
-        { fps: 20, qrbox: (width, height) => ({ width: Math.min(width * .85, 360), height: Math.min(height * .55, 220) }), aspectRatio: 1.333 },
+        // Scan the complete video instead of a fixed qrbox. This catches large
+        // QR codes and barcodes even when they are not perfectly centered.
+        { fps: 24, aspectRatio: 1.333 },
         (rawCode) => {
           const code = rawCode.trim()
           const now = Date.now()
@@ -84,7 +86,10 @@ export default function Scanner({ onScan }: ScannerProps) {
       <button type="button" onClick={() => void stopScanning()} className="bg-red-600 text-white py-2 px-4 rounded-md">Camera ပိတ်မည်</button>
     </div>}
     {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>}
-    {isScanning && <p className="my-2 text-sm text-center text-gray-600">Front / Back camera ရွေးပြီး Barcode သို့ QR ကို ဘောင်ထဲထားပါ</p>}
-    <div id={readerId} className={`overflow-hidden rounded-lg bg-black ${isScanning ? 'min-h-64' : 'hidden'}`} />
+    {isScanning && <p className="my-2 text-sm text-center text-gray-600">Code ကို camera မြင်ကွင်းထဲဝင်ရုံပါပဲ—ဘောင်အလယ်တည့်ရန် မလိုပါ</p>}
+    <div className={`relative overflow-hidden rounded-lg bg-black ${isScanning ? 'min-h-64' : 'hidden'}`}>
+      <div id={readerId} />
+      <div className="pointer-events-none absolute inset-3 rounded-xl border-2 border-green-400/80 scanner-frame" />
+    </div>
   </div>
 }

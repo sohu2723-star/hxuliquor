@@ -95,7 +95,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Barcode
+                Barcode / QR codes
               </label>
               <div className="flex gap-2">
                 <input
@@ -104,7 +104,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   value={formData.barcode}
                   onChange={handleChange}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Scan or type barcode"
+                  placeholder="Codes များလျှင် comma ခြားထည့်ပါ"
                 />
                 <button
                   type="button"
@@ -119,6 +119,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   <Scanner onScan={handleScan} />
                 </div>
               )}
+              <p className="mt-1 text-xs text-gray-500">QR မတူလျှင် code အားလုံးကို comma ခြားထည့်ပါ။ အစပိုင်းတူပြီး အဆုံးသာပြောင်းလျှင် တူသောအစနောက်တွင် * ထည့်နိုင်သည် (ဥပမာ ABC123*)။ Code မရှိလျှင် ကွက်လပ်ထားပြီး POS product ပုံကိုနှိပ်ရောင်းနိုင်သည်။</p>
             </div>
 
             <div>

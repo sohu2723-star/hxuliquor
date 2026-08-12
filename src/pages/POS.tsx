@@ -75,10 +75,15 @@ export default function POS() {
   }
 
   const handleScan = (code: string) => {
-    const product = products.find((p) => p.barcode === code)
+    const product = products.find((p) => p.barcode.split(/[,\n]/).some((value) => {
+      const savedCode = value.trim()
+      return savedCode.endsWith('*') ? code.startsWith(savedCode.slice(0, -1)) : savedCode === code
+    }))
     if (product) {
+      playScanSound(true)
       addToCart(product)
     } else {
+      playScanSound(false)
       showToast(`No product found for barcode: ${code}`, 'error')
     }
   }
@@ -128,6 +133,11 @@ export default function POS() {
   return (
     <div className="min-h-screen bg-gray-100">
       <AppHeader />
+      {products.some((product) => product.stockQty <= product.lowStockThreshold) && (
+        <div className="bg-red-50 border-b border-red-200 text-red-800 px-4 py-2 text-sm font-medium">
+          ⚠️ ကုန်တော့မည့်ပစ္စည်း {products.filter((product) => product.stockQty <= product.lowStockThreshold).length} မျိုးရှိသည်။ Admin Income dashboard တွင်ကြည့်ပါ။
+        </div>
+      )}
       {toast && (
         <div
           className={`fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg z-50 ${
@@ -305,4 +315,20 @@ export default function POS() {
       )}
     </div>
   )
+}
+
+function playScanSound(success: boolean) {
+  try {
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioContextClass) return
+    const context = new AudioContextClass()
+    const oscillator = context.createOscillator()
+    const gain = context.createGain()
+    oscillator.frequency.value = success ? 1050 : 240
+    gain.gain.setValueAtTime(.16, context.currentTime)
+    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + (success ? .1 : .25))
+    oscillator.connect(gain); gain.connect(context.destination)
+    oscillator.start(); oscillator.stop(context.currentTime + (success ? .1 : .25))
+    oscillator.onended = () => void context.close()
+  } catch { /* sound is optional when the browser blocks audio */ }
 }

@@ -97,8 +97,13 @@ function initSheets() {
     'id', 'cashierId', 'cashierName', 'totalAmount', 'paymentMethod', 'ageVerified', 'createdAt'
   ]);
   setupSheet('SaleItems', [
-    'id', 'saleId', 'productId', 'productName', 'quantity', 'unitPrice', 'subtotal'
+    'id', 'saleId', 'productId', 'productName', 'quantity', 'unitPrice', 'subtotal', 'unitCost', 'profit'
   ]);
+  const saleItems = ss.getSheetByName('SaleItems');
+  const existingHeaders = saleItems.getRange(1, 1, 1, saleItems.getLastColumn()).getValues()[0];
+  ['unitCost', 'profit'].forEach(header => {
+    if (!existingHeaders.includes(header)) saleItems.getRange(1, saleItems.getLastColumn() + 1).setValue(header);
+  });
   setupSheet('Users', [
     'id', 'name', 'email', 'passwordHash', 'role', 'createdAt'
   ]);
@@ -148,7 +153,11 @@ function getProducts() {
 
 function getProductByBarcode(barcode) {
   const products = getProducts();
-  return products.find(p => p.barcode == barcode) || null;
+  const scanned = String(barcode).trim();
+  return products.find(p => String(p.barcode).split(/[,\n]/).some(code => {
+    const saved = code.trim();
+    return saved.endsWith('*') ? scanned.startsWith(saved.slice(0, -1)) : saved === scanned;
+  })) || null;
 }
 
 function searchProducts(query) {
@@ -175,10 +184,10 @@ function getSales(startDate, endDate) {
 
   let filtered = sales;
   if (startDate) {
-    filtered = filtered.filter(s => s.createdAt >= startDate);
+    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), Session.getScriptTimeZone(), 'yyyy-MM-dd') >= startDate);
   }
   if (endDate) {
-    filtered = filtered.filter(s => s.createdAt <= endDate + ' 23:59:59');
+    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), Session.getScriptTimeZone(), 'yyyy-MM-dd') <= endDate);
   }
 
   return filtered.map(sale => ({
@@ -189,7 +198,9 @@ function getSales(startDate, endDate) {
       ...i,
       quantity: parseInt(i.quantity) || 0,
       unitPrice: parseFloat(i.unitPrice) || 0,
-      subtotal: parseFloat(i.subtotal) || 0
+      subtotal: parseFloat(i.subtotal) || 0,
+      unitCost: parseFloat(i.unitCost) || 0,
+      profit: parseFloat(i.profit) || 0
     }))
   }));
 }
@@ -361,6 +372,8 @@ function createSale(params) {
 
       const unitPrice = parseFloat(product.price) || 0;
       const subtotal = unitPrice * item.quantity;
+      const unitCost = parseFloat(product.costPrice) || 0;
+      const profit = (unitPrice - unitCost) * item.quantity;
       totalAmount += subtotal;
 
       saleItems.push({
@@ -370,7 +383,9 @@ function createSale(params) {
         productName: product.name,
         quantity: item.quantity,
         unitPrice: unitPrice,
-        subtotal: subtotal
+        subtotal: subtotal,
+        unitCost: unitCost,
+        profit: profit
       });
     }
 
@@ -396,7 +411,9 @@ function createSale(params) {
         item.productName,
         item.quantity,
         item.unitPrice,
-        item.subtotal
+        item.subtotal,
+        item.unitCost,
+        item.profit
       ]);
     });
 
