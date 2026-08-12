@@ -1,19 +1,12 @@
-const GAS_URL = import.meta.env.VITE_GAS_URL || ''
-
-if (!GAS_URL) {
-  console.warn('VITE_GAS_URL is not set')
-}
-
-// Apps Script CORS workaround:
-// Google Apps Script Web Apps have CORS limitations when called with custom headers
-// (like Content-Type: application/json). To avoid preflight OPTIONS requests,
-// we send JSON as a plain string in the body with Content-Type: text/plain.
-// The Apps Script backend reads e.postData.contents and parses JSON manually.
+// Keep Apps Script behind our same-origin serverless endpoint. Apps Script web-app
+// responses do not reliably include CORS headers, so browsers cannot call them
+// directly even when the request itself does not trigger a preflight.
+const API_URL = '/api/gas'
 
 type Json = Record<string, unknown>
 
 async function gasFetch(action: string, payload?: Json): Promise<Json> {
-  const url = `${GAS_URL}?action=${encodeURIComponent(action)}`
+  const url = `${API_URL}?action=${encodeURIComponent(action)}`
 
   const body = payload ? JSON.stringify(payload) : undefined
 
@@ -26,7 +19,14 @@ async function gasFetch(action: string, payload?: Json): Promise<Json> {
   })
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    let message = `HTTP ${response.status}: ${response.statusText}`
+    try {
+      const error = await response.json()
+      if (typeof error?.message === 'string') message = error.message
+    } catch {
+      // Keep the HTTP fallback when the proxy did not return JSON.
+    }
+    throw new Error(message)
   }
 
   const data = await response.json()
@@ -112,6 +112,20 @@ export const api = {
   async googleLogin(idToken: string): Promise<User> {
     const data = await gasFetch('googleLogin', { idToken })
     return data.user as User
+  },
+
+  async getEmployees(): Promise<User[]> {
+    const data = await gasFetch('getEmployees')
+    return Array.isArray(data) ? data as User[] : []
+  },
+
+  async addEmployee(payload: { name: string; email: string }): Promise<User> {
+    const data = await gasFetch('addEmployee', payload)
+    return data.user as User
+  },
+
+  async deleteEmployee(id: string): Promise<void> {
+    await gasFetch('deleteEmployee', { id })
   },
 
   async createSale(payload: {
