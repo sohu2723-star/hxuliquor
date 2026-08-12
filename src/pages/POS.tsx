@@ -22,10 +22,10 @@ export default function POS() {
     loadProducts()
   }, [])
 
-  const loadProducts = async () => {
+  const loadProducts = async (forceRefresh = false) => {
     setIsLoading(true)
     try {
-      const all = await api.getProducts()
+      const all = await api.getProducts(forceRefresh)
       setProducts(all)
     } catch {
       showToast('Failed to load products', 'error')
@@ -206,7 +206,7 @@ export default function POS() {
               <div className="text-center py-8">
                 <p className="text-gray-500 mb-4">No products available</p>
                 <button
-                  onClick={loadProducts}
+                  onClick={() => loadProducts(true)}
                   className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
                 >
                   Retry

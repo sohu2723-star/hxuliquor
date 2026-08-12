@@ -5,6 +5,32 @@ const API_URL = '/api/gas'
 
 type Json = Record<string, unknown>
 
+const PRODUCT_CACHE_KEY = 'hxu-products-v1'
+const PRODUCT_CACHE_MS = 5 * 60 * 1000
+let productCache: { products: Product[]; savedAt: number } | null = null
+
+function readProductCache(): Product[] | null {
+  if (productCache && Date.now() - productCache.savedAt < PRODUCT_CACHE_MS) return productCache.products
+  try {
+    const stored = JSON.parse(localStorage.getItem(PRODUCT_CACHE_KEY) || 'null')
+    if (stored && Date.now() - stored.savedAt < PRODUCT_CACHE_MS && Array.isArray(stored.products)) {
+      productCache = stored
+      return stored.products
+    }
+  } catch { localStorage.removeItem(PRODUCT_CACHE_KEY) }
+  return null
+}
+
+function saveProductCache(products: Product[]) {
+  productCache = { products, savedAt: Date.now() }
+  try { localStorage.setItem(PRODUCT_CACHE_KEY, JSON.stringify(productCache)) } catch { /* storage may be full */ }
+}
+
+function clearProductCache() {
+  productCache = null
+  try { localStorage.removeItem(PRODUCT_CACHE_KEY) } catch { /* storage unavailable */ }
+}
+
 async function gasFetch(action: string, payload?: Json): Promise<Json> {
   const url = `${API_URL}?action=${encodeURIComponent(action)}`
 
@@ -81,9 +107,15 @@ export type User = {
 }
 
 export const api = {
-  async getProducts(): Promise<Product[]> {
+  async getProducts(forceRefresh = false): Promise<Product[]> {
+    if (!forceRefresh) {
+      const cached = readProductCache()
+      if (cached) return cached
+    }
     const data = await gasFetch('getProducts')
-    return Array.isArray(data) ? data : []
+    const products = Array.isArray(data) ? data as Product[] : []
+    saveProductCache(products)
+    return products
   },
 
   async getProductByBarcode(barcode: string): Promise<Product | null> {
@@ -92,6 +124,11 @@ export const api = {
   },
 
   async searchProducts(query: string): Promise<Product[]> {
+    const cached = readProductCache()
+    if (cached) {
+      const normalized = query.trim().toLowerCase()
+      return cached.filter((product) => product.name.toLowerCase().includes(normalized) || product.category.toLowerCase().includes(normalized) || product.barcode.includes(normalized))
+    }
     const data = await gasFetch('searchProducts', { query })
     return Array.isArray(data) ? data : []
   },
@@ -152,6 +189,7 @@ export const api = {
     imageFileName?: string
   }): Promise<Product> {
     const data = await gasFetch('addProduct', payload)
+    clearProductCache()
     return data.product as Product
   },
 
@@ -169,9 +207,11 @@ export const api = {
     imageFileName?: string
   }): Promise<void> {
     await gasFetch('updateProduct', payload)
+    clearProductCache()
   },
 
   async deleteProduct(id: string): Promise<void> {
     await gasFetch('deleteProduct', { id })
+    clearProductCache()
   },
 }

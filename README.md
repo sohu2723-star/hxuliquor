@@ -167,6 +167,8 @@ When you update `gas/Code.gs`:
 - **Create an employee:** Open **Employees**, enter the employee's name and exact Google email, then choose **Add Employee**.
 - **Employee:** Sign in with the Google account that the admin registered. Employees are sent to **Scan / Sale** and cannot open product or employee management pages.
 - **Tablet scanning:** Tap **Tablet Camera ဖြင့် Barcode Scan ဖတ်မည်**, allow camera access, and hold the product barcode inside the camera frame. The rear (`environment`) camera is requested automatically. If video does not appear, allow Camera under the browser's site settings and reload the page.
+- If the tablet has multiple cameras, choose the front or rear camera from the scanner camera list. The scanner recognizes QR, EAN-13/EAN-8, UPC-A/UPC-E, Code 128/39, ITF, Codabar, and Data Matrix codes.
+- Product data is cached on the tablet for five minutes so the POS list and product search reopen immediately. Adding, editing, or deleting a product clears this cache automatically; **Retry** forces a fresh download.
 
 ## Known Apps Script Limitations
 
