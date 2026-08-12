@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes scannerPulse {
+  0%, 100% { transform: scale(.97); opacity: .55; }
+  50% { transform: scale(1); opacity: 1; }
+}
+.scanner-frame { animation: scannerPulse 1.2s ease-in-out infinite; }
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
