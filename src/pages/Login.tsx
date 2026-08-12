@@ -43,7 +43,7 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              placeholder="admin@shop.com"
+              placeholder="cashier@hxu-liquor.com"
             />
           </div>
 
@@ -76,10 +76,6 @@ export default function Login() {
             {isSubmitting ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-
-        <p className="mt-6 text-center text-xs text-gray-400">
-          Demo: admin@shop.com / admin123
-        </p>
       </div>
     </div>
   )
