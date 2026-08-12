@@ -53,6 +53,17 @@ export default defineConfig({
                 maxAgeSeconds: 3600
               }
             }
+          },
+          {
+            urlPattern: /\.js$/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'js-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 86400
+              }
+            }
           }
         ]
       }
