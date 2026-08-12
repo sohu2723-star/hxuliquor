@@ -143,7 +143,6 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
-                required
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="">Select category</option>
@@ -155,6 +154,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 type="text"
                 placeholder="Or type new category"
                 value={formData.category}
+                required
                 onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
                 className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               />

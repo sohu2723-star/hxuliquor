@@ -6,11 +6,22 @@ const SHEET_ID = '1o0a1cRxDdk0dyfysq4jx3HL6OqNWT75iCZEBKygOoPY'; // Replace with
 const ADMIN_EMAIL = 'copy2723@gmail.com'; // Only this Google email can login
 const ss = SpreadsheetApp.openById(SHEET_ID);
 
-// CORS note:
-// Apps Script Web Apps have CORS limitations when called with custom headers
-// (like Content-Type: application/json). To avoid preflight OPTIONS requests,
-// the frontend sends JSON as a plain string in the body with Content-Type: text/plain.
-// This backend reads e.postData.contents and parses JSON manually.
+// The frontend reaches this web app through its same-origin Vercel proxy because
+// Apps Script ContentService responses cannot set arbitrary CORS headers.
+
+/**
+ * Run this function once from the Apps Script editor as the deployment owner.
+ * It deliberately touches every authorized service so Google displays the
+ * Drive, Sheets, and external-request consent prompts before the web app runs.
+ */
+function authorizeServices() {
+  SpreadsheetApp.openById(SHEET_ID).getName();
+  DriveApp.getRootFolder().getName();
+  UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=authorization-check', {
+    muteHttpExceptions: true
+  });
+  console.log('Required services are authorized. Redeploy the web app now.');
+}
 
 function doGet(e) {
   return handleRequest(e);
@@ -20,21 +31,9 @@ function doPost(e) {
   return handleRequest(e);
 }
 
-function doOptions(e) {
-  const output = ContentService.createTextOutput('');
-  output.setMimeType(ContentService.MimeType.JSON);
-  output.setHeader('Access-Control-Allow-Origin', '*');
-  output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  return output;
-}
-
 function jsonResponse(data) {
   const output = ContentService.createTextOutput(JSON.stringify(data));
   output.setMimeType(ContentService.MimeType.JSON);
-  output.setHeader('Access-Control-Allow-Origin', '*');
-  output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   return output;
 }
 
@@ -60,6 +59,9 @@ function handleRequest(e) {
       case 'getSales': result = getSales(params.startDate, params.endDate); break;
       case 'login': result = login(params.email, params.password); break;
       case 'googleLogin': result = googleLogin(params.idToken); break;
+      case 'getEmployees': result = getEmployees(); break;
+      case 'addEmployee': result = addEmployee(params); break;
+      case 'deleteEmployee': result = deleteEmployee(params.id); break;
       case 'createSale': result = createSale(params); break;
       case 'addProduct': result = addProduct(params); break;
       case 'updateProduct': result = updateProduct(params); break;
@@ -222,13 +224,9 @@ function googleLogin(idToken) {
       return { success: false, message: 'Invalid Google token' };
     }
 
-    const email = data.email;
+    const email = String(data.email || '').trim().toLowerCase();
     if (!email) {
       return { success: false, message: 'No email found in Google token' };
-    }
-
-    if (email !== ADMIN_EMAIL) {
-      return { success: false, message: 'Unauthorized: only admin can login' };
     }
 
     initSheets();
@@ -236,7 +234,7 @@ function googleLogin(idToken) {
     const users = sheetToObjects(usersSheet);
     let user = users.find(u => u.email === email);
 
-    if (!user) {
+    if (!user && email === ADMIN_EMAIL.toLowerCase()) {
       const id = generateId();
       const name = data.name || email.split('@')[0];
       const newUser = {
@@ -258,6 +256,10 @@ function googleLogin(idToken) {
       user = newUser;
     }
 
+    if (!user) {
+      return { success: false, message: 'Employee account မရှိသေးပါ။ Admin ကို ဒီ Google email ထည့်ခိုင်းပါ။' };
+    }
+
     return {
       success: true,
       user: {
@@ -270,6 +272,34 @@ function googleLogin(idToken) {
   } catch (err) {
     return { success: false, message: 'Google login failed: ' + err.toString() };
   }
+}
+
+function getEmployees() {
+  initSheets();
+  return sheetToObjects(ss.getSheetByName('Users')).map(user => ({
+    id: user.id, name: user.name, email: user.email, role: user.role
+  }));
+}
+
+function addEmployee(params) {
+  initSheets();
+  const sheet = ss.getSheetByName('Users');
+  const email = String(params.email || '').trim().toLowerCase();
+  if (!email || !params.name) return { success: false, message: 'Name and Google email are required' };
+  const users = sheetToObjects(sheet);
+  if (users.some(user => String(user.email).toLowerCase() === email)) return { success: false, message: 'This email already exists' };
+  const user = { id: generateId(), name: params.name, email, role: 'employee' };
+  sheet.appendRow([user.id, user.name, user.email, '', user.role, new Date().toISOString()]);
+  return { success: true, user };
+}
+
+function deleteEmployee(id) {
+  initSheets();
+  const sheet = ss.getSheetByName('Users');
+  const users = sheetToObjects(sheet);
+  const index = users.findIndex(user => user.id === id && user.role !== 'admin');
+  if (index >= 0) sheet.deleteRow(index + 2);
+  return { success: true };
 }
 
 function uploadImageToDrive(base64Data, fileName) {

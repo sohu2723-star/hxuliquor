@@ -66,12 +66,12 @@ minimart-pos/
 
 1. Create a new Google Sheet with 4 tabs: `Products`, `Sales`, `SaleItems`, `Users`
 2. Go to [script.google.com](https://script.google.com/) and create a new project
-3. Delete any default code and paste the contents of `gas/Code.gs`
+3. Delete any default code and paste the contents of `gas/Code.gs`. In **Project Settings**, enable **Show "appsscript.json" manifest file in editor**, then replace it with `gas/appsscript.json`.
 4. Update `SHEET_ID` at the top of `Code.gs` with your Google Sheet ID (from the URL)
-5. On first run, you will be prompted to authorize. Grant the permissions:
+5. Select `authorizeServices` in the function menu and click **Run**. Sign in as the account that will own the deployment and grant the permissions:
    - **Google Drive**: `https://www.googleapis.com/auth/drive` (needed for image uploads)
    - **Google Sheets**: `https://www.googleapis.com/auth/spreadsheets` (to read/write data)
-   - **Basic**: `https://www.googleapis.com/auth/script.external_request` (if making external requests)
+   - **External requests**: `https://www.googleapis.com/auth/script.external_request` (required to validate Google ID tokens)
 6. Click **Deploy** > **New deployment**
 7. Select type: **Web app**
 8. Set **Execute as**: **Me**
@@ -79,9 +79,12 @@ minimart-pos/
 10. Click **Deploy** and copy the Web App URL
 11. Keep this URL for the next step
 
+> **Google login permission error (မြန်မာ):** `You do not have permission to call UrlFetchApp.fetch` ဟုပြပါက Apps Script editor ထဲတွင် deployment ပိုင်ရှင် account ဖြင့် `authorizeServices` ကို တစ်ကြိမ် **Run** လုပ်ပြီး permission အားလုံးကို **Allow** နှိပ်ပါ။ ထို့နောက် **Deploy → Manage deployments → Edit → New version → Deploy** လုပ်ပါ။ `GAS_URL` သည် `/exec` ဖြင့်ဆုံးသော URL ဖြစ်ရမည်။ Google button ၏ Feature Policy/CSP စာတန်းများသည် Firefox ကပြသော Google iframe warnings ဖြစ်ပြီး login ပျက်ရသည့်အဓိကအကြောင်းမဟုတ်ပါ။
+
 ### Google Apps Script Permissions
 
 The script requires these OAuth scopes:
+
 - `https://www.googleapis.com/auth/drive` — Create folders and upload product images to Google Drive
 - `https://www.googleapis.com/auth/spreadsheets` — Read/write product, sales, and user data
 - `https://www.googleapis.com/auth/script.external_request` — Standard Apps Script scope
@@ -92,7 +95,7 @@ The script requires these OAuth scopes:
 cd minimart-pos
 npm install
 cp .env.example .env
-# Edit .env and set VITE_GAS_URL to your Apps Script Web App URL
+# Edit .env and set GAS_URL to your Apps Script Web App URL
 npm run dev
 ```
 
@@ -114,7 +117,7 @@ git push -u origin main
 2. Click **Add New...** > **Project**
 3. Import your `minimart-pos` GitHub repository
 4. Under **Environment Variables**, add:
-   - `VITE_GAS_URL` = your Apps Script Web App URL from Step 1
+   - `GAS_URL` = your Apps Script Web App URL from Step 1 (server-side only)
 5. Click **Deploy**
 
 Vercel will build and deploy your app. You will get a URL like `https://minimart-pos.vercel.app`.
@@ -134,6 +137,7 @@ When you update `gas/Code.gs`:
 ## Step 6: Testing Camera Scanning + PWA Install
 
 ### On Android:
+
 1. Open `https://your-app.vercel.app` in Chrome
 2. Grant camera permission when prompted
 3. Tap the **Scan** button to open the camera
@@ -142,6 +146,7 @@ When you update `gas/Code.gs`:
 6. Once installed, the app launches fullscreen like a native app
 
 ### On iOS:
+
 1. Open in Safari (not Chrome)
 2. Tap **Share** > **Add to Home Screen**
 3. Camera access works in standalone PWA mode on iOS 16.4+
@@ -156,6 +161,15 @@ When you update `gas/Code.gs`:
 5. **Checkout**: Select payment method, confirm age check for restricted items, complete sale
 6. **Verify**: Check the `Sales` and `SaleItems` sheets for the transaction
 
+### Admin and Employee workflow
+
+- **Admin:** Sign in with `ADMIN_EMAIL`, open **Products**, choose **Add Product**, and use the barcode field's **Scan** button to register a product with the tablet camera. Admin can also use **Scan / Sale** to sell products.
+- **Create an employee:** Open **Employees**, enter the employee's name and exact Google email, then choose **Add Employee**.
+- **Employee:** Sign in with the Google account that the admin registered. Employees are sent to **Scan / Sale** and cannot open product or employee management pages.
+- **Tablet scanning:** Tap **Tablet Camera ဖြင့် Barcode Scan ဖတ်မည်**, allow camera access, and hold the product barcode inside the camera frame. The rear (`environment`) camera is requested automatically. If video does not appear, allow Camera under the browser's site settings and reload the page.
+- If the tablet has multiple cameras, choose the front or rear camera from the scanner camera list. The scanner recognizes QR, EAN-13/EAN-8, UPC-A/UPC-E, Code 128/39, ITF, Codabar, and Data Matrix codes.
+- Product data is cached on the tablet for five minutes so the POS list and product search reopen immediately. Adding, editing, or deleting a product clears this cache automatically; **Retry** forces a fresh download.
+
 ## Known Apps Script Limitations
 
 - **Execution Quotas**: Apps Script has daily quotas (90,000 calls/day for consumer accounts, 1,000,000 for Workspace). Monitor usage if the shop gets busy.
@@ -168,6 +182,7 @@ When you update `gas/Code.gs`:
 ## When to Migrate to Supabase
 
 Consider migrating if:
+
 - You need sub-second API response times
 - You want real-time inventory sync across multiple devices
 - You need proper relational queries and reporting
@@ -178,9 +193,9 @@ For a single-location shop with <500 transactions/day, Apps Script is usually su
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `VITE_GAS_URL` | Google Apps Script Web App URL |
+| Variable  | Description                                             |
+| --------- | ------------------------------------------------------- |
+| `GAS_URL` | Google Apps Script Web App URL used by the Vercel proxy |
 
 ## License
 

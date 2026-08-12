@@ -5,6 +5,7 @@ import Checkout from '../components/Checkout'
 import type { Product } from '../lib/api'
 import { api } from '../lib/api'
 import { formatCurrency } from '../lib/format'
+import AppHeader from '../components/AppHeader'
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
@@ -21,10 +22,10 @@ export default function POS() {
     loadProducts()
   }, [])
 
-  const loadProducts = async () => {
+  const loadProducts = async (forceRefresh = false) => {
     setIsLoading(true)
     try {
-      const all = await api.getProducts()
+      const all = await api.getProducts(forceRefresh)
       setProducts(all)
     } catch {
       showToast('Failed to load products', 'error')
@@ -126,6 +127,7 @@ export default function POS() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <AppHeader />
       {toast && (
         <div
           className={`fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg z-50 ${
@@ -139,7 +141,8 @@ export default function POS() {
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-6">
           <div className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-lg font-semibold mb-3">Scan Product</h2>
+            <h2 className="text-lg font-semibold">Scan Product / Barcode ဖတ်ရန်</h2>
+            <p className="text-sm text-gray-500 mb-3">Admin နှင့် Employee နှစ်ဦးလုံး အရောင်းအတွက် tablet နောက် camera ဖြင့် scan ဖတ်နိုင်သည်။</p>
             <Scanner onScan={handleScan} />
           </div>
 
@@ -203,7 +206,7 @@ export default function POS() {
               <div className="text-center py-8">
                 <p className="text-gray-500 mb-4">No products available</p>
                 <button
-                  onClick={loadProducts}
+                  onClick={() => loadProducts(true)}
                   className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
                 >
                   Retry
