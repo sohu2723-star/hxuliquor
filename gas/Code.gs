@@ -2,7 +2,7 @@
 // Tabs: Products, Sales, SaleItems, Users
 // Deploy as Web App: Execute as "Me", Who has access: "Anyone"
 
-const SHEET_ID = 'YOUR_SHEET_ID'; // Replace with your Sheet ID
+const SHEET_ID = '1o0a1cRxDdk0dyfysq4jx3HL6OqNWT75iCZEBKygOoPY'; // Replace with your Sheet ID
 const ss = SpreadsheetApp.openById(SHEET_ID);
 
 // CORS note:
