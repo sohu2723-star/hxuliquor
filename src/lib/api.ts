@@ -114,6 +114,11 @@ export const api = {
     return data.user as User
   },
 
+  async googleLogin(idToken: string): Promise<User> {
+    const data = await gasFetch('googleLogin', { idToken })
+    return data.user as User
+  },
+
   async createSale(payload: {
     cashierId: string
     cashierName: string

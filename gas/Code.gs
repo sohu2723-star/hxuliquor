@@ -40,6 +40,7 @@ function handleRequest(e) {
       case 'getCategories': result = getCategories(); break;
       case 'getSales': result = getSales(params.startDate, params.endDate); break;
       case 'login': result = login(params.email, params.password); break;
+      case 'googleLogin': result = googleLogin(params.idToken); break;
       case 'createSale': result = createSale(params); break;
       case 'addProduct': result = addProduct(params); break;
       case 'updateProduct': result = updateProduct(params); break;
@@ -192,6 +193,61 @@ function login(email, password) {
       role: user.role
     }
   };
+}
+
+function googleLogin(idToken) {
+  try {
+    const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken));
+    const data = JSON.parse(response.getContentText());
+
+    if (data.error_description) {
+      return { success: false, message: 'Invalid Google token' };
+    }
+
+    const email = data.email;
+    if (!email) {
+      return { success: false, message: 'No email found in Google token' };
+    }
+
+    initSheets();
+    const usersSheet = ss.getSheetByName('Users');
+    const users = sheetToObjects(usersSheet);
+    let user = users.find(u => u.email === email);
+
+    if (!user) {
+      const id = generateId();
+      const name = data.name || email.split('@')[0];
+      const newUser = {
+        id: id,
+        name: name,
+        email: email,
+        passwordHash: '',
+        role: 'cashier',
+        createdAt: new Date().toISOString()
+      };
+      usersSheet.appendRow([
+        newUser.id,
+        newUser.name,
+        newUser.email,
+        newUser.passwordHash,
+        newUser.role,
+        newUser.createdAt
+      ]);
+      user = newUser;
+    }
+
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    };
+  } catch (err) {
+    return { success: false, message: 'Google login failed: ' + err.toString() };
+  }
 }
 
 function uploadImageToDrive(base64Data, fileName) {
