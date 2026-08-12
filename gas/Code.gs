@@ -21,11 +21,19 @@ function doPost(e) {
 }
 
 function doOptions(e) {
-  return ContentService.createTextOutput('')
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeader('Access-Control-Allow-Origin', '*')
-    .setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  const output = HtmlService.createHtmlOutput('');
+  output.setMimeType(HtmlService.MimeType.JSON);
+  output.setHeader('Access-Control-Allow-Origin', '*');
+  output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  return output;
+}
+
+function jsonResponse(data) {
+  const output = HtmlService.createHtmlOutput(JSON.stringify(data));
+  output.setMimeType(HtmlService.MimeType.JSON);
+  output.setHeader('Access-Control-Allow-Origin', '*');
+  return output;
 }
 
 function handleRequest(e) {
@@ -57,15 +65,12 @@ function handleRequest(e) {
       default: result = { success: false, message: 'Unknown action' };
     }
 
-    return ContentService.createTextOutput(JSON.stringify(result))
-      .setMimeType(ContentService.MimeType.JSON)
-      .setHeader('Access-Control-Allow-Origin', '*');
+    return jsonResponse(result);
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({
+    return jsonResponse({
       success: false,
       message: err.toString()
-    })).setMimeType(ContentService.MimeType.JSON)
-      .setHeader('Access-Control-Allow-Origin', '*');
+    });
   }
 }
 
