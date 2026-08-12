@@ -21,8 +21,8 @@ function doPost(e) {
 }
 
 function doOptions(e) {
-  const output = HtmlService.createHtmlOutput('');
-  output.setMimeType(HtmlService.MimeType.JSON);
+  const output = ContentService.createTextOutput('');
+  output.setMimeType(ContentService.MimeType.JSON);
   output.setHeader('Access-Control-Allow-Origin', '*');
   output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -30,9 +30,11 @@ function doOptions(e) {
 }
 
 function jsonResponse(data) {
-  const output = HtmlService.createHtmlOutput(JSON.stringify(data));
-  output.setMimeType(HtmlService.MimeType.JSON);
+  const output = ContentService.createTextOutput(JSON.stringify(data));
+  output.setMimeType(ContentService.MimeType.JSON);
   output.setHeader('Access-Control-Allow-Origin', '*');
+  output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   return output;
 }
 
