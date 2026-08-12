@@ -1,4 +1,4 @@
-import type { Product } from '../../lib/api'
+import type { Product } from '../lib/api'
 
 interface CartProps {
   items: { product: Product; quantity: number }[]

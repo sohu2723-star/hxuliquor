@@ -1,4 +1,4 @@
-import type { Product } from '../../lib/api'
+import type { Product } from '../lib/api'
 
 interface ProductListProps {
   products: Product[]

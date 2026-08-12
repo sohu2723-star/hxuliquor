@@ -3,6 +3,7 @@ import Scanner from '../components/Scanner'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
 import type { Product } from '../lib/api'
+import { api } from '../lib/api'
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])

@@ -88,7 +88,7 @@ export const api = {
 
   async getProductByBarcode(barcode: string): Promise<Product | null> {
     const data = await gasFetch('getProductByBarcode', { barcode })
-    return data.product ?? null
+    return (data.product as Product | undefined) ?? null
   },
 
   async searchProducts(query: string): Promise<Product[]> {

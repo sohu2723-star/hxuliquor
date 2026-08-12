@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Scanner from './Scanner'
-import type { Product } from '../../lib/api'
+import type { Product } from '../lib/api'
 
 interface ProductFormProps {
   product: Product | null
