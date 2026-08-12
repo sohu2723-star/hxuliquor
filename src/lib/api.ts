@@ -114,6 +114,20 @@ export const api = {
     return data.user as User
   },
 
+  async getEmployees(): Promise<User[]> {
+    const data = await gasFetch('getEmployees')
+    return Array.isArray(data) ? data as User[] : []
+  },
+
+  async addEmployee(payload: { name: string; email: string }): Promise<User> {
+    const data = await gasFetch('addEmployee', payload)
+    return data.user as User
+  },
+
+  async deleteEmployee(id: string): Promise<void> {
+    await gasFetch('deleteEmployee', { id })
+  },
+
   async createSale(payload: {
     cashierId: string
     cashierName: string

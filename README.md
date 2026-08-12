@@ -161,6 +161,13 @@ When you update `gas/Code.gs`:
 5. **Checkout**: Select payment method, confirm age check for restricted items, complete sale
 6. **Verify**: Check the `Sales` and `SaleItems` sheets for the transaction
 
+### Admin and Employee workflow
+
+- **Admin:** Sign in with `ADMIN_EMAIL`, open **Products**, choose **Add Product**, and use the barcode field's **Scan** button to register a product with the tablet camera. Admin can also use **Scan / Sale** to sell products.
+- **Create an employee:** Open **Employees**, enter the employee's name and exact Google email, then choose **Add Employee**.
+- **Employee:** Sign in with the Google account that the admin registered. Employees are sent to **Scan / Sale** and cannot open product or employee management pages.
+- **Tablet scanning:** Tap **Tablet Camera ဖြင့် Barcode Scan ဖတ်မည်**, allow camera access, and hold the product barcode inside the camera frame. The rear (`environment`) camera is requested automatically. If video does not appear, allow Camera under the browser's site settings and reload the page.
+
 ## Known Apps Script Limitations
 
 - **Execution Quotas**: Apps Script has daily quotas (90,000 calls/day for consumer accounts, 1,000,000 for Workspace). Monitor usage if the shop gets busy.
