@@ -6,11 +6,22 @@ const SHEET_ID = '1o0a1cRxDdk0dyfysq4jx3HL6OqNWT75iCZEBKygOoPY'; // Replace with
 const ADMIN_EMAIL = 'copy2723@gmail.com'; // Only this Google email can login
 const ss = SpreadsheetApp.openById(SHEET_ID);
 
-// CORS note:
-// Apps Script Web Apps have CORS limitations when called with custom headers
-// (like Content-Type: application/json). To avoid preflight OPTIONS requests,
-// the frontend sends JSON as a plain string in the body with Content-Type: text/plain.
-// This backend reads e.postData.contents and parses JSON manually.
+// The frontend reaches this web app through its same-origin Vercel proxy because
+// Apps Script ContentService responses cannot set arbitrary CORS headers.
+
+/**
+ * Run this function once from the Apps Script editor as the deployment owner.
+ * It deliberately touches every authorized service so Google displays the
+ * Drive, Sheets, and external-request consent prompts before the web app runs.
+ */
+function authorizeServices() {
+  SpreadsheetApp.openById(SHEET_ID).getName();
+  DriveApp.getRootFolder().getName();
+  UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=authorization-check', {
+    muteHttpExceptions: true
+  });
+  console.log('Required services are authorized. Redeploy the web app now.');
+}
 
 function doGet(e) {
   return handleRequest(e);
@@ -20,21 +31,9 @@ function doPost(e) {
   return handleRequest(e);
 }
 
-function doOptions(e) {
-  const output = ContentService.createTextOutput('');
-  output.setMimeType(ContentService.MimeType.JSON);
-  output.setHeader('Access-Control-Allow-Origin', '*');
-  output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  return output;
-}
-
 function jsonResponse(data) {
   const output = ContentService.createTextOutput(JSON.stringify(data));
   output.setMimeType(ContentService.MimeType.JSON);
-  output.setHeader('Access-Control-Allow-Origin', '*');
-  output.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  output.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   return output;
 }
 
