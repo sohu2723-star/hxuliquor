@@ -4,7 +4,6 @@ import type { User } from '../lib/api'
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, password: string) => Promise<void>
   googleLogin: (idToken: string) => Promise<void>
   logout: () => void
   isLoading: boolean
@@ -28,12 +27,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false)
   }, [])
 
-  const login = async (email: string, password: string) => {
-    const userData = await api.login(email, password)
-    setUser(userData)
-    localStorage.setItem('minimart-pos-user', JSON.stringify(userData))
-  }
-
   const googleLogin = async (idToken: string) => {
     const userData = await api.googleLogin(idToken)
     setUser(userData)
@@ -46,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, googleLogin, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, googleLogin, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   )

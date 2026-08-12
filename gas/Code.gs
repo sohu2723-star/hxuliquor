@@ -3,6 +3,7 @@
 // Deploy as Web App: Execute as "Me", Who has access: "Anyone"
 
 const SHEET_ID = '1o0a1cRxDdk0dyfysq4jx3HL6OqNWT75iCZEBKygOoPY'; // Replace with your Sheet ID
+const ADMIN_EMAIL = 'copy2723@gmail.com'; // Only this Google email can login
 const ss = SpreadsheetApp.openById(SHEET_ID);
 
 // CORS note:
@@ -209,6 +210,10 @@ function googleLogin(idToken) {
       return { success: false, message: 'No email found in Google token' };
     }
 
+    if (email !== ADMIN_EMAIL) {
+      return { success: false, message: 'Unauthorized: only admin can login' };
+    }
+
     initSheets();
     const usersSheet = ss.getSheetByName('Users');
     const users = sheetToObjects(usersSheet);
@@ -222,7 +227,7 @@ function googleLogin(idToken) {
         name: name,
         email: email,
         passwordHash: '',
-        role: 'cashier',
+        role: 'admin',
         createdAt: new Date().toISOString()
       };
       usersSheet.appendRow([

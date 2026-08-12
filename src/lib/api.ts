@@ -109,11 +109,6 @@ export const api = {
     return Array.isArray(data) ? data : []
   },
 
-  async login(email: string, password: string): Promise<User> {
-    const data = await gasFetch('login', { email, password })
-    return data.user as User
-  },
-
   async googleLogin(idToken: string): Promise<User> {
     const data = await gasFetch('googleLogin', { idToken })
     return data.user as User
