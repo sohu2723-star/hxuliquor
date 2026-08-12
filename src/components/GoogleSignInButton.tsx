@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 
 declare global {
   interface Window {
@@ -21,8 +21,23 @@ interface GoogleSignInButtonProps {
 
 export default function GoogleSignInButton({ clientId, onSuccess, onError }: GoogleSignInButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null)
+  const [isScriptLoaded, setIsScriptLoaded] = useState(false)
 
   useEffect(() => {
+    const script = document.createElement('script')
+    script.src = 'https://accounts.google.com/gsi/client'
+    script.async = true
+    script.defer = true
+    script.onload = () => setIsScriptLoaded(true)
+    document.head.appendChild(script)
+
+    return () => {
+      document.head.removeChild(script)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isScriptLoaded) return
     if (!window.google?.accounts?.id || !buttonRef.current) return
 
     window.google.accounts.id.initialize({
@@ -41,19 +56,11 @@ export default function GoogleSignInButton({ clientId, onSuccess, onError }: Goo
       size: 'large',
       width: buttonRef.current.offsetWidth || 320,
     })
-  }, [clientId, onSuccess, onError])
+  }, [isScriptLoaded, clientId, onSuccess, onError])
 
-  useEffect(() => {
-    const script = document.createElement('script')
-    script.src = 'https://accounts.google.com/gsi/client'
-    script.async = true
-    script.defer = true
-    document.head.appendChild(script)
-
-    return () => {
-      document.head.removeChild(script)
-    }
-  }, [])
+  if (!isScriptLoaded) {
+    return <div className="flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
+  }
 
   return <div ref={buttonRef} className="flex justify-center" />
 }
