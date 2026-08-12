@@ -20,6 +20,14 @@ function doPost(e) {
   return handleRequest(e);
 }
 
+function doOptions(e) {
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader('Access-Control-Allow-Origin', '*')
+    .setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 function handleRequest(e) {
   try {
     const action = e.parameter.action;
@@ -50,12 +58,14 @@ function handleRequest(e) {
     }
 
     return ContentService.createTextOutput(JSON.stringify(result))
-      .setMimeType(ContentService.MimeType.JSON);
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeader('Access-Control-Allow-Origin', '*');
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({
       success: false,
       message: err.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
+    })).setMimeType(ContentService.MimeType.JSON)
+      .setHeader('Access-Control-Allow-Origin', '*');
   }
 }
 

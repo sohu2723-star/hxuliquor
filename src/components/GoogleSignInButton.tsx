@@ -21,32 +21,31 @@ interface GoogleSignInButtonProps {
 
 export default function GoogleSignInButton({ clientId, onSuccess, onError }: GoogleSignInButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null)
+  const onSuccessRef = useRef(onSuccess)
+  const onErrorRef = useRef(onError)
   const [isScriptLoaded, setIsScriptLoaded] = useState(false)
 
   useEffect(() => {
-    const script = document.createElement('script')
-    script.src = 'https://accounts.google.com/gsi/client'
-    script.async = true
-    script.defer = true
-    script.onload = () => setIsScriptLoaded(true)
-    document.head.appendChild(script)
-
-    return () => {
-      document.head.removeChild(script)
-    }
-  }, [])
+    onSuccessRef.current = onSuccess
+    onErrorRef.current = onError
+  })
 
   useEffect(() => {
     if (!isScriptLoaded) return
-    if (!window.google?.accounts?.id || !buttonRef.current) return
+    if (!buttonRef.current) return
+
+    if (!window.google?.accounts?.id) {
+      onErrorRef.current?.('Google Identity Services not loaded')
+      return
+    }
 
     window.google.accounts.id.initialize({
       client_id: clientId,
       callback: (response) => {
         if (response.credential) {
-          onSuccess(response.credential)
+          onSuccessRef.current(response.credential)
         } else {
-          onError?.('Google Sign-In failed')
+          onErrorRef.current?.('Google Sign-In failed')
         }
       },
     })
@@ -56,7 +55,21 @@ export default function GoogleSignInButton({ clientId, onSuccess, onError }: Goo
       size: 'large',
       width: buttonRef.current.offsetWidth || 320,
     })
-  }, [isScriptLoaded, clientId, onSuccess, onError])
+  }, [isScriptLoaded, clientId])
+
+  useEffect(() => {
+    const script = document.createElement('script')
+    script.src = 'https://accounts.google.com/gsi/client'
+    script.async = true
+    script.defer = true
+    script.onload = () => setIsScriptLoaded(true)
+    script.onerror = () => onError?.('Failed to load Google Sign-In script')
+    document.head.appendChild(script)
+
+    return () => {
+      document.head.removeChild(script)
+    }
+  }, [])
 
   if (!isScriptLoaded) {
     return <div className="flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
