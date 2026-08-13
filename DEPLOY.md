@@ -48,6 +48,8 @@ If Google login reports that `UrlFetchApp.fetch` is not permitted, run `authoriz
 5. Select **New version** and deploy
 6. The URL typically stays the same
 
+After deploying this version, open the Products page once. `initSheets()` will automatically repair older `Products`/`Users` column layouts, generate missing row IDs, and prevent barcode/name/price values from shifting into the wrong fields.
+
 ## Testing
 
 1. Open the deployed Vercel URL

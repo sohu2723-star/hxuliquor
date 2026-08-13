@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
-import Scanner from './Scanner'
+import { lazy, Suspense, useState, useEffect, useRef } from 'react'
 import type { Product } from '../lib/api'
+
+const Scanner = lazy(() => import('./Scanner'))
 
 interface ProductFormProps {
   product: Product | null
@@ -116,7 +117,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
               {isScanning && (
                 <div className="mt-2">
-                  <Scanner onScan={handleScan} />
+                  <Suspense fallback={<div className="h-12 animate-pulse bg-gray-200 rounded-md" />}><Scanner onScan={handleScan} /></Suspense>
                 </div>
               )}
               <p className="mt-1 text-xs text-gray-500">QR မတူလျှင် code အားလုံးကို comma ခြားထည့်ပါ။ အစပိုင်းတူပြီး အဆုံးသာပြောင်းလျှင် တူသောအစနောက်တွင် * ထည့်နိုင်သည် (ဥပမာ ABC123*)။ Code မရှိလျှင် ကွက်လပ်ထားပြီး POS product ပုံကိုနှိပ်ရောင်းနိုင်သည်။</p>

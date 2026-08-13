@@ -61,7 +61,7 @@ export default defineConfig(({ mode }) => {
             },
             {
               urlPattern: /\.js$/i,
-              handler: 'NetworkFirst',
+              handler: 'CacheFirst',
               options: {
                 cacheName: 'js-cache',
                 expiration: {

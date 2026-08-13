@@ -5,7 +5,7 @@ const API_URL = '/api/gas'
 
 type Json = Record<string, unknown>
 
-const PRODUCT_CACHE_KEY = 'hxu-products-v1'
+const PRODUCT_CACHE_KEY = 'hxu-products-v2'
 const PRODUCT_CACHE_MS = 5 * 60 * 1000
 let productCache: { products: Product[]; savedAt: number } | null = null
 
@@ -122,7 +122,7 @@ export const api = {
 
   async getProductByBarcode(barcode: string): Promise<Product | null> {
     const data = await gasFetch('getProductByBarcode', { barcode })
-    return (data.product as Product | undefined) ?? null
+    return data && 'id' in data ? data as Product : null
   },
 
   async searchProducts(query: string): Promise<Product[]> {

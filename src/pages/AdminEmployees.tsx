@@ -33,7 +33,7 @@ export default function AdminEmployees() {
     </form>
     <div className="bg-white shadow rounded-lg divide-y">{employees.map((employee) => <div key={employee.id} className="p-4 flex items-center gap-3">
       <div className="flex-1"><p className="font-medium">{employee.name}</p><p className="text-sm text-gray-500">{employee.email} · {employee.role}</p></div>
-      {employee.role !== 'admin' && <button onClick={async () => { await api.deleteEmployee(employee.id); load() }} className="text-red-700 px-3 py-2">Remove</button>}
+      {employee.role !== 'admin' && <button onClick={async () => { try { setMessage('Removing...'); await api.deleteEmployee(employee.id); setMessage('Employee ဖယ်ရှားပြီးပါပြီ။'); await load() } catch (error) { setMessage(error instanceof Error ? error.message : 'Remove failed') } }} className="text-red-700 px-3 py-2">Remove</button>}
     </div>)}</div>
   </main></div>
 }

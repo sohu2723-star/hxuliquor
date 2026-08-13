@@ -86,10 +86,21 @@ function initSheets() {
       sheet.appendRow(headers);
       sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
     }
+    // Older deployments created sheets with fewer/different columns. Insert
+    // missing columns in their canonical positions so existing row values move
+    // with the columns instead of being read as the next field (price as cost,
+    // barcode as name, etc.).
+    headers.forEach((header, index) => {
+      const currentHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+      if (!currentHeaders.includes(header)) {
+        sheet.insertColumnBefore(index + 1);
+        sheet.getRange(1, index + 1).setValue(header).setFontWeight('bold');
+      }
+    });
     return sheet;
   };
 
-  setupSheet('Products', [
+  const products = setupSheet('Products', [
     'id', 'barcode', 'name', 'category', 'price', 'costPrice',
     'stockQty', 'lowStockThreshold', 'requiresAgeCheck', 'imageUrl', 'createdAt'
   ]);
@@ -99,14 +110,23 @@ function initSheets() {
   setupSheet('SaleItems', [
     'id', 'saleId', 'productId', 'productName', 'quantity', 'unitPrice', 'subtotal', 'unitCost', 'profit'
   ]);
-  const saleItems = ss.getSheetByName('SaleItems');
-  const existingHeaders = saleItems.getRange(1, 1, 1, saleItems.getLastColumn()).getValues()[0];
-  ['unitCost', 'profit'].forEach(header => {
-    if (!existingHeaders.includes(header)) saleItems.getRange(1, saleItems.getLastColumn() + 1).setValue(header);
-  });
-  setupSheet('Users', [
+  const users = setupSheet('Users', [
     'id', 'name', 'email', 'passwordHash', 'role', 'createdAt'
   ]);
+  [products, users].forEach(sheet => {
+    if (sheet.getLastRow() < 2) return;
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const idColumn = headers.indexOf('id') + 1;
+    if (!idColumn) return;
+    const range = sheet.getRange(2, idColumn, sheet.getLastRow() - 1, 1);
+    const ids = range.getValues().map(([id]) => [id || generateId()]);
+    range.setValues(ids);
+  });
+}
+
+function appendObject(sheet, object) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  sheet.appendRow(headers.map(header => object[header] ?? ''));
 }
 
 function sheetToObjects(sheet) {
@@ -256,14 +276,7 @@ function googleLogin(idToken) {
         role: 'admin',
         createdAt: new Date().toISOString()
       };
-      usersSheet.appendRow([
-        newUser.id,
-        newUser.name,
-        newUser.email,
-        newUser.passwordHash,
-        newUser.role,
-        newUser.createdAt
-      ]);
+      appendObject(usersSheet, newUser);
       user = newUser;
     }
 
@@ -300,7 +313,7 @@ function addEmployee(params) {
   const users = sheetToObjects(sheet);
   if (users.some(user => String(user.email).toLowerCase() === email)) return { success: false, message: 'This email already exists' };
   const user = { id: generateId(), name: params.name, email, role: 'employee' };
-  sheet.appendRow([user.id, user.name, user.email, '', user.role, new Date().toISOString()]);
+  appendObject(sheet, { ...user, passwordHash: '', createdAt: new Date().toISOString() });
   return { success: true, user };
 }
 
@@ -308,7 +321,7 @@ function deleteEmployee(id) {
   initSheets();
   const sheet = ss.getSheetByName('Users');
   const users = sheetToObjects(sheet);
-  const index = users.findIndex(user => user.id === id && user.role !== 'admin');
+  const index = users.findIndex(user => String(user.id) === String(id) && user.role !== 'admin');
   if (index >= 0) sheet.deleteRow(index + 2);
   return { success: true };
 }
@@ -473,19 +486,7 @@ function addProduct(params) {
     createdAt
   };
 
-  sheet.appendRow([
-    product.id,
-    product.barcode,
-    product.name,
-    product.category,
-    product.price,
-    product.costPrice,
-    product.stockQty,
-    product.lowStockThreshold,
-    product.requiresAgeCheck,
-    product.imageUrl,
-    product.createdAt
-  ]);
+  appendObject(sheet, product);
 
   return { success: true, product };
 }
