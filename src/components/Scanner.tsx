@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats, type CameraDevice } from 'html5-qrcode'
 
 interface ScannerProps { onScan: (code: string) => void }
+type ExtendedCapabilities = MediaTrackCapabilities & { focusMode?: string[]; zoom?: { min: number; max: number; step?: number }; torch?: boolean }
+type ExtendedConstraints = MediaTrackConstraints & { advanced?: Array<MediaTrackConstraintSet & { focusMode?: string; zoom?: number; torch?: boolean }> }
 
 const FORMATS = [
   Html5QrcodeSupportedFormats.QR_CODE,
@@ -22,6 +24,10 @@ export default function Scanner({ onScan }: ScannerProps) {
   const [cameras, setCameras] = useState<CameraDevice[]>([])
   const [cameraId, setCameraId] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [canTorch, setCanTorch] = useState(false)
+  const [torchOn, setTorchOn] = useState(false)
+  const [zoomRange, setZoomRange] = useState<{ min: number; max: number; step: number } | null>(null)
+  const [zoom, setZoom] = useState(1)
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const lastScan = useRef({ code: '', time: 0 })
 
@@ -33,6 +39,9 @@ export default function Scanner({ onScan }: ScannerProps) {
       try { scanner.clear() } catch { /* reader already removed */ }
     }
     setIsScanning(false)
+    setCanTorch(false)
+    setTorchOn(false)
+    setZoomRange(null)
   }
 
   const startScanning = async (requestedCameraId?: string) => {
@@ -65,6 +74,22 @@ export default function Scanner({ onScan }: ScannerProps) {
         },
         () => undefined,
       )
+      const capabilities = scanner.getRunningTrackCapabilities() as ExtendedCapabilities
+      const focusMode = capabilities.focusMode?.includes('continuous') ? 'continuous' : capabilities.focusMode?.includes('single-shot') ? 'single-shot' : undefined
+      const zoomCapability = capabilities.zoom
+      const initialZoom = zoomCapability ? Math.min(zoomCapability.max, Math.max(zoomCapability.min, 1)) : undefined
+      const advanced = [{ ...(focusMode && { focusMode }), ...(initialZoom !== undefined && { zoom: initialZoom }) }]
+      try {
+        await scanner.applyVideoConstraints({
+          width: { ideal: 1920 }, height: { ideal: 1080 },
+          ...(advanced[0].focusMode || advanced[0].zoom !== undefined ? { advanced } : {}),
+        } as ExtendedConstraints)
+      } catch { /* Some browsers report capabilities but reject constraints. */ }
+      setCanTorch(capabilities.torch === true)
+      if (zoomCapability) {
+        setZoom(initialZoom ?? zoomCapability.min)
+        setZoomRange({ min: zoomCapability.min, max: zoomCapability.max, step: zoomCapability.step || .1 })
+      }
     } catch (err) {
       await stopScanning()
       const detail = err instanceof Error ? err.message : String(err)
@@ -75,6 +100,12 @@ export default function Scanner({ onScan }: ScannerProps) {
   }
 
   useEffect(() => () => { void stopScanning() }, [])
+
+  const applyCameraControl = async (control: { torch?: boolean; zoom?: number; focusMode?: string }) => {
+    if (!scannerRef.current?.isScanning) return
+    try { await scannerRef.current.applyVideoConstraints({ advanced: [control] } as ExtendedConstraints) }
+    catch { setError('ဤ camera/browser က ရွေးထားသော focus control ကို မပံ့ပိုးပါ။') }
+  }
 
   return <div>
     {!isScanning ? <button type="button" onClick={() => void startScanning()} className="w-full bg-primary text-white py-3 px-4 rounded-md font-medium">
@@ -87,6 +118,13 @@ export default function Scanner({ onScan }: ScannerProps) {
     </div>}
     {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>}
     {isScanning && <p className="my-2 text-sm text-center text-gray-600">Code ကို camera မြင်ကွင်းထဲဝင်ရုံပါပဲ—ဘောင်အလယ်တည့်ရန် မလိုပါ</p>}
+    {isScanning && <div className="flex flex-wrap items-center gap-2 mb-2">
+      <button type="button" onClick={() => void applyCameraControl({ focusMode: 'single-shot' })} className="border rounded-md px-3 py-2 text-sm bg-white">🎯 ပြန် Focus</button>
+      {canTorch && <button type="button" onClick={() => { const next = !torchOn; setTorchOn(next); void applyCameraControl({ torch: next }) }} className="border rounded-md px-3 py-2 text-sm bg-white">{torchOn ? '🔦 မီးပိတ်' : '🔦 မီးဖွင့်'}</button>}
+      {zoomRange && <label className="flex flex-1 min-w-44 items-center gap-2 text-sm">Zoom
+        <input aria-label="Camera zoom" type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step} value={zoom} onChange={(event) => { const next = Number(event.target.value); setZoom(next); void applyCameraControl({ zoom: next }) }} className="flex-1" />
+      </label>}
+    </div>}
     <div className={`relative overflow-hidden rounded-lg bg-black ${isScanning ? 'min-h-64' : 'hidden'}`}>
       <div id={readerId} />
       <div className="pointer-events-none absolute inset-3 rounded-xl border-2 border-green-400/80 scanner-frame" />

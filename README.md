@@ -171,6 +171,7 @@ When you update `gas/Code.gs`:
 - Product data is cached on the tablet for five minutes so the POS list and product search reopen immediately. Adding, editing, or deleting a product clears this cache automatically; **Retry** forces a fresh download.
 - Products without codes can be sold by tapping their product card. For several unique codes belonging to one product, save them comma-separated; when codes share a stable prefix, save that prefix with a trailing `*` (for example `ABC123*`). Do not use a wildcard unless that prefix uniquely identifies the product.
 - Every successful POS scan beeps and adds one unit; scanning the same product again increases its quantity. Use `−`, `+`, or `×` in the cart to correct/remove items before checkout. Checkout deducts stock and feeds the admin **Income** daily/monthly revenue, estimated profit, and low-stock report.
+- The scanner requests continuous autofocus and Full-HD camera input where the device supports them. Use **ပြန် Focus** after moving the product, **မီးဖွင့်** in a dark shop, or the Zoom slider for a small/distant code. Browser cameras cannot optically focus on “codes only”; good light, a clean lens, and holding the code roughly 10–25 cm away still matter.
 
 ## Known Apps Script Limitations
 
