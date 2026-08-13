@@ -4,6 +4,7 @@ import type { Product } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import ProductList from '../components/ProductList'
 import ProductForm from '../components/ProductForm'
+import AppHeader from '../components/AppHeader'
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([])
@@ -113,7 +114,9 @@ export default function AdminProducts() {
   })
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 lg:p-6">
+    <div className="min-h-screen bg-gray-100">
+      <AppHeader />
+      <main className="p-4 lg:p-6">
       {toast && (
         <div
           className={`fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg z-50 ${
@@ -178,6 +181,7 @@ export default function AdminProducts() {
           />
         )}
       </div>
+      </main>
     </div>
   )
 }
