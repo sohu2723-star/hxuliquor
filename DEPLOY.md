@@ -37,6 +37,8 @@ If Google login reports that `UrlFetchApp.fetch` is not permitted, run `authoriz
 3. Add environment variable: `GAS_URL` = your Apps Script URL
 4. Click **Deploy**
 
+`GAS_URL` must be the deployed Web app URL ending in `/exec`—not the Apps Script editor URL and not a `/dev` test URL. If the app reports HTTP 404, copy the current URL from **Deploy → Manage deployments**, replace `GAS_URL` in Vercel for Production, Preview, and Development, then redeploy Vercel.
+
 ### Redeploying Apps Script
 
 1. Open your Apps Script project

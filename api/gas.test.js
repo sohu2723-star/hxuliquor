@@ -89,3 +89,31 @@ test("returns a useful message for a non-JSON Apps Script error", async (context
   assert.equal(response.statusCode, 502);
   assert.match(response.body.message, /deployment access and authorization/);
 });
+
+test("rejects a GAS_URL that is not an Apps Script exec deployment", async (context) => {
+  const originalUrl = process.env.GAS_URL;
+  context.after(() => originalUrl === undefined ? delete process.env.GAS_URL : process.env.GAS_URL = originalUrl);
+  process.env.GAS_URL = "https://script.google.com/home/projects/example/edit";
+  const response = createResponse();
+  await handler({ method: "POST", query: { action: "addEmployee" }, body: "{}" }, response);
+  assert.equal(response.statusCode, 500);
+  assert.match(response.body.message, /GAS_URL/);
+  assert.match(response.body.message, /\/exec/);
+});
+
+test("explains how to recover from a removed Apps Script deployment", async (context) => {
+  const originalFetch = globalThis.fetch;
+  const originalUrl = process.env.GAS_URL;
+  context.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalUrl === undefined) delete process.env.GAS_URL;
+    else process.env.GAS_URL = originalUrl;
+  });
+  process.env.GAS_URL = "https://script.google.com/macros/s/deployment/exec";
+  globalThis.fetch = async () => new Response("Not found", { status: 404 });
+  const response = createResponse();
+  await handler({ method: "POST", query: { action: "addEmployee" }, body: "{}" }, response);
+  assert.equal(response.statusCode, 502);
+  assert.match(response.body.message, /HTTP 404/);
+  assert.match(response.body.message, /Redeploy/);
+});

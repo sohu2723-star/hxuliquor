@@ -85,8 +85,8 @@ export default function AdminProducts() {
       setEditingProduct(null)
       loadProducts()
       loadCategories()
-    } catch {
-      showToast('Failed to save product', 'error')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to save product', 'error')
     }
   }
 
@@ -96,8 +96,8 @@ export default function AdminProducts() {
       await api.deleteProduct(id)
       showToast('Product deleted', 'success')
       loadProducts()
-    } catch {
-      showToast('Failed to delete product', 'error')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to delete product', 'error')
     }
   }
 

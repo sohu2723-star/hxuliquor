@@ -315,9 +315,11 @@ function deleteEmployee(id) {
 
 function uploadImageToDrive(base64Data, fileName) {
   try {
+    const dataUrlMatch = String(base64Data).match(/^data:([^;]+);base64,(.+)$/);
+    const mimeType = dataUrlMatch ? dataUrlMatch[1] : 'image/jpeg';
+    const encodedData = dataUrlMatch ? dataUrlMatch[2] : String(base64Data);
     // Validate size (max 2MB)
-    const base64Length = base64Data.length - base64Data.indexOf(',') - 1;
-    const sizeInBytes = Math.round(base64Length * 3 / 4);
+    const sizeInBytes = Math.round(encodedData.length * 3 / 4);
     if (sizeInBytes > 2 * 1024 * 1024) {
       throw new Error('Image size exceeds 2MB limit');
     }
@@ -327,7 +329,7 @@ function uploadImageToDrive(base64Data, fileName) {
     let folder = getOrCreateFolder(folderName);
     
     // Create file
-    const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), 'image/jpeg', fileName || 'product.jpg');
+    const blob = Utilities.newBlob(Utilities.base64Decode(encodedData), mimeType, fileName || 'product.jpg');
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     

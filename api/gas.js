@@ -41,6 +41,9 @@ export default async function handler(request, response) {
 
   try {
     const upstreamUrl = new URL(gasUrl);
+    if (upstreamUrl.hostname !== "script.google.com" || !/^\/macros\/s\/[^/]+\/exec\/?$/.test(upstreamUrl.pathname)) {
+      return response.status(500).json({ success: false, message: "Vercel GAS_URL မှားနေသည်။ Apps Script Web app ၏ https://script.google.com/macros/s/.../exec URL အပြည့်အစုံကို ထည့်ပြီး Vercel ကို Redeploy လုပ်ပါ။" });
+    }
     upstreamUrl.searchParams.set("action", action);
 
     const body =
@@ -67,7 +70,9 @@ export default async function handler(request, response) {
         success: false,
         message:
           upstreamMessage ||
-          `Apps Script returned HTTP ${upstream.status}. Check the web app deployment access and authorization.`,
+          upstream.status === 404
+            ? "Apps Script deployment မတွေ့ပါ (HTTP 404)။ Apps Script → Deploy → Manage deployments မှ /exec URL အသစ်ကို Vercel GAS_URL တွင် အစားထိုးပြီး Redeploy လုပ်ပါ။"
+            : `Apps Script returned HTTP ${upstream.status}. Check the web app deployment access and authorization.`,
       });
     }
 
