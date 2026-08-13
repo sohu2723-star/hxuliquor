@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
-import Scanner from '../components/Scanner'
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
 import type { Product } from '../lib/api'
 import { api } from '../lib/api'
 import { formatCurrency } from '../lib/format'
+import AppHeader from '../components/AppHeader'
+
+const Scanner = lazy(() => import('../components/Scanner'))
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
@@ -21,10 +23,10 @@ export default function POS() {
     loadProducts()
   }, [])
 
-  const loadProducts = async () => {
+  const loadProducts = async (forceRefresh = false) => {
     setIsLoading(true)
     try {
-      const all = await api.getProducts()
+      const all = await api.getProducts(forceRefresh)
       setProducts(all)
     } catch {
       showToast('Failed to load products', 'error')
@@ -39,6 +41,10 @@ export default function POS() {
   }
 
   const addToCart = useCallback((product: Product) => {
+    if (product.stockQty <= 0) {
+      showToast(`${product.name} stock ကုန်နေပါသည်`, 'error')
+      return
+    }
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id)
       if (existing) {
@@ -74,10 +80,15 @@ export default function POS() {
   }
 
   const handleScan = (code: string) => {
-    const product = products.find((p) => p.barcode === code)
+    const product = products.find((p) => String(p.barcode).split(/[,\n]/).some((value) => {
+      const savedCode = value.trim()
+      return savedCode.endsWith('*') ? code.startsWith(savedCode.slice(0, -1)) : savedCode === code
+    }))
     if (product) {
+      playScanSound(true)
       addToCart(product)
     } else {
+      playScanSound(false)
       showToast(`No product found for barcode: ${code}`, 'error')
     }
   }
@@ -126,6 +137,12 @@ export default function POS() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <AppHeader />
+      {products.some((product) => product.stockQty <= product.lowStockThreshold) && (
+        <div className="bg-red-50 border-b border-red-200 text-red-800 px-4 py-2 text-sm font-medium">
+          ⚠️ ကုန်တော့မည့်ပစ္စည်း {products.filter((product) => product.stockQty <= product.lowStockThreshold).length} မျိုးရှိသည်။ Admin Income dashboard တွင်ကြည့်ပါ။
+        </div>
+      )}
       {toast && (
         <div
           className={`fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg z-50 ${
@@ -139,8 +156,9 @@ export default function POS() {
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-6">
           <div className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-lg font-semibold mb-3">Scan Product</h2>
-            <Scanner onScan={handleScan} />
+            <h2 className="text-lg font-semibold">Scan Product / Barcode ဖတ်ရန်</h2>
+            <p className="text-sm text-gray-500 mb-3">Admin နှင့် Employee နှစ်ဦးလုံး အရောင်းအတွက် tablet နောက် camera ဖြင့် scan ဖတ်နိုင်သည်။</p>
+            <Suspense fallback={<div className="h-12 animate-pulse bg-gray-200 rounded-md" />}><Scanner onScan={handleScan} /></Suspense>
           </div>
 
           <div className="bg-white rounded-lg shadow p-4">
@@ -203,7 +221,7 @@ export default function POS() {
               <div className="text-center py-8">
                 <p className="text-gray-500 mb-4">No products available</p>
                 <button
-                  onClick={loadProducts}
+                  onClick={() => loadProducts(true)}
                   className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
                 >
                   Retry
@@ -302,4 +320,20 @@ export default function POS() {
       )}
     </div>
   )
+}
+
+function playScanSound(success: boolean) {
+  try {
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioContextClass) return
+    const context = new AudioContextClass()
+    const oscillator = context.createOscillator()
+    const gain = context.createGain()
+    oscillator.frequency.value = success ? 1050 : 240
+    gain.gain.setValueAtTime(.16, context.currentTime)
+    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + (success ? .1 : .25))
+    oscillator.connect(gain); gain.connect(context.destination)
+    oscillator.start(); oscillator.stop(context.currentTime + (success ? .1 : .25))
+    oscillator.onended = () => void context.close()
+  } catch { /* sound is optional when the browser blocks audio */ }
 }
