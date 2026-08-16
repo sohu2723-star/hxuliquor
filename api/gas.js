@@ -9,6 +9,7 @@ const ALLOWED_ACTIONS = new Set([
   "addEmployee",
   "deleteEmployee",
   "createSale",
+  "payCredit",
   "addProduct",
   "updateProduct",
   "deleteProduct",
@@ -69,10 +70,9 @@ export default async function handler(request, response) {
       return response.status(502).json({
         success: false,
         message:
-          upstreamMessage ||
-          upstream.status === 404
+          upstreamMessage || (upstream.status === 404
             ? "Apps Script deployment မတွေ့ပါ (HTTP 404)။ Apps Script → Deploy → Manage deployments မှ /exec URL အသစ်ကို Vercel GAS_URL တွင် အစားထိုးပြီး Redeploy လုပ်ပါ။"
-            : `Apps Script returned HTTP ${upstream.status}. Check the web app deployment access and authorization.`,
+            : `Apps Script returned HTTP ${upstream.status}. Check the web app deployment access and authorization.`),
       });
     }
 

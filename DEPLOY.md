@@ -7,7 +7,7 @@
 1. Create a Google Sheet with tabs: `Products`, `Sales`, `SaleItems`, `Users`
 2. Go to [script.google.com](https://script.google.com/)
 3. Create a new project
-4. Paste `gas/Code.gs` into the editor. Enable **Show "appsscript.json" manifest file in editor** in Project Settings and replace that manifest with `gas/appsscript.json`.
+4. Open the editor's existing `Code.gs`, select **all** of its contents, and replace it with the complete `gas/Code.gs` file. Do not append a new copy below old code. Enable **Show "appsscript.json" manifest file in editor** in Project Settings and replace that manifest with `gas/appsscript.json`.
 5. Update `SHEET_ID` in the code with your Sheet ID
 
 ### First-Run Authorization
@@ -47,6 +47,8 @@ If Google login reports that `UrlFetchApp.fetch` is not permitted, run `authoriz
 4. Click **Edit** on the active deployment
 5. Select **New version** and deploy
 6. The URL typically stays the same
+
+If Apps Script reports `Identifier '...' has already been declared`, the editor contains duplicated old/new code. Select all content in `Code.gs`, paste one complete fresh copy of `gas/Code.gs`, save, and deploy a new version. Replacing only a section can leave a second declaration elsewhere in the file.
 
 After deploying this version, open the Products page once. `initSheets()` will automatically repair older `Products`/`Users` column layouts, generate missing row IDs, and prevent barcode/name/price values from shifting into the wrong fields.
 
