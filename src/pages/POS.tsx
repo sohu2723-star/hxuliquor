@@ -26,18 +26,18 @@ export default function POS() {
     window.setTimeout(() => setToast(null), 3000)
   }, [])
 
-  const loadProducts = useCallback(async (forceRefresh = false) => {
+  const loadProducts = useCallback(async (forceRefresh = false, quiet = false) => {
     if (productsRefreshing.current) return
     productsRefreshing.current = true
     if (forceRefresh) {
-      setIsLoading(true)
+      if (!quiet) setIsLoading(true)
       try {
         const all = await api.getProducts(true)
-        setProducts(all)
+        setProducts((current) => JSON.stringify(current) === JSON.stringify(all) ? current : all)
       } catch (error) {
-        showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
+        if (!quiet) showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
       } finally {
-        setIsLoading(false)
+        if (!quiet) setIsLoading(false)
         productsRefreshing.current = false
       }
       return
@@ -55,10 +55,17 @@ export default function POS() {
 
   useEffect(() => {
     void loadProducts()
+    const refreshWhenReturning = () => {
+      if (document.visibilityState === 'visible') void loadProducts(true, true)
+    }
+    document.addEventListener('visibilitychange', refreshWhenReturning)
     const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void loadProducts(true)
-    }, 5000)
-    return () => window.clearInterval(timer)
+      if (document.visibilityState === 'visible') void loadProducts(true, true)
+    }, 30000)
+    return () => {
+      document.removeEventListener('visibilitychange', refreshWhenReturning)
+      window.clearInterval(timer)
+    }
   }, [loadProducts])
 
   const addToCart = useCallback((product: Product, saleUnit: 'unit' | 'pack' = 'unit') => {
