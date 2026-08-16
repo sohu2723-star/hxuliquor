@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
 import type { Product } from '../lib/api'
@@ -24,7 +24,7 @@ export default function POS() {
     window.setTimeout(() => setToast(null), 3000)
   }, [])
 
-  const loadProducts = useCallback(async (forceRefresh = false) => {
+  const loadProducts = async (forceRefresh = false) => {
     setIsLoading(true)
     try {
       const all = await api.getProducts(forceRefresh)
@@ -41,6 +41,10 @@ export default function POS() {
   }, [loadProducts])
 
   const addToCart = useCallback((product: Product) => {
+    if (product.stockQty <= 0) {
+      showToast(`${product.name} stock ကုန်နေပါသည်`, 'error')
+      return
+    }
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id)
       if (existing) {
@@ -75,35 +79,17 @@ export default function POS() {
     )
   }
 
-  const handleScan = async (code: string) => {
-    const normalizedCode = code.trim()
-    const findByBarcode = (list: Product[], scannedCode: string) => list.find((product) => String(product.barcode || '').split(/[,\n]/).some((value) => {
+  const handleScan = (code: string) => {
+    const product = products.find((p) => String(p.barcode).split(/[,\n]/).some((value) => {
       const savedCode = value.trim()
-      return savedCode.endsWith('*') ? scannedCode.startsWith(savedCode.slice(0, -1)) : savedCode === scannedCode
+      return savedCode.endsWith('*') ? code.startsWith(savedCode.slice(0, -1)) : savedCode === code
     }))
-
-    let product = findByBarcode(products, normalizedCode)
-    if (!product) {
-      try {
-        // The POS list can be stale after an admin adds a product. Ask the
-        // backend directly, then add the fresh product to the visible list.
-        product = await api.getProductByBarcode(normalizedCode) || undefined
-        if (product) {
-          setProducts((current) => current.some((item) => item.id === product?.id) ? current : [...current, product as Product])
-        }
-      } catch (error) {
-        playScanSound(false)
-        showToast(error instanceof Error ? error.message : 'Barcode lookup failed', 'error')
-        return
-      }
-    }
-
     if (product) {
       playScanSound(true)
       addToCart(product)
     } else {
       playScanSound(false)
-      showToast(`Product မတွေ့ပါ: ${normalizedCode}`, 'error')
+      showToast(`No product found for barcode: ${code}`, 'error')
     }
   }
 

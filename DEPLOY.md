@@ -50,6 +50,8 @@ If Google login reports that `UrlFetchApp.fetch` is not permitted, run `authoriz
 
 After deploying this version, open the Products page once. `initSheets()` will automatically repair older `Products`/`Users` column layouts, generate missing row IDs, and prevent barcode/name/price values from shifting into the wrong fields.
 
+It also repairs the known legacy shifted-row pattern where a numeric barcode appeared as the product name, the real name appeared as category, and price/stock displayed as zero. Product and employee deletion now return an explicit error instead of silently reporting success when an ID cannot be found.
+
 ## Testing
 
 1. Open the deployed Vercel URL

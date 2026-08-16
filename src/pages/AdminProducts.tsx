@@ -78,10 +78,10 @@ export default function AdminProducts() {
 
       setShowForm(false)
       setEditingProduct(null)
-      // Clear the local cache and fetch the newly saved product immediately.
-      await Promise.all([refreshProducts(), loadCategories()])
+      loadProducts()
+      loadCategories()
     } catch (error) {
-      showToast(getErrorMessage(error, 'Product save မအောင်မြင်ပါ။'), 'error')
+      showToast(error instanceof Error ? error.message : 'Failed to save product', 'error')
     }
   }
 
@@ -90,10 +90,9 @@ export default function AdminProducts() {
     try {
       await api.deleteProduct(id)
       showToast('Product deleted', 'success')
-      await refreshProducts()
-      await loadCategories()
+      loadProducts()
     } catch (error) {
-      showToast(getErrorMessage(error, 'Product delete မအောင်မြင်ပါ။'), 'error')
+      showToast(error instanceof Error ? error.message : 'Failed to delete product', 'error')
     }
   }
 
@@ -102,11 +101,10 @@ export default function AdminProducts() {
     setShowForm(true)
   }
 
-  const normalizedSearch = searchQuery.trim().toLowerCase()
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch = String(product.name || '').toLowerCase().includes(normalizedSearch) ||
-      String(product.barcode || '').toLowerCase().includes(normalizedSearch)
-    const matchesCategory = !categoryFilter || String(product.category || '') === categoryFilter
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch = String(p.name).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      String(p.barcode).toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesCategory = !categoryFilter || p.category === categoryFilter
     return matchesSearch && matchesCategory
   })
 
@@ -114,11 +112,29 @@ export default function AdminProducts() {
     <div className="min-h-screen bg-gray-100">
       <AppHeader />
       <main className="p-4 lg:p-6">
-        {toast && (
-          <div className={`fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg z-50 ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'} text-white font-medium`}>
-            {toast.message}
-          </div>
-        )}
+      {toast && (
+        <div
+          className={`fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg z-50 ${
+            toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+          } text-white font-medium`}
+        >
+          {toast.message}
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <h1 className="text-2xl font-bold">Product Management</h1>
+          <button
+            onClick={() => {
+              setEditingProduct(null)
+              setShowForm(true)
+            }}
+            className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+          >
+            Add Product
+          </button>
+        </div>
 
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -133,27 +149,24 @@ export default function AdminProducts() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4 mb-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <input type="text" placeholder="Search by name or barcode..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
-              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
-                <option value="">All Categories</option>
-                {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-              </select>
-            </div>
-          </div>
+        <ProductList
+          products={filteredProducts}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
 
-          <ProductList products={filteredProducts} onEdit={handleEdit} onDelete={handleDelete} />
-
-          {showForm && (
-            <ProductForm
-              product={editingProduct}
-              categories={categories}
-              onSave={handleSave}
-              onClose={() => { setShowForm(false); setEditingProduct(null) }}
-            />
-          )}
-        </div>
+        {showForm && (
+          <ProductForm
+            product={editingProduct}
+            categories={categories}
+            onSave={handleSave}
+            onClose={() => {
+              setShowForm(false)
+              setEditingProduct(null)
+            }}
+          />
+        )}
+      </div>
       </main>
     </div>
   )
