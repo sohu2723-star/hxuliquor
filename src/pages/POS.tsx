@@ -151,8 +151,9 @@ export default function POS() {
     setCart([])
     setShowCheckout(false)
     setCompletedSale(sale)
-    showToast('✅ Checkout အောင်မြင်ပါသည်။ Slip ထွက်ပြီးပါပြီ။', 'success')
-    loadProducts()
+    if (sale.id.startsWith('local-')) setProducts((current) => reduceSoldStock(current, sale))
+    showToast(sale.id.startsWith('local-') ? 'Slip ချက်ချင်းထုတ်ပြီးပါပြီ။ Backend ကို နောက်ကွယ်မှာ သိမ်းနေပါသည်။' : 'Backend သိမ်းပြီးပါပြီ။ Stock စာရင်း update ဖြစ်ပါပြီ။', 'success')
+    if (!sale.id.startsWith('local-')) loadProducts(true, true)
   }
 
   const ProductImage = ({ url, name }: { url: string; name: string }) => {
@@ -280,7 +281,7 @@ export default function POS() {
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 max-h-[50vh] overflow-y-auto pr-1">
                 {products.map((product) => (
-                  <div key={product.id} className="product-card p-3 text-left flex flex-col shadow-sm">
+                  <div key={product.id} className={`product-card p-3 text-left flex flex-col shadow-sm ${product.stockQty <= 0 ? 'opacity-40 grayscale' : ''}`}>
                   <div className="text-left flex-1">
                     <div className="flex justify-center mb-2">
                       <ProductImage url={product.imageUrl} name={product.name} />
@@ -290,7 +291,7 @@ export default function POS() {
                     <p className={`mt-1 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${product.saleType === 'pack' ? 'bg-violet-100 text-violet-800' : 'bg-slate-100 text-slate-700'}`}>Stock: {product.stockQty} {product.saleType === 'pack' ? 'ပါကင်' : 'ခု/ဘူး'}</p>
                   </div>
                   <div className="mt-3 grid gap-2">
-                    {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} className="w-full rounded-xl bg-primary px-3 py-2.5 text-left text-white shadow-sm">
+                    {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} disabled={product.stockQty <= 0} className="w-full rounded-xl bg-primary disabled:cursor-not-allowed disabled:bg-slate-300 px-3 py-2.5 text-left text-white shadow-sm">
                       <span className="flex items-center gap-1 text-[11px] font-medium text-white/80"><Icon name="bottle" className="h-4 w-4" />တစ်ဘူး / တစ်ခု ဈေး</span><strong className="block text-base">{formatCurrency(product.price)}</strong>
                     </button>}
                     {product.saleType !== 'unit' && product.unitsPerPack > 1 && product.packPrice > 0 && <button onClick={() => addToCart(product, 'pack')} disabled={product.stockQty < (product.saleType === 'pack' ? 1 : product.unitsPerPack)} className="w-full rounded-xl border-2 border-violet-400 bg-violet-50 px-3 py-2.5 text-left text-violet-950 shadow-sm disabled:opacity-40">
@@ -370,6 +371,7 @@ export default function POS() {
           requiresAgeCheck={requiresAgeCheck}
           onClose={() => setShowCheckout(false)}
           onSuccess={handleCheckoutSuccess}
+          onError={(message) => showToast(message, 'error')}
         />
       )}
       {completedSale && <div className="receipt-modal fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 print:static print:bg-white print:p-0">
@@ -383,7 +385,7 @@ export default function POS() {
             <p>{new Date(completedSale.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Yangon' })}</p>
             <p>Cashier: {completedSale.cashierName}</p>
             <p>Payment: {completedSale.paymentMethod}</p>
-            <p>Slip: {completedSale.id}</p>
+            <p>Slip ID: {formatSlipId(completedSale)}</p>
           </div>
           <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm print:text-xs"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
           <div className="mt-4 border-t pt-3 print:mt-2 print:pt-2"><div className="flex justify-between text-lg font-bold print:text-sm"><span>Total</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800 print:text-xs">အကြွေး · {completedSale.customerName} · ကျန်ငွေ {formatCurrency(completedSale.balanceDue)}</p>}</div>
@@ -395,6 +397,22 @@ export default function POS() {
   )
 }
 
+
+
+function formatSlipId(sale: Sale) {
+  const date = new Date(sale.createdAt)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  if (Number.isNaN(date.getTime())) return String(sale.id || '').slice(-8).toUpperCase()
+  return `HXU-${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
+}
+
+
+function reduceSoldStock(products: Product[], sale: Sale) {
+  return products.map((product) => {
+    const sold = sale.items.filter((item) => item.productId === product.id).reduce((sum, item) => sum + item.quantity, 0)
+    return sold ? { ...product, stockQty: Math.max(0, product.stockQty - sold) } : product
+  })
+}
 
 function findProductByVisualFallback(products: Product[], scannedValue: string) {
   const scanned = normalizeVisualText(scannedValue)

@@ -37,7 +37,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
     margin: 0;
   }
 
-  body {
+  html,
+  body,
+  #root {
+    width: 80mm !important;
+    min-width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: #fff !important;
   }
 
@@ -51,10 +57,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   }
 
   .receipt-modal {
-    position: static !important;
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
     display: block !important;
     width: 80mm !important;
-    min-height: auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
     background: #fff !important;
   }
 
@@ -62,7 +71,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
     position: static !important;
     width: 80mm !important;
     max-width: 80mm !important;
+    min-height: 0 !important;
     margin: 0 !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
     color: #111827 !important;
     box-shadow: none !important;
   }
