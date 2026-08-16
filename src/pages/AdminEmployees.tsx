@@ -9,7 +9,11 @@ export default function AdminEmployees() {
   const [message, setMessage] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const load = () => api.getEmployees().then(setEmployees).catch((e) => setMessage(e.message))
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    void load()
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load() }, 5000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const add = async (event: React.FormEvent) => {
     event.preventDefault()
