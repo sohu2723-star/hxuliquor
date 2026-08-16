@@ -4,7 +4,12 @@
 
 const SHEET_ID = '1o0a1cRxDdk0dyfysq4jx3HL6OqNWT75iCZEBKygOoPY'; // Replace with your Sheet ID
 const ADMIN_EMAIL = 'copy2723@gmail.com'; // Only this Google email can login
+const GOOGLE_CLIENT_ID = ''; // Set to your Google OAuth client ID for token validation
 const ss = SpreadsheetApp.openById(SHEET_ID);
+
+const ADMIN_ACTIONS = new Set([
+  'addEmployee', 'deleteEmployee', 'addProduct', 'updateProduct', 'deleteProduct', 'getEmployees'
+]);
 
 // The frontend reaches this web app through its same-origin Vercel proxy because
 // Apps Script ContentService responses cannot set arbitrary CORS headers.
@@ -70,7 +75,7 @@ function handleRequest(e) {
       case 'getEmployees': result = getEmployees(); break;
       case 'addEmployee': result = addEmployee(params); break;
       case 'deleteEmployee': result = deleteEmployee(params.id); break;
-      case 'createSale': result = createSale(params); break;
+      case 'createSale': result = createSale(params, actor); break;
       case 'addProduct': result = addProduct(params); break;
       case 'updateProduct': result = updateProduct(params); break;
       case 'deleteProduct': result = deleteProduct(params.id); break;
@@ -94,10 +99,6 @@ function initSheets() {
       sheet.appendRow(headers);
       sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
     }
-    // Older deployments created sheets with fewer/different columns. Insert
-    // missing columns in their canonical positions so existing row values move
-    // with the columns instead of being read as the next field (price as cost,
-    // barcode as name, etc.).
     headers.forEach((header, index) => {
       const currentHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
       if (!currentHeaders.includes(header)) {
@@ -448,17 +449,14 @@ function uploadImageToDrive(base64Data, fileName) {
     const dataUrlMatch = String(base64Data).match(/^data:([^;]+);base64,(.+)$/);
     const mimeType = dataUrlMatch ? dataUrlMatch[1] : 'image/jpeg';
     const encodedData = dataUrlMatch ? dataUrlMatch[2] : String(base64Data);
-    // Validate size (max 2MB)
     const sizeInBytes = Math.round(encodedData.length * 3 / 4);
     if (sizeInBytes > 2 * 1024 * 1024) {
       throw new Error('Image size exceeds 2MB limit');
     }
 
-    // Get or create folder
     const folderName = 'MiniMartProductImages';
     let folder = getOrCreateFolder(folderName);
     
-    // Create file
     const blob = Utilities.newBlob(Utilities.base64Decode(encodedData), mimeType, fileName || 'product.jpg');
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -503,24 +501,24 @@ function createSale(params, actor) {
     Object.keys(mergedItems).forEach(productId => {
       const quantity = mergedItems[productId];
       const product = products.find(p => text(p.id) === productId);
-      if (!product) throw new Error(`Product ${productId} not found`);
+      if (!product) throw new Error('Product ' + productId + ' not found');
       const stockQty = integerValue(product.stockQty);
-      if (stockQty < quantity) throw new Error(`Insufficient stock for ${text(product.name, 'Unnamed product')}`);
+      if (stockQty < quantity) throw new Error('Insufficient stock for ' + text(product.name, 'Unnamed product'));
       if (booleanValue(product.requiresAgeCheck) && !booleanValue(params.ageVerified)) {
         throw new Error('Age verification required for restricted items');
       }
 
-      const unitPrice = parseFloat(product.price) || 0;
-      const subtotal = unitPrice * item.quantity;
-      const unitCost = parseFloat(product.costPrice) || 0;
-      const profit = (unitPrice - unitCost) * item.quantity;
+      const unitPrice = numberValue(product.price);
+      const subtotal = unitPrice * quantity;
+      const unitCost = numberValue(product.costPrice);
+      const profit = (unitPrice - unitCost) * quantity;
       totalAmount += subtotal;
       saleItems.push({
         id: generateId(),
         saleId: '',
-        productId: item.productId,
-        productName: product.name,
-        quantity: item.quantity,
+        productId: productId,
+        productName: text(product.name),
+        quantity: quantity,
         unitPrice: unitPrice,
         subtotal: subtotal,
         unitCost: unitCost,
@@ -543,7 +541,7 @@ function createSale(params, actor) {
     ]);
 
     const saleItemsSheet = ss.getSheetByName('SaleItems');
-    const itemRows = saleItems.map(item => {
+    saleItems.forEach(item => {
       item.saleId = saleId;
       saleItemsSheet.appendRow([
         item.id,
@@ -590,41 +588,21 @@ function addProduct(params) {
   }
 
   const product = {
-    id,
-    barcode: params.barcode || '',
-    name: params.name || '',
-    category: params.category || '',
-    price: parseFloat(params.price) || 0,
-    costPrice: parseFloat(params.costPrice) || 0,
-    stockQty: parseInt(params.stockQty) || 0,
-    lowStockThreshold: parseInt(params.lowStockThreshold) || 0,
-    requiresAgeCheck: params.requiresAgeCheck === true || params.requiresAgeCheck === 'TRUE',
-    imageUrl,
-    createdAt
+    id: generateId(),
+    barcode: barcode,
+    name: name,
+    category: category,
+    price: numberValue(params.price),
+    costPrice: numberValue(params.costPrice),
+    stockQty: integerValue(params.stockQty),
+    lowStockThreshold: integerValue(params.lowStockThreshold),
+    requiresAgeCheck: booleanValue(params.requiresAgeCheck),
+    imageUrl: imageUrl,
+    createdAt: new Date().toISOString()
   };
 
   appendObject(sheet, product);
-
-    let imageUrl = '';
-    if (params.imageBase64) imageUrl = uploadImageToDrive(params.imageBase64, params.imageFileName);
-    const product = {
-      id: generateId(),
-      barcode,
-      name,
-      category,
-      price: numberValue(params.price),
-      costPrice: numberValue(params.costPrice),
-      stockQty: integerValue(params.stockQty),
-      lowStockThreshold: integerValue(params.lowStockThreshold),
-      requiresAgeCheck: booleanValue(params.requiresAgeCheck),
-      imageUrl,
-      createdAt: new Date().toISOString()
-    };
-    appendObject(sheet, product);
-    return { success: true, product };
-  } finally {
-    lock.releaseLock();
-  }
+  return { success: true, product: product };
 }
 
 function updateProduct(params) {
@@ -637,25 +615,25 @@ function updateProduct(params) {
     return { success: false, message: 'Product not found' };
   }
 
-  let imageUrl = products[index].imageUrl;
+  const current = products[index];
+  const productId = text(current.id);
+  let imageUrl = text(current.imageUrl);
   if (params.imageBase64) {
     imageUrl = uploadImageToDrive(params.imageBase64, params.imageFileName);
   }
 
-  let imageUrl = text(current.imageUrl);
-  if (params.imageBase64) imageUrl = uploadImageToDrive(params.imageBase64, params.imageFileName);
   const updated = {
     ...current,
     id: productId,
-    barcode,
-    name,
-    category,
+    barcode: params.barcode === undefined ? text(current.barcode) : text(params.barcode),
+    name: params.name === undefined ? text(current.name) : text(params.name),
+    category: params.category === undefined ? text(current.category) : text(params.category),
     price: params.price === undefined ? numberValue(current.price) : numberValue(params.price),
     costPrice: params.costPrice === undefined ? numberValue(current.costPrice) : numberValue(params.costPrice),
     stockQty: params.stockQty === undefined ? integerValue(current.stockQty) : integerValue(params.stockQty),
     lowStockThreshold: params.lowStockThreshold === undefined ? integerValue(current.lowStockThreshold) : integerValue(params.lowStockThreshold),
     requiresAgeCheck: params.requiresAgeCheck === undefined ? booleanValue(current.requiresAgeCheck) : booleanValue(params.requiresAgeCheck),
-    imageUrl,
+    imageUrl: imageUrl,
     createdAt: text(current.createdAt, new Date().toISOString())
   };
 
@@ -672,21 +650,19 @@ function deleteProduct(id) {
   const index = products.findIndex(p => String(p.id) === String(id));
 
   if (index < 0) return { success: false, message: 'Product not found. Refresh Products and try again.' };
-  if (index >= 0) {
-    // Optionally delete Drive image
-    const product = products[index];
-    if (product.imageUrl && product.imageUrl.includes('drive.google.com')) {
-      try {
-        const fileId = product.imageUrl.match(/id=([^&]+)/)?.[1];
-        if (fileId) {
-          DriveApp.getFileById(fileId).setTrashed(true);
-        }
-      } catch (err) {
-        // Ignore if file not found
+  // Optionally delete Drive image
+  const product = products[index];
+  if (product.imageUrl && product.imageUrl.includes('drive.google.com')) {
+    try {
+      const fileId = product.imageUrl.match(/id=([^&]+)/)?.[1];
+      if (fileId) {
+        DriveApp.getFileById(fileId).setTrashed(true);
       }
+    } catch (err) {
+      // Ignore if file not found
     }
-    sheet.deleteRow(index + 2);
   }
+  sheet.deleteRow(index + 2);
 
   return { success: true };
 }
