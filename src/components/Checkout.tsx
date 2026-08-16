@@ -8,11 +8,14 @@ interface CheckoutProps {
   requiresAgeCheck: boolean
   onClose: () => void
   onSuccess: (sale: Sale) => void
+  onError?: (message: string) => void
 }
+
+type CartItem = { product: Product; quantity: number; saleUnit: 'unit' | 'pack' }
 
 type PaymentMethod = 'Cash' | 'Card' | 'Mobile Wallet' | 'Credit'
 
-export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }: CheckoutProps) {
+export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, onError }: CheckoutProps) {
   const [ageVerified, setAgeVerified] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -24,7 +27,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }:
     0
   )
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (requiresAgeCheck && !ageVerified) {
       setError('Age verification is required')
       return
@@ -33,32 +36,33 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }:
     setIsSubmitting(true)
     setError('')
 
-    try {
-      const user = JSON.parse(localStorage.getItem('minimart-pos-user') || '{}')
-      if (paymentMethod === 'Credit' && !customerName.trim()) {
-        setError('အကြွေးရောင်းရန် Customer Name ထည့်ပါ။')
-        return
-      }
-      const sale = await api.createSale({
-        cashierId: user.id || 'unknown',
-        cashierName: user.name || 'Cashier',
-        items: cart.map((item) => ({
-          productId: item.product.id,
-          quantity: item.quantity,
-          saleUnit: item.saleUnit,
-        })),
-        ageVerified: requiresAgeCheck ? ageVerified : true,
-        paymentMethod,
-        isCredit: paymentMethod === 'Credit',
-        customerName: customerName.trim(),
-      })
-      onSuccess(sale)
-      onClose()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Checkout failed')
-    } finally {
+    const user = JSON.parse(localStorage.getItem('minimart-pos-user') || '{}')
+    if (paymentMethod === 'Credit' && !customerName.trim()) {
+      setError('အကြွေးရောင်းရန် Customer Name ထည့်ပါ။')
       setIsSubmitting(false)
+      return
     }
+
+    const payload = {
+      cashierId: user.id || 'unknown',
+      cashierName: user.name || 'Cashier',
+      items: cart.map((item) => ({
+        productId: item.product.id,
+        quantity: item.quantity,
+        saleUnit: item.saleUnit,
+      })),
+      ageVerified: requiresAgeCheck ? ageVerified : true,
+      paymentMethod,
+      isCredit: paymentMethod === 'Credit',
+      customerName: customerName.trim(),
+    }
+
+    onSuccess(createInstantSale(cart, payload.cashierId, payload.cashierName, paymentMethod, payload.customerName, payload.isCredit))
+    onClose()
+
+    void api.createSale(payload)
+      .then(onSuccess)
+      .catch((err) => onError?.(err instanceof Error ? err.message : 'Checkout failed'))
   }
 
   return (
@@ -160,4 +164,49 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }:
       </div>
     </div>
   )
+}
+
+
+function createInstantSale(
+  cart: CartItem[],
+  cashierId: string,
+  cashierName: string,
+  paymentMethod: PaymentMethod,
+  customerName: string,
+  isCredit: boolean
+): Sale {
+  const createdAt = new Date().toISOString()
+  const totalAmount = cart.reduce((sum, item) => sum + (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity, 0)
+  return {
+    id: `local-${Date.now()}`,
+    cashierId,
+    cashierName,
+    cashierEmail: '',
+    totalAmount,
+    paidAmount: isCredit ? 0 : totalAmount,
+    balanceDue: isCredit ? totalAmount : 0,
+    customerName,
+    isCredit,
+    settledAt: '',
+    paymentMethod,
+    ageVerified: true,
+    createdAt,
+    items: cart.map((item) => {
+      const linePrice = (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity
+      const stockQuantity = item.quantity * (item.saleUnit === 'pack' && item.product.saleType !== 'pack' ? item.product.unitsPerPack : 1)
+      return {
+        id: `${item.product.id}-${item.saleUnit}`,
+        saleId: '',
+        productId: item.product.id,
+        productName: item.product.name + (item.saleUnit === 'pack' ? ` (Pack x${item.product.unitsPerPack})` : ''),
+        quantity: stockQuantity,
+        unitPrice: linePrice / stockQuantity,
+        subtotal: linePrice,
+        unitCost: item.product.costPrice,
+        profit: linePrice - (item.product.costPrice * stockQuantity),
+        saleUnit: item.saleUnit,
+        saleQuantity: item.quantity,
+      }
+    }),
+  }
 }

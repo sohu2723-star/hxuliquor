@@ -12,12 +12,14 @@ body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+    'Noto Sans Myanmar', 'Myanmar Text', 'Padauk', sans-serif;
   color: #172033;
   background: #f8fafc;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+html[lang='my'] body { font-family: 'Noto Sans Myanmar', 'Myanmar Text', 'Padauk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
 button, input, select { transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease, transform .18s ease; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(185, 28, 28, .18); outline-offset: 2px; }
@@ -27,4 +29,53 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 
 #reader video {
   border-radius: 8px;
+}
+
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  html,
+  body,
+  #root {
+    width: 80mm !important;
+    min-width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .receipt-modal,
+  .receipt-modal * {
+    visibility: visible !important;
+  }
+
+  .receipt-modal {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    display: block !important;
+    width: 80mm !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  .receipt-slip {
+    position: static !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+    color: #111827 !important;
+    box-shadow: none !important;
+  }
 }

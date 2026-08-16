@@ -111,7 +111,7 @@ function initSheets() {
   };
 
   const products = setupSheet('Products', [
-    'id', 'barcode', 'name', 'category', 'price', 'costPrice',
+    'id', 'barcode', 'name', 'category', 'productColor', 'productSize', 'price', 'costPrice',
     'stockQty', 'lowStockThreshold', 'unitsPerPack', 'packPrice', 'saleType', 'requiresAgeCheck', 'imageUrl', 'createdAt'
   ]);
   setupSheet('Sales', [
@@ -275,6 +275,8 @@ function getProducts() {
     barcode: text(p.barcode),
     name: text(p.name, 'Unnamed product'),
     category: text(p.category),
+    productColor: text(p.productColor),
+    productSize: text(p.productSize),
     price: numberValue(p.price),
     costPrice: numberValue(p.costPrice),
     stockQty: integerValue(p.stockQty),
@@ -308,7 +310,9 @@ function searchProducts(query) {
   const q = String(query || '').toLowerCase();
   return products.filter(p => 
     String(p.name || '').toLowerCase().includes(q) ||
-    String(p.category || '').toLowerCase().includes(q)
+    String(p.category || '').toLowerCase().includes(q) ||
+    String(p.productColor || '').toLowerCase().includes(q) ||
+    String(p.productSize || '').toLowerCase().includes(q)
   );
 }
 
@@ -634,32 +638,61 @@ function addProduct(params) {
   const barcode = text(params && params.barcode);
   const name = text(params && params.name);
   const category = text(params && params.category);
+  const productColor = text(params && params.productColor);
+  const productSize = text(params && params.productSize);
   if (!name || !category) return { success: false, message: 'Product name နှင့် category လိုအပ်ပါသည်။' };
 
-  let imageUrl = '';
+  const incomingStock = integerValue(params.stockQty);
+  const saleType = ['unit', 'pack'].includes(text(params.saleType)) ? text(params.saleType) : 'both';
+  const products = sheetToObjects(sheet);
+  const barcodeMatch = barcode ? products.find(p => getProductByBarcodeMatch(text(p.barcode), barcode)) : null;
+  const nameMatch = products.find(p => !barcode && text(p.name).toLowerCase() === name.toLowerCase() && text(p.category).toLowerCase() === category.toLowerCase() && text(p.productColor).toLowerCase() === productColor.toLowerCase() && text(p.productSize).toLowerCase() === productSize.toLowerCase() && text(p.saleType, 'both') === saleType);
+  const existing = barcodeMatch || nameMatch;
+
+  let imageUrl = existing ? text(existing.imageUrl) : '';
   if (params.imageBase64) {
     imageUrl = uploadImageToDrive(params.imageBase64, params.imageFileName);
   }
 
   const product = {
-    id: generateId(),
-    barcode: barcode,
+    id: existing ? text(existing.id) : generateId(),
+    barcode: barcode || (existing ? text(existing.barcode) : ''),
     name: name,
     category: category,
+    productColor: productColor,
+    productSize: productSize,
     price: numberValue(params.price),
     costPrice: numberValue(params.costPrice),
-    stockQty: integerValue(params.stockQty),
+    stockQty: (existing ? integerValue(existing.stockQty) : 0) + incomingStock,
     lowStockThreshold: integerValue(params.lowStockThreshold),
     unitsPerPack: Math.max(1, integerValue(params.unitsPerPack, 1)),
     packPrice: numberValue(params.packPrice),
-    saleType: ['unit', 'pack'].includes(text(params.saleType)) ? text(params.saleType) : 'both',
+    saleType: saleType,
     requiresAgeCheck: booleanValue(params.requiresAgeCheck),
     imageUrl: imageUrl,
-    createdAt: new Date().toISOString()
+    createdAt: existing ? text(existing.createdAt, new Date().toISOString()) : new Date().toISOString()
   };
 
+  if (existing) {
+    const index = products.findIndex(p => text(p.id) === product.id);
+    const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+    sheet.getRange(index + 2, 1, 1, headers.length).setValues([headers.map(header => product[header] ?? '')]);
+    return { success: true, product: product, merged: true };
+  }
+
   appendObject(sheet, product);
-  return { success: true, product: product };
+  return { success: true, product: product, merged: false };
+}
+
+function getProductByBarcodeMatch(savedValue, scannedValue) {
+  const scanned = normalizeBarcode(scannedValue);
+  if (!scanned) return false;
+  return String(savedValue || '').split(/[,\n;]/).some(code => {
+    const saved = normalizeBarcode(code);
+    if (!saved) return false;
+    return saved.endsWith('*') ? scanned.startsWith(saved.slice(0, -1))
+      : saved === scanned || '0' + saved === scanned || saved === '0' + scanned;
+  });
 }
 
 function updateProduct(params) {
@@ -685,6 +718,8 @@ function updateProduct(params) {
     barcode: params.barcode === undefined ? text(current.barcode) : text(params.barcode),
     name: params.name === undefined ? text(current.name) : text(params.name),
     category: params.category === undefined ? text(current.category) : text(params.category),
+    productColor: params.productColor === undefined ? text(current.productColor) : text(params.productColor),
+    productSize: params.productSize === undefined ? text(current.productSize) : text(params.productSize),
     price: params.price === undefined ? numberValue(current.price) : numberValue(params.price),
     costPrice: params.costPrice === undefined ? numberValue(current.costPrice) : numberValue(params.costPrice),
     stockQty: params.stockQty === undefined ? integerValue(current.stockQty) : integerValue(params.stockQty),

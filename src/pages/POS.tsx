@@ -7,6 +7,8 @@ import { formatCurrency } from '../lib/format'
 import AppHeader from '../components/AppHeader'
 import Scanner from '../components/Scanner'
 import Icon from '../components/Icon'
+import ReceiptLogo from '../components/ReceiptLogo'
+import AppToast, { type ToastMessage } from '../components/AppToast'
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
@@ -14,7 +16,7 @@ export default function POS() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Product[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [toast, setToast] = useState<ToastMessage | null>(null)
   const [showCheckout, setShowCheckout] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
@@ -22,7 +24,7 @@ export default function POS() {
   const lastHandledScan = useRef({ code: '', time: 0 })
   const productsRefreshing = useRef(false)
 
-  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+  const showToast = useCallback((message: string, type: ToastMessage['type']) => {
     setToast({ message, type })
     window.setTimeout(() => setToast(null), 3000)
   }, [])
@@ -92,7 +94,7 @@ export default function POS() {
       }
       return [...prev, { product, quantity: 1, saleUnit }]
     })
-    showToast(`✅ ${product.name} — ${saleUnit === 'pack' ? 'တစ်ပါကင်' : 'တစ်ဘူး/တစ်ခု'} Cart ထဲထည့်ပြီးပါပြီ`, 'success')
+    showToast(`${product.name} — ${saleUnit === 'pack' ? 'တစ်ပါကင်' : 'တစ်ဘူး/တစ်ခု'} Cart ထဲထည့်ပြီးပါပြီ`, 'success')
   }, [showToast])
 
   const removeFromCart = (productId: string, saleUnit: 'unit' | 'pack') => {
@@ -116,13 +118,13 @@ export default function POS() {
     const now = Date.now()
     if (lastHandledScan.current.code === code && now - lastHandledScan.current.time < 3000) return
     lastHandledScan.current = { code, time: now }
-    const product = products.find((p) => barcodeMatches(p.barcode, code))
+    const product = products.find((p) => barcodeMatches(p.barcode, code)) || findProductByVisualFallback(products, code)
     if (product) {
       playScanSound(true)
       addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit')
     } else {
       playScanSound(false)
-      showToast(`Barcode ${code} ကို product စာရင်းတွင် မတွေ့ပါ။ Products ကို Refresh လုပ်ပြီး စစ်ပါ။`, 'error')
+      showToast(`Code/Text ${code} ကို product စာရင်းတွင် မတွေ့ပါ။ Product name/color/size သို့မဟုတ် QR code ကို စစ်ပါ။`, 'error')
     }
   }
 
@@ -149,8 +151,9 @@ export default function POS() {
     setCart([])
     setShowCheckout(false)
     setCompletedSale(sale)
-    showToast('✅ Checkout အောင်မြင်ပါသည်။ Slip ထွက်ပြီးပါပြီ။', 'success')
-    loadProducts()
+    if (sale.id.startsWith('local-')) setProducts((current) => reduceSoldStock(current, sale))
+    showToast(sale.id.startsWith('local-') ? 'Slip ချက်ချင်းထုတ်ပြီးပါပြီ။ Backend ကို နောက်ကွယ်မှာ သိမ်းနေပါသည်။' : 'Backend သိမ်းပြီးပါပြီ။ Stock စာရင်း update ဖြစ်ပါပြီ။', 'success')
+    if (!sale.id.startsWith('local-')) loadProducts(true, true)
   }
 
   const ProductImage = ({ url, name }: { url: string; name: string }) => {
@@ -188,15 +191,7 @@ export default function POS() {
           </div>
         )
       })()}
-      {toast && (
-        <div
-          className={`fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg z-50 ${
-            toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
-          } text-white font-medium`}
-        >
-          {toast.message}
-        </div>
-      )}
+      <AppToast toast={toast} />
 
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
@@ -234,7 +229,7 @@ export default function POS() {
                       <ProductImage url={product.imageUrl} name={product.name} />
                       <div>
                         <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-gray-500">{product.category}</p>
+                        <p className="text-sm text-gray-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
                       </div>
                     </div>
                     <span className="font-semibold text-primary">
@@ -278,19 +273,19 @@ export default function POS() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 max-h-[50vh] overflow-y-auto pr-1">
                 {products.map((product) => (
-                  <div key={product.id} className="product-card p-3 text-left flex flex-col">
+                  <div key={product.id} className={`product-card p-3 text-left flex flex-col shadow-sm ${product.stockQty <= 0 ? 'opacity-40 grayscale' : ''}`}>
                   <div className="text-left flex-1">
                     <div className="flex justify-center mb-2">
                       <ProductImage url={product.imageUrl} name={product.name} />
                     </div>
                     <p className="font-medium truncate">{product.name}</p>
-                    <p className="text-sm text-gray-500">{product.category}</p>
+                    <p className="text-sm text-gray-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
                     <p className={`mt-1 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${product.saleType === 'pack' ? 'bg-violet-100 text-violet-800' : 'bg-slate-100 text-slate-700'}`}>Stock: {product.stockQty} {product.saleType === 'pack' ? 'ပါကင်' : 'ခု/ဘူး'}</p>
                   </div>
                   <div className="mt-3 grid gap-2">
-                    {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} className="w-full rounded-xl bg-primary px-3 py-2.5 text-left text-white shadow-sm">
+                    {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} disabled={product.stockQty <= 0} className="w-full rounded-xl bg-primary disabled:cursor-not-allowed disabled:bg-slate-300 px-3 py-2.5 text-left text-white shadow-sm">
                       <span className="flex items-center gap-1 text-[11px] font-medium text-white/80"><Icon name="bottle" className="h-4 w-4" />တစ်ဘူး / တစ်ခု ဈေး</span><strong className="block text-base">{formatCurrency(product.price)}</strong>
                     </button>}
                     {product.saleType !== 'unit' && product.unitsPerPack > 1 && product.packPrice > 0 && <button onClick={() => addToCart(product, 'pack')} disabled={product.stockQty < (product.saleType === 'pack' ? 1 : product.unitsPerPack)} className="w-full rounded-xl border-2 border-violet-400 bg-violet-50 px-3 py-2.5 text-left text-violet-950 shadow-sm disabled:opacity-40">
@@ -370,19 +365,64 @@ export default function POS() {
           requiresAgeCheck={requiresAgeCheck}
           onClose={() => setShowCheckout(false)}
           onSuccess={handleCheckoutSuccess}
+          onError={(message) => showToast(message, 'error')}
         />
       )}
-      {completedSale && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 print:static print:bg-white print:p-0">
-        <div className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl print:max-h-none print:shadow-none">
-          <div className="text-center"><h2 className="text-xl font-bold">HXU Liquor POS</h2><p className="text-sm text-slate-500">SALE RECEIPT</p></div>
-          <div className="my-4 border-y py-3 text-xs text-slate-600"><p>{new Date(completedSale.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Yangon' })}</p><p>Cashier: {completedSale.cashierName} · {completedSale.cashierEmail}</p><p>Slip: {completedSale.id}</p></div>
-          <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
-          <div className="mt-4 border-t pt-3"><div className="flex justify-between text-lg font-bold"><span>Total</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800">အကြွေး · {completedSale.customerName} · ကျန်ငွေ {formatCurrency(completedSale.balanceDue)}</p>}</div>
-          <div className="mt-5 grid grid-cols-2 gap-2 print:hidden"><button onClick={() => window.print()} className="rounded-lg border px-4 py-2 font-medium">Print Slip</button><button onClick={() => setCompletedSale(null)} className="rounded-lg bg-primary px-4 py-2 font-medium text-white">ပြီးပါပြီ</button></div>
+      {completedSale && <div className="receipt-modal fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 print:static print:bg-white print:p-0">
+        <div className="receipt-slip max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl print:max-h-none print:w-[80mm] print:overflow-visible print:rounded-none print:p-3 print:shadow-none">
+          <div className="text-center">
+            <ReceiptLogo className="mx-auto mb-2 h-16 w-16 print:h-12 print:w-12" />
+            <h2 className="text-2xl font-extrabold tracking-tight print:text-lg">HXU Liquor</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700 print:text-[10px]">Sale Receipt</p>
+          </div>
+          <div className="my-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600 print:my-2 print:rounded-none print:border-x-0 print:bg-white print:px-0">
+            <p>{new Date(completedSale.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Yangon' })}</p>
+            <p>Cashier: {completedSale.cashierName}</p>
+            <p>Payment: {completedSale.paymentMethod}</p>
+            <p>Slip ID: {formatSlipId(completedSale)}</p>
+          </div>
+          <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm print:text-xs"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
+          <div className="mt-4 border-t pt-3 print:mt-2 print:pt-2"><div className="flex justify-between text-lg font-bold print:text-sm"><span>Total</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800 print:text-xs">အကြွေး · {completedSale.customerName} · ကျန်ငွေ {formatCurrency(completedSale.balanceDue)}</p>}</div>
+          <p className="mt-4 text-center text-xs text-slate-500 print:mt-2">Thank you for shopping with HXU Liquor</p>
+          <div className="mt-5 grid grid-cols-2 gap-2 print:hidden"><button onClick={() => window.print()} className="rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-800 shadow-sm">Print Slip</button><button onClick={() => setCompletedSale(null)} className="rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm">ပြီးပါပြီ</button></div>
         </div>
       </div>}
     </div>
   )
+}
+
+
+
+function formatSlipId(sale: Sale) {
+  const date = new Date(sale.createdAt)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  if (Number.isNaN(date.getTime())) return String(sale.id || '').slice(-8).toUpperCase()
+  return `HXU-${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
+}
+
+
+function reduceSoldStock(products: Product[], sale: Sale) {
+  return products.map((product) => {
+    const sold = sale.items.filter((item) => item.productId === product.id).reduce((sum, item) => sum + item.quantity, 0)
+    return sold ? { ...product, stockQty: Math.max(0, product.stockQty - sold) } : product
+  })
+}
+
+function findProductByVisualFallback(products: Product[], scannedValue: string) {
+  const scanned = normalizeVisualText(scannedValue)
+  if (!scanned) return undefined
+  return products.find((product) => {
+    const tokens = [product.name, product.productColor, product.productSize, product.category]
+      .map(normalizeVisualText)
+      .filter(Boolean)
+    if (!tokens.length) return false
+    const strongTokens = tokens.filter((token) => token.length >= 2)
+    return strongTokens.every((token) => scanned.includes(token)) || scanned.includes(tokens.join(''))
+  })
+}
+
+function normalizeVisualText(value: string) {
+  return String(value || '').toLowerCase().replace(/[|:;,_\-\s]+/g, '')
 }
 
 function playScanSound(success: boolean) {
@@ -393,10 +433,10 @@ function playScanSound(success: boolean) {
     const oscillator = context.createOscillator()
     const gain = context.createGain()
     oscillator.frequency.value = success ? 1050 : 240
-    gain.gain.setValueAtTime(.16, context.currentTime)
-    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + (success ? .1 : .25))
+    gain.gain.setValueAtTime(success ? .55 : .45, context.currentTime)
+    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + (success ? .22 : .35))
     oscillator.connect(gain); gain.connect(context.destination)
-    oscillator.start(); oscillator.stop(context.currentTime + (success ? .1 : .25))
+    oscillator.start(); oscillator.stop(context.currentTime + (success ? .22 : .35))
     oscillator.onended = () => void context.close()
   } catch { /* sound is optional when the browser blocks audio */ }
 }
