@@ -186,14 +186,23 @@ function fileToBase64(file: File): Promise<string> {
     reader.onload = () => {
       const image = new Image()
       image.onload = () => {
-        const scale = Math.min(1, 1280 / Math.max(image.width, image.height))
+        const scale = Math.min(1, 640 / Math.max(image.width, image.height))
         const canvas = document.createElement('canvas')
         canvas.width = Math.round(image.width * scale)
         canvas.height = Math.round(image.height * scale)
         const context = canvas.getContext('2d')
         if (!context) return reject(new Error('ပုံကို ပြင်ဆင်၍မရပါ။ အခြားပုံရွေးပါ။'))
         context.drawImage(image, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', .78))
+        let quality = .76
+        let result = canvas.toDataURL('image/jpeg', quality)
+        while (result.length > 45000 && quality > .3) {
+          quality -= .08
+          result = canvas.toDataURL('image/jpeg', quality)
+        }
+        if (result.length > 48000) {
+          return reject(new Error('ပုံဖိုင်ကို ချုံ့၍မရပါ။ ပိုသေးသောပုံကို ရွေးပါ။'))
+        }
+        resolve(result)
       }
       image.onerror = () => reject(new Error('ပုံဖိုင်ကို ဖတ်၍မရပါ။ JPG/PNG ပုံရွေးပါ။'))
       image.src = String(reader.result)

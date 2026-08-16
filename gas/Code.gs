@@ -470,7 +470,14 @@ function uploadImageToDrive(base64Data, fileName) {
     
     return 'https://drive.google.com/uc?export=view&id=' + file.getId();
   } catch (err) {
-    throw new Error('Failed to upload image: ' + err.message);
+    // Some existing web-app deployments were authorized before Drive scope was
+    // added. Keep product creation working by storing the already-compressed
+    // data URL directly in the Sheet until the owner re-authorizes Drive.
+    const inlineImage = String(base64Data || '');
+    if (/^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(inlineImage) && inlineImage.length <= 48000) {
+      return inlineImage;
+    }
+    throw new Error('ပုံတင်၍မရပါ။ Apps Script တွင် authorizeServices ကို Run လုပ်ပြီး Drive permission ပေးပါ။');
   }
 }
 

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
 import type { Product } from '../lib/api'
@@ -18,6 +18,7 @@ export default function POS() {
   const [showCheckout, setShowCheckout] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
+  const lastHandledScan = useRef({ code: '', time: 0 })
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type })
@@ -95,6 +96,9 @@ export default function POS() {
   }
 
   const handleScan = (code: string) => {
+    const now = Date.now()
+    if (lastHandledScan.current.code === code && now - lastHandledScan.current.time < 3000) return
+    lastHandledScan.current = { code, time: now }
     const product = products.find((p) => barcodeMatches(p.barcode, code))
     if (product) {
       playScanSound(true)
