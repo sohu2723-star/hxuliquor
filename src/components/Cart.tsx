@@ -3,9 +3,9 @@ import type { Product } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 
 interface CartProps {
-  items: { product: Product; quantity: number }[]
-  onUpdateQuantity: (productId: string, delta: number) => void
-  onRemove: (productId: string) => void
+  items: { product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]
+  onUpdateQuantity: (productId: string, saleUnit: 'unit' | 'pack', delta: number) => void
+  onRemove: (productId: string, saleUnit: 'unit' | 'pack') => void
   onCheckout: () => void
   requiresAgeCheck: boolean
 }
@@ -20,7 +20,7 @@ export default function Cart({
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
 
   const total = items.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
+    (sum, item) => sum + (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity,
     0
   )
 
@@ -32,24 +32,26 @@ export default function Cart({
         {items.length === 0 ? (
           <p className="text-gray-500 text-center py-8">Cart is empty</p>
         ) : (
-          items.map(({ product, quantity }) => (
+          items.map(({ product, quantity, saleUnit }) => {
+            const lineId = `${product.id}-${saleUnit}`
+            return (
             <div
-              key={product.id}
+              key={`${product.id}-${saleUnit}`}
               className="border border-gray-200 rounded-md p-3"
             >
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <p className="font-medium">{product.name}</p>
-                  <p className="text-sm text-gray-500">{product.category}</p>
+                  <p className="text-sm font-medium text-gray-500">{saleUnit === 'pack' ? `📦 ပါကင် (${product.unitsPerPack} ခု)` : '🍾 တစ်ဘူး / တစ်ခု'}</p>
                   <p className="font-semibold text-primary mt-1">
-                    {formatCurrency(product.price)}
+                    {formatCurrency(saleUnit === 'pack' ? product.packPrice : product.price)}
                   </p>
                 </div>
-                {pendingRemoveId === product.id ? (
+                {pendingRemoveId === lineId ? (
                   <div className="flex gap-1">
                     <button
                       onClick={() => {
-                        onRemove(product.id)
+                        onRemove(product.id, saleUnit)
                         setPendingRemoveId(null)
                       }}
                       className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
@@ -65,7 +67,7 @@ export default function Cart({
                   </div>
                 ) : (
                   <button
-                    onClick={() => setPendingRemoveId(product.id)}
+                      onClick={() => setPendingRemoveId(lineId)}
                     className="text-red-600 hover:text-red-800 text-lg font-bold leading-none"
                   >
                     ×
@@ -76,26 +78,26 @@ export default function Cart({
               <div className="flex items-center justify-between mt-3">
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => onUpdateQuantity(product.id, -1)}
+                      onClick={() => onUpdateQuantity(product.id, saleUnit, -1)}
                     className="w-8 h-8 rounded-md bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold"
                   >
                     -
                   </button>
                   <span className="w-8 text-center font-medium">{quantity}</span>
                   <button
-                    onClick={() => onUpdateQuantity(product.id, 1)}
-                    disabled={quantity >= product.stockQty}
+                    onClick={() => onUpdateQuantity(product.id, saleUnit, 1)}
+                    disabled={quantity * (saleUnit === 'pack' ? product.unitsPerPack : 1) >= product.stockQty}
                     className="w-8 h-8 rounded-md bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold disabled:opacity-50"
                   >
                     +
                   </button>
                 </div>
                 <span className="font-semibold">
-                  {formatCurrency(product.price * quantity)}
+                  {formatCurrency((saleUnit === 'pack' ? product.packPrice : product.price) * quantity)}
                 </span>
               </div>
             </div>
-          ))
+          )})
         )}
       </div>
 

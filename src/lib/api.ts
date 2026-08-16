@@ -23,6 +23,7 @@ export type Product = {
   stockQty: number
   lowStockThreshold: number
   unitsPerPack: number
+  packPrice: number
   requiresAgeCheck: boolean
   imageUrl: string
   createdAt: string
@@ -95,6 +96,7 @@ function normalizeProduct(value: unknown): Product | null {
     stockQty: asInteger(value.stockQty),
     lowStockThreshold: asInteger(value.lowStockThreshold),
     unitsPerPack: Math.max(1, asInteger(value.unitsPerPack) || 1),
+    packPrice: asNumber(value.packPrice),
     requiresAgeCheck: asBoolean(value.requiresAgeCheck),
     imageUrl: asString(value.imageUrl),
     createdAt: asString(value.createdAt),
@@ -367,7 +369,7 @@ export const api = {
   async createSale(payload: {
     cashierId: string
     cashierName: string
-    items: { productId: string; quantity: number }[]
+    items: { productId: string; quantity: number; saleUnit: 'unit' | 'pack' }[]
     ageVerified: boolean
     paymentMethod: string
   }): Promise<Sale> {
@@ -387,6 +389,7 @@ export const api = {
     stockQty: number
     lowStockThreshold: number
     unitsPerPack: number
+    packPrice: number
     requiresAgeCheck: boolean
     imageBase64?: string
     imageFileName?: string
@@ -408,6 +411,7 @@ export const api = {
     stockQty?: number
     lowStockThreshold?: number
     unitsPerPack?: number
+    packPrice?: number
     requiresAgeCheck?: boolean
     imageBase64?: string
     imageFileName?: string

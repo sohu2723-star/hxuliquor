@@ -20,6 +20,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     stockQty: product?.stockQty?.toString() || '',
     lowStockThreshold: product?.lowStockThreshold?.toString() || '5',
     unitsPerPack: product?.unitsPerPack?.toString() || '1',
+    packPrice: product?.packPrice?.toString() || '',
     requiresAgeCheck: product?.requiresAgeCheck || false,
   })
   const [imageFile, setImageFile] = useState<File | undefined>()
@@ -70,6 +71,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       stockQty: parseInt(formData.stockQty) || 0,
       lowStockThreshold: parseInt(formData.lowStockThreshold) || 0,
       unitsPerPack: Math.max(1, parseInt(formData.unitsPerPack) || 1),
+      packPrice: parseFloat(formData.packPrice) || 0,
       requiresAgeCheck: formData.requiresAgeCheck,
     }
 
@@ -194,10 +196,17 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">တစ်ပါကင်တွင် ပါဝင်သည့် အရေအတွက်</label>
-              <input type="number" name="unitsPerPack" min="1" value={formData.unitsPerPack} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
-              <p className="mt-1 text-xs text-gray-500">ဥပမာ တစ်ပါကင် 12 ဘူးဆိုလျှင် 12 ထည့်ပါ။ Stock ကို ဘူး/ခု အရေအတွက်ဖြင့်ထားပါ။</p>
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+              <h3 className="font-semibold text-slate-900">ပါကင်လိုက် ရောင်းရန် (မရှိလျှင် မဖြည့်ပါနှင့်)</h3>
+              <p className="mb-3 mt-1 text-xs text-slate-600">POS တွင် “တစ်ဘူး” နှင့် “တစ်ပါကင်” ခွဲပြပါမည်။ Stock ကို ဘူးအရေအတွက်ဖြင့်သာ ထည့်ပါ။</p>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-sm font-medium text-gray-700">တစ်ပါကင်ပါဝင်မှု
+                  <input type="number" name="unitsPerPack" min="1" value={formData.unitsPerPack} onChange={handleChange} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
+                </label>
+                <label className="text-sm font-medium text-gray-700">တစ်ပါကင်ဈေး (Ks)
+                  <input type="number" name="packPrice" min="0" value={formData.packPrice} onChange={handleChange} placeholder="ဥပမာ 33000" className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
+                </label>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

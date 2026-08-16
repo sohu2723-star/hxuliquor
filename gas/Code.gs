@@ -111,7 +111,7 @@ function initSheets() {
 
   const products = setupSheet('Products', [
     'id', 'barcode', 'name', 'category', 'price', 'costPrice',
-    'stockQty', 'lowStockThreshold', 'unitsPerPack', 'requiresAgeCheck', 'imageUrl', 'createdAt'
+    'stockQty', 'lowStockThreshold', 'unitsPerPack', 'packPrice', 'requiresAgeCheck', 'imageUrl', 'createdAt'
   ]);
   setupSheet('Sales', [
     'id', 'cashierId', 'cashierName', 'totalAmount', 'paymentMethod', 'ageVerified', 'createdAt'
@@ -278,6 +278,7 @@ function getProducts() {
     stockQty: integerValue(p.stockQty),
     lowStockThreshold: integerValue(p.lowStockThreshold),
     unitsPerPack: Math.max(1, integerValue(p.unitsPerPack, 1)),
+    packPrice: numberValue(p.packPrice),
     requiresAgeCheck: booleanValue(p.requiresAgeCheck),
     imageUrl: text(p.imageUrl),
     createdAt: text(p.createdAt)
@@ -499,43 +500,43 @@ function createSale(params, actor) {
     const items = Array.isArray(params && params.items) ? params.items : [];
     if (!items.length) throw new Error('Cart ထဲတွင် product မရှိပါ။');
 
-    const mergedItems = {};
-    items.forEach(item => {
-      const productId = text(item && item.productId);
-      const quantity = integerValue(item && item.quantity);
-      if (!productId || quantity <= 0) throw new Error('Cart item မမှန်ပါ။');
-      mergedItems[productId] = (mergedItems[productId] || 0) + quantity;
-    });
-
     const productsSheet = ss.getSheetByName('Products');
     const products = sheetToObjects(productsSheet);
     const remainingStock = {};
+    const stockUsed = {};
     let totalAmount = 0;
     const saleItems = [];
 
-    Object.keys(mergedItems).forEach(productId => {
-      const quantity = mergedItems[productId];
+    items.forEach(item => {
+      const productId = text(item && item.productId);
+      const quantity = integerValue(item && item.quantity);
+      const saleUnit = text(item && item.saleUnit, 'unit') === 'pack' ? 'pack' : 'unit';
+      if (!productId || quantity <= 0) throw new Error('Cart item မမှန်ပါ။');
       const product = products.find(p => text(p.id) === productId);
       if (!product) throw new Error('Product ' + productId + ' not found');
       const stockQty = integerValue(product.stockQty);
-      if (stockQty < quantity) throw new Error('Insufficient stock for ' + text(product.name, 'Unnamed product'));
-      remainingStock[productId] = stockQty - quantity;
+      const unitsPerPack = Math.max(1, integerValue(product.unitsPerPack, 1));
+      const stockQuantity = quantity * (saleUnit === 'pack' ? unitsPerPack : 1);
+      stockUsed[productId] = (stockUsed[productId] || 0) + stockQuantity;
+      if (stockQty < stockUsed[productId]) throw new Error('Insufficient stock for ' + text(product.name, 'Unnamed product'));
+      remainingStock[productId] = stockQty - stockUsed[productId];
       if (booleanValue(product.requiresAgeCheck) && !booleanValue(params.ageVerified)) {
         throw new Error('Age verification required for restricted items');
       }
 
-      const unitPrice = numberValue(product.price);
-      const subtotal = unitPrice * quantity;
+      const sellingPrice = saleUnit === 'pack' ? numberValue(product.packPrice) : numberValue(product.price);
+      if (saleUnit === 'pack' && (unitsPerPack <= 1 || sellingPrice <= 0)) throw new Error('Pack price is not configured for ' + text(product.name));
+      const subtotal = sellingPrice * quantity;
       const unitCost = numberValue(product.costPrice);
-      const profit = (unitPrice - unitCost) * quantity;
+      const profit = subtotal - (unitCost * stockQuantity);
       totalAmount += subtotal;
       saleItems.push({
         id: generateId(),
         saleId: '',
         productId: productId,
-        productName: text(product.name),
-        quantity: quantity,
-        unitPrice: unitPrice,
+        productName: text(product.name) + (saleUnit === 'pack' ? ' (Pack x' + unitsPerPack + ')' : ''),
+        quantity: stockQuantity,
+        unitPrice: subtotal / stockQuantity,
         subtotal: subtotal,
         unitCost: unitCost,
         profit: profit
@@ -624,6 +625,7 @@ function addProduct(params) {
     stockQty: integerValue(params.stockQty),
     lowStockThreshold: integerValue(params.lowStockThreshold),
     unitsPerPack: Math.max(1, integerValue(params.unitsPerPack, 1)),
+    packPrice: numberValue(params.packPrice),
     requiresAgeCheck: booleanValue(params.requiresAgeCheck),
     imageUrl: imageUrl,
     createdAt: new Date().toISOString()
@@ -661,6 +663,7 @@ function updateProduct(params) {
     stockQty: params.stockQty === undefined ? integerValue(current.stockQty) : integerValue(params.stockQty),
     lowStockThreshold: params.lowStockThreshold === undefined ? integerValue(current.lowStockThreshold) : integerValue(params.lowStockThreshold),
     unitsPerPack: params.unitsPerPack === undefined ? Math.max(1, integerValue(current.unitsPerPack, 1)) : Math.max(1, integerValue(params.unitsPerPack, 1)),
+    packPrice: params.packPrice === undefined ? numberValue(current.packPrice) : numberValue(params.packPrice),
     requiresAgeCheck: params.requiresAgeCheck === undefined ? booleanValue(current.requiresAgeCheck) : booleanValue(params.requiresAgeCheck),
     imageUrl: imageUrl,
     createdAt: text(current.createdAt, new Date().toISOString())
