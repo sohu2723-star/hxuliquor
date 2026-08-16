@@ -8,8 +8,13 @@ export default function AdminEmployees() {
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const load = () => api.getEmployees().then(setEmployees).catch((e) => setMessage(e.message))
-  useEffect(() => { void load() }, [])
+  const load = (force = false) => api.getEmployees(force).then((fresh) => setEmployees((current) => JSON.stringify(current) === JSON.stringify(fresh) ? current : fresh)).catch((e) => { if (!force) setMessage(e.message) })
+  useEffect(() => {
+    void load()
+    const initialRefresh = window.setTimeout(() => void load(true), 100)
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(true) }, 30000)
+    return () => { window.clearTimeout(initialRefresh); window.clearInterval(timer) }
+  }, [])
 
   const add = async (event: React.FormEvent) => {
     event.preventDefault()

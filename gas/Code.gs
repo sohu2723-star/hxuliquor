@@ -8,7 +8,7 @@ const GOOGLE_CLIENT_ID = ''; // Set to your Google OAuth client ID for token val
 const ss = SpreadsheetApp.openById(SHEET_ID);
 
 const ADMIN_ACTIONS = new Set([
-  'addEmployee', 'deleteEmployee', 'addProduct', 'updateProduct', 'deleteProduct', 'getEmployees'
+  'addEmployee', 'deleteEmployee', 'addProduct', 'updateProduct', 'deleteProduct', 'getEmployees', 'payCredit'
 ]);
 
 // The frontend reaches this web app through its same-origin Vercel proxy because
@@ -76,6 +76,7 @@ function handleRequest(e) {
       case 'addEmployee': result = addEmployee(params); break;
       case 'deleteEmployee': result = deleteEmployee(params.id); break;
       case 'createSale': result = createSale(params, actor); break;
+      case 'payCredit': result = payCredit(params.saleId); break;
       case 'addProduct': result = addProduct(params); break;
       case 'updateProduct': result = updateProduct(params); break;
       case 'deleteProduct': result = deleteProduct(params.id); break;
@@ -111,13 +112,14 @@ function initSheets() {
 
   const products = setupSheet('Products', [
     'id', 'barcode', 'name', 'category', 'price', 'costPrice',
-    'stockQty', 'lowStockThreshold', 'requiresAgeCheck', 'imageUrl', 'createdAt'
+    'stockQty', 'lowStockThreshold', 'unitsPerPack', 'packPrice', 'saleType', 'requiresAgeCheck', 'imageUrl', 'createdAt'
   ]);
   setupSheet('Sales', [
-    'id', 'cashierId', 'cashierName', 'totalAmount', 'paymentMethod', 'ageVerified', 'createdAt'
+    'id', 'cashierId', 'cashierName', 'cashierEmail', 'totalAmount', 'paidAmount', 'balanceDue',
+    'customerName', 'isCredit', 'settledAt', 'paymentMethod', 'ageVerified', 'createdAt'
   ]);
   setupSheet('SaleItems', [
-    'id', 'saleId', 'productId', 'productName', 'quantity', 'unitPrice', 'subtotal', 'unitCost', 'profit'
+    'id', 'saleId', 'productId', 'productName', 'quantity', 'saleQuantity', 'saleUnit', 'unitPrice', 'subtotal', 'unitCost', 'profit'
   ]);
   const users = setupSheet('Users', [
     'id', 'name', 'email', 'passwordHash', 'role', 'createdAt'
@@ -277,6 +279,9 @@ function getProducts() {
     costPrice: numberValue(p.costPrice),
     stockQty: integerValue(p.stockQty),
     lowStockThreshold: integerValue(p.lowStockThreshold),
+    unitsPerPack: Math.max(1, integerValue(p.unitsPerPack, 1)),
+    packPrice: numberValue(p.packPrice),
+    saleType: ['unit', 'pack'].includes(text(p.saleType)) ? text(p.saleType) : 'both',
     requiresAgeCheck: booleanValue(p.requiresAgeCheck),
     imageUrl: text(p.imageUrl),
     createdAt: text(p.createdAt)
@@ -285,11 +290,17 @@ function getProducts() {
 
 function getProductByBarcode(barcode) {
   const products = getProducts();
-  const scanned = String(barcode).trim();
-  return products.find(p => String(p.barcode).split(/[,\n]/).some(code => {
-    const saved = code.trim();
-    return saved.endsWith('*') ? scanned.startsWith(saved.slice(0, -1)) : saved === scanned;
+  const scanned = normalizeBarcode(barcode);
+  return products.find(p => String(p.barcode).split(/[,\n;]/).some(code => {
+    const saved = normalizeBarcode(code);
+    if (!saved) return false;
+    return saved.endsWith('*') ? scanned.startsWith(saved.slice(0, -1))
+      : saved === scanned || '0' + saved === scanned || saved === '0' + scanned;
   })) || null;
+}
+
+function normalizeBarcode(value) {
+  return String(value || '').trim().replace(/[\s-]+/g, '').toUpperCase();
 }
 
 function searchProducts(query) {
@@ -315,19 +326,23 @@ function getSales(startDate, endDate) {
   const items = sheetToObjects(itemsSheet);
 
   let filtered = sales;
-  if (startDate) {
-    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), Session.getScriptTimeZone(), 'yyyy-MM-dd') >= startDate);
-  }
-  if (endDate) {
-    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), Session.getScriptTimeZone(), 'yyyy-MM-dd') <= endDate);
-  }
+  if (startDate || endDate) filtered = filtered.filter(s => {
+    const dates = [s.createdAt, s.settledAt].filter(Boolean).map(value => Utilities.formatDate(new Date(value), 'Asia/Yangon', 'yyyy-MM-dd'));
+    return dates.some(date => (!startDate || date >= startDate) && (!endDate || date <= endDate));
+  });
 
   return filtered.map(sale => ({
     ...sale,
     id: text(sale.id),
     cashierId: text(sale.cashierId),
     cashierName: text(sale.cashierName, 'Cashier'),
+    cashierEmail: text(sale.cashierEmail),
     totalAmount: numberValue(sale.totalAmount),
+    paidAmount: sale.paidAmount === '' ? numberValue(sale.totalAmount) : numberValue(sale.paidAmount),
+    balanceDue: numberValue(sale.balanceDue),
+    customerName: text(sale.customerName),
+    isCredit: booleanValue(sale.isCredit),
+    settledAt: text(sale.settledAt),
     paymentMethod: text(sale.paymentMethod, 'cash'),
     ageVerified: booleanValue(sale.ageVerified),
     createdAt: text(sale.createdAt),
@@ -338,6 +353,8 @@ function getSales(startDate, endDate) {
       subtotal: parseFloat(i.subtotal) || 0,
       unitCost: parseFloat(i.unitCost) || 0,
       profit: parseFloat(i.profit) || 0
+      ,saleQuantity: parseInt(i.saleQuantity) || parseInt(i.quantity) || 0
+      ,saleUnit: text(i.saleUnit, 'unit')
     }))
   }));
 }
@@ -461,9 +478,16 @@ function uploadImageToDrive(base64Data, fileName) {
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
-    return file.getUrl();
+    return 'https://drive.google.com/uc?export=view&id=' + file.getId();
   } catch (err) {
-    throw new Error('Failed to upload image: ' + err.message);
+    // Some existing web-app deployments were authorized before Drive scope was
+    // added. Keep product creation working by storing the already-compressed
+    // data URL directly in the Sheet until the owner re-authorizes Drive.
+    const inlineImage = String(base64Data || '');
+    if (/^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(inlineImage) && inlineImage.length <= 48000) {
+      return inlineImage;
+    }
+    throw new Error('ပုံတင်၍မရပါ။ Apps Script တွင် authorizeServices ကို Run လုပ်ပြီး Drive permission ပေးပါ။');
   }
 }
 
@@ -485,41 +509,46 @@ function createSale(params, actor) {
     const items = Array.isArray(params && params.items) ? params.items : [];
     if (!items.length) throw new Error('Cart ထဲတွင် product မရှိပါ။');
 
-    const mergedItems = {};
-    items.forEach(item => {
-      const productId = text(item && item.productId);
-      const quantity = integerValue(item && item.quantity);
-      if (!productId || quantity <= 0) throw new Error('Cart item မမှန်ပါ။');
-      mergedItems[productId] = (mergedItems[productId] || 0) + quantity;
-    });
-
     const productsSheet = ss.getSheetByName('Products');
     const products = sheetToObjects(productsSheet);
+    const remainingStock = {};
+    const stockUsed = {};
     let totalAmount = 0;
     const saleItems = [];
 
-    Object.keys(mergedItems).forEach(productId => {
-      const quantity = mergedItems[productId];
+    items.forEach(item => {
+      const productId = text(item && item.productId);
+      const quantity = integerValue(item && item.quantity);
+      const saleUnit = text(item && item.saleUnit, 'unit') === 'pack' ? 'pack' : 'unit';
+      if (!productId || quantity <= 0) throw new Error('Cart item မမှန်ပါ။');
       const product = products.find(p => text(p.id) === productId);
       if (!product) throw new Error('Product ' + productId + ' not found');
       const stockQty = integerValue(product.stockQty);
-      if (stockQty < quantity) throw new Error('Insufficient stock for ' + text(product.name, 'Unnamed product'));
+      const unitsPerPack = Math.max(1, integerValue(product.unitsPerPack, 1));
+      const separatePackStock = text(product.saleType) === 'pack';
+      const stockQuantity = quantity * (saleUnit === 'pack' && !separatePackStock ? unitsPerPack : 1);
+      stockUsed[productId] = (stockUsed[productId] || 0) + stockQuantity;
+      if (stockQty < stockUsed[productId]) throw new Error('Insufficient stock for ' + text(product.name, 'Unnamed product'));
+      remainingStock[productId] = stockQty - stockUsed[productId];
       if (booleanValue(product.requiresAgeCheck) && !booleanValue(params.ageVerified)) {
         throw new Error('Age verification required for restricted items');
       }
 
-      const unitPrice = numberValue(product.price);
-      const subtotal = unitPrice * quantity;
+      const sellingPrice = saleUnit === 'pack' ? numberValue(product.packPrice, numberValue(product.price)) : numberValue(product.price);
+      if (saleUnit === 'pack' && (unitsPerPack <= 1 || sellingPrice <= 0)) throw new Error('Pack price is not configured for ' + text(product.name));
+      const subtotal = sellingPrice * quantity;
       const unitCost = numberValue(product.costPrice);
-      const profit = (unitPrice - unitCost) * quantity;
+      const profit = subtotal - (unitCost * stockQuantity);
       totalAmount += subtotal;
       saleItems.push({
         id: generateId(),
         saleId: '',
         productId: productId,
-        productName: text(product.name),
-        quantity: quantity,
-        unitPrice: unitPrice,
+        productName: text(product.name) + (saleUnit === 'pack' ? ' (Pack x' + unitsPerPack + ')' : ''),
+        quantity: stockQuantity,
+        saleQuantity: quantity,
+        saleUnit: saleUnit,
+        unitPrice: subtotal / stockQuantity,
         subtotal: subtotal,
         unitCost: unitCost,
         profit: profit
@@ -529,31 +558,34 @@ function createSale(params, actor) {
     const saleId = generateId();
     const createdAt = new Date();
     const paymentMethod = text(params.paymentMethod, 'cash');
+    const isCredit = booleanValue(params.isCredit) || paymentMethod.toLowerCase() === 'credit';
+    const customerName = text(params.customerName);
+    if (isCredit && !customerName) throw new Error('အကြွေးရောင်းရန် customer name လိုအပ်ပါသည်။');
+    const paidAmount = isCredit ? 0 : totalAmount;
+    const balanceDue = isCredit ? totalAmount : 0;
     const ageVerified = booleanValue(params.ageVerified);
-    ss.getSheetByName('Sales').appendRow([
-      saleId,
-      actor.id,
-      actor.name,
-      totalAmount,
-      paymentMethod,
-      ageVerified,
-      createdAt
-    ]);
+    appendObject(ss.getSheetByName('Sales'), {
+      id: saleId, cashierId: actor.id, cashierName: actor.name, cashierEmail: actor.email,
+      totalAmount: totalAmount, paidAmount: paidAmount, balanceDue: balanceDue,
+      customerName: customerName, isCredit: isCredit, settledAt: '',
+      paymentMethod: paymentMethod, ageVerified: ageVerified, createdAt: createdAt
+    });
 
     const saleItemsSheet = ss.getSheetByName('SaleItems');
     saleItems.forEach(item => {
       item.saleId = saleId;
-      saleItemsSheet.appendRow([
-        item.id,
-        item.saleId,
-        item.productId,
-        item.productName,
-        item.quantity,
-        item.unitPrice,
-        item.subtotal,
-        item.unitCost,
-        item.profit
-      ]);
+      appendObject(saleItemsSheet, item);
+    });
+
+    // Stock is stored as individual units. One bottle sold subtracts one;
+    // selling a 12-unit pack subtracts 12 through the same quantity field.
+    const productSheetHeaders = productsSheet.getRange(1, 1, 1, productsSheet.getLastColumn()).getValues()[0];
+    const stockColumn = productSheetHeaders.indexOf('stockQty') + 1;
+    products.forEach((product, index) => {
+      const productId = text(product.id);
+      if (remainingStock[productId] !== undefined) {
+        productsSheet.getRange(index + 2, stockColumn).setValue(remainingStock[productId]);
+      }
     });
 
     return {
@@ -562,7 +594,13 @@ function createSale(params, actor) {
         id: saleId,
         cashierId: actor.id,
         cashierName: actor.name,
+        cashierEmail: actor.email,
         totalAmount,
+        paidAmount,
+        balanceDue,
+        customerName,
+        isCredit,
+        settledAt: '',
         paymentMethod,
         ageVerified,
         createdAt: createdAt.toISOString(),
@@ -572,6 +610,22 @@ function createSale(params, actor) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function payCredit(saleId) {
+  initSheets();
+  const sheet = ss.getSheetByName('Sales');
+  const sales = sheetToObjects(sheet);
+  const index = sales.findIndex(sale => text(sale.id) === text(saleId));
+  if (index < 0) throw new Error('အကြွေးစာရင်း မတွေ့ပါ။');
+  const sale = sales[index];
+  if (numberValue(sale.balanceDue) <= 0) throw new Error('ဤအကြွေးစာရင်း ပေးချေပြီးဖြစ်ပါသည်။');
+  sale.paidAmount = numberValue(sale.totalAmount);
+  sale.balanceDue = 0;
+  sale.settledAt = new Date().toISOString();
+  const salesSheetHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  sheet.getRange(index + 2, 1, 1, salesSheetHeaders.length).setValues([salesSheetHeaders.map(header => sale[header] ?? '')]);
+  return { success: true, sale: getSales().find(item => item.id === text(saleId)) };
 }
 
 function addProduct(params) {
@@ -596,6 +650,9 @@ function addProduct(params) {
     costPrice: numberValue(params.costPrice),
     stockQty: integerValue(params.stockQty),
     lowStockThreshold: integerValue(params.lowStockThreshold),
+    unitsPerPack: Math.max(1, integerValue(params.unitsPerPack, 1)),
+    packPrice: numberValue(params.packPrice),
+    saleType: ['unit', 'pack'].includes(text(params.saleType)) ? text(params.saleType) : 'both',
     requiresAgeCheck: booleanValue(params.requiresAgeCheck),
     imageUrl: imageUrl,
     createdAt: new Date().toISOString()
@@ -632,14 +689,17 @@ function updateProduct(params) {
     costPrice: params.costPrice === undefined ? numberValue(current.costPrice) : numberValue(params.costPrice),
     stockQty: params.stockQty === undefined ? integerValue(current.stockQty) : integerValue(params.stockQty),
     lowStockThreshold: params.lowStockThreshold === undefined ? integerValue(current.lowStockThreshold) : integerValue(params.lowStockThreshold),
+    unitsPerPack: params.unitsPerPack === undefined ? Math.max(1, integerValue(current.unitsPerPack, 1)) : Math.max(1, integerValue(params.unitsPerPack, 1)),
+    packPrice: params.packPrice === undefined ? numberValue(current.packPrice) : numberValue(params.packPrice),
+    saleType: params.saleType === undefined ? text(current.saleType, 'both') : (['unit', 'pack'].includes(text(params.saleType)) ? text(params.saleType) : 'both'),
     requiresAgeCheck: params.requiresAgeCheck === undefined ? booleanValue(current.requiresAgeCheck) : booleanValue(params.requiresAgeCheck),
     imageUrl: imageUrl,
     createdAt: text(current.createdAt, new Date().toISOString())
   };
 
-  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
-  const row = headers.map(header => updated[header] ?? '');
-  sheet.getRange(index + 2, 1, 1, headers.length).setValues([row]);
+  const productUpdateHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  const row = productUpdateHeaders.map(header => updated[header] ?? '');
+  sheet.getRange(index + 2, 1, 1, productUpdateHeaders.length).setValues([row]);
   return { success: true, product: updated };
 }
 
