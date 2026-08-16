@@ -78,8 +78,8 @@ export default function AdminProducts() {
 
       setShowForm(false)
       setEditingProduct(null)
-      loadProducts()
-      loadCategories()
+      void refreshProducts()
+      void loadCategories()
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to save product', 'error')
     }
@@ -90,7 +90,7 @@ export default function AdminProducts() {
     try {
       await api.deleteProduct(id)
       showToast('Product deleted', 'success')
-      loadProducts()
+      void refreshProducts()
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to delete product', 'error')
     }
@@ -125,29 +125,35 @@ export default function AdminProducts() {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-2xl font-bold">Product Management</h1>
-          <button
-            onClick={() => {
-              setEditingProduct(null)
-              setShowForm(true)
-            }}
-            className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-          >
-            Add Product
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => void refreshProducts()} disabled={isLoading} className="border border-gray-300 px-4 py-2 rounded-md disabled:opacity-50">
+              {isLoading ? 'Loading...' : 'Refresh'}
+            </button>
+            <button onClick={() => { setEditingProduct(null); setShowForm(true) }} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
+              Add Product
+            </button>
+          </div>
         </div>
 
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <h1 className="text-2xl font-bold">Product Management</h1>
-            <div className="flex gap-2">
-              <button onClick={() => void refreshProducts()} disabled={isLoading} className="border border-gray-300 px-4 py-2 rounded-md disabled:opacity-50">
-                {isLoading ? 'Loading...' : 'Refresh'}
-              </button>
-              <button onClick={() => { setEditingProduct(null); setShowForm(true) }} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
-                Add Product
-              </button>
-            </div>
-          </div>
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <input
+            type="text"
+            placeholder="Search by name or barcode..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="">All Categories</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
 
         <ProductList
           products={filteredProducts}
