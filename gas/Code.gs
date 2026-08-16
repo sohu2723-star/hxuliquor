@@ -111,7 +111,7 @@ function initSheets() {
 
   const products = setupSheet('Products', [
     'id', 'barcode', 'name', 'category', 'price', 'costPrice',
-    'stockQty', 'lowStockThreshold', 'requiresAgeCheck', 'imageUrl', 'createdAt'
+    'stockQty', 'lowStockThreshold', 'unitsPerPack', 'packPrice', 'requiresAgeCheck', 'imageUrl', 'createdAt'
   ]);
   setupSheet('Sales', [
     'id', 'cashierId', 'cashierName', 'totalAmount', 'paymentMethod', 'ageVerified', 'createdAt'
@@ -277,6 +277,8 @@ function getProducts() {
     costPrice: numberValue(p.costPrice),
     stockQty: integerValue(p.stockQty),
     lowStockThreshold: integerValue(p.lowStockThreshold),
+    unitsPerPack: Math.max(1, integerValue(p.unitsPerPack, 1)),
+    packPrice: numberValue(p.packPrice),
     requiresAgeCheck: booleanValue(p.requiresAgeCheck),
     imageUrl: text(p.imageUrl),
     createdAt: text(p.createdAt)
@@ -285,11 +287,17 @@ function getProducts() {
 
 function getProductByBarcode(barcode) {
   const products = getProducts();
-  const scanned = String(barcode).trim();
-  return products.find(p => String(p.barcode).split(/[,\n]/).some(code => {
-    const saved = code.trim();
-    return saved.endsWith('*') ? scanned.startsWith(saved.slice(0, -1)) : saved === scanned;
+  const scanned = normalizeBarcode(barcode);
+  return products.find(p => String(p.barcode).split(/[,\n;]/).some(code => {
+    const saved = normalizeBarcode(code);
+    if (!saved) return false;
+    return saved.endsWith('*') ? scanned.startsWith(saved.slice(0, -1))
+      : saved === scanned || '0' + saved === scanned || saved === '0' + scanned;
   })) || null;
+}
+
+function normalizeBarcode(value) {
+  return String(value || '').trim().replace(/[\s-]+/g, '').toUpperCase();
 }
 
 function searchProducts(query) {
@@ -316,10 +324,10 @@ function getSales(startDate, endDate) {
 
   let filtered = sales;
   if (startDate) {
-    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), Session.getScriptTimeZone(), 'yyyy-MM-dd') >= startDate);
+    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), 'Asia/Yangon', 'yyyy-MM-dd') >= startDate);
   }
   if (endDate) {
-    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), Session.getScriptTimeZone(), 'yyyy-MM-dd') <= endDate);
+    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), 'Asia/Yangon', 'yyyy-MM-dd') <= endDate);
   }
 
   return filtered.map(sale => ({
@@ -461,9 +469,16 @@ function uploadImageToDrive(base64Data, fileName) {
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
-    return file.getUrl();
+    return 'https://drive.google.com/uc?export=view&id=' + file.getId();
   } catch (err) {
-    throw new Error('Failed to upload image: ' + err.message);
+    // Some existing web-app deployments were authorized before Drive scope was
+    // added. Keep product creation working by storing the already-compressed
+    // data URL directly in the Sheet until the owner re-authorizes Drive.
+    const inlineImage = String(base64Data || '');
+    if (/^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(inlineImage) && inlineImage.length <= 48000) {
+      return inlineImage;
+    }
+    throw new Error('ပုံတင်၍မရပါ။ Apps Script တွင် authorizeServices ကို Run လုပ်ပြီး Drive permission ပေးပါ။');
   }
 }
 
@@ -485,41 +500,43 @@ function createSale(params, actor) {
     const items = Array.isArray(params && params.items) ? params.items : [];
     if (!items.length) throw new Error('Cart ထဲတွင် product မရှိပါ။');
 
-    const mergedItems = {};
-    items.forEach(item => {
-      const productId = text(item && item.productId);
-      const quantity = integerValue(item && item.quantity);
-      if (!productId || quantity <= 0) throw new Error('Cart item မမှန်ပါ။');
-      mergedItems[productId] = (mergedItems[productId] || 0) + quantity;
-    });
-
     const productsSheet = ss.getSheetByName('Products');
     const products = sheetToObjects(productsSheet);
+    const remainingStock = {};
+    const stockUsed = {};
     let totalAmount = 0;
     const saleItems = [];
 
-    Object.keys(mergedItems).forEach(productId => {
-      const quantity = mergedItems[productId];
+    items.forEach(item => {
+      const productId = text(item && item.productId);
+      const quantity = integerValue(item && item.quantity);
+      const saleUnit = text(item && item.saleUnit, 'unit') === 'pack' ? 'pack' : 'unit';
+      if (!productId || quantity <= 0) throw new Error('Cart item မမှန်ပါ။');
       const product = products.find(p => text(p.id) === productId);
       if (!product) throw new Error('Product ' + productId + ' not found');
       const stockQty = integerValue(product.stockQty);
-      if (stockQty < quantity) throw new Error('Insufficient stock for ' + text(product.name, 'Unnamed product'));
+      const unitsPerPack = Math.max(1, integerValue(product.unitsPerPack, 1));
+      const stockQuantity = quantity * (saleUnit === 'pack' ? unitsPerPack : 1);
+      stockUsed[productId] = (stockUsed[productId] || 0) + stockQuantity;
+      if (stockQty < stockUsed[productId]) throw new Error('Insufficient stock for ' + text(product.name, 'Unnamed product'));
+      remainingStock[productId] = stockQty - stockUsed[productId];
       if (booleanValue(product.requiresAgeCheck) && !booleanValue(params.ageVerified)) {
         throw new Error('Age verification required for restricted items');
       }
 
-      const unitPrice = numberValue(product.price);
-      const subtotal = unitPrice * quantity;
+      const sellingPrice = saleUnit === 'pack' ? numberValue(product.packPrice) : numberValue(product.price);
+      if (saleUnit === 'pack' && (unitsPerPack <= 1 || sellingPrice <= 0)) throw new Error('Pack price is not configured for ' + text(product.name));
+      const subtotal = sellingPrice * quantity;
       const unitCost = numberValue(product.costPrice);
-      const profit = (unitPrice - unitCost) * quantity;
+      const profit = subtotal - (unitCost * stockQuantity);
       totalAmount += subtotal;
       saleItems.push({
         id: generateId(),
         saleId: '',
         productId: productId,
-        productName: text(product.name),
-        quantity: quantity,
-        unitPrice: unitPrice,
+        productName: text(product.name) + (saleUnit === 'pack' ? ' (Pack x' + unitsPerPack + ')' : ''),
+        quantity: stockQuantity,
+        unitPrice: subtotal / stockQuantity,
         subtotal: subtotal,
         unitCost: unitCost,
         profit: profit
@@ -554,6 +571,17 @@ function createSale(params, actor) {
         item.unitCost,
         item.profit
       ]);
+    });
+
+    // Stock is stored as individual units. One bottle sold subtracts one;
+    // selling a 12-unit pack subtracts 12 through the same quantity field.
+    const headers = productsSheet.getRange(1, 1, 1, productsSheet.getLastColumn()).getValues()[0];
+    const stockColumn = headers.indexOf('stockQty') + 1;
+    products.forEach((product, index) => {
+      const productId = text(product.id);
+      if (remainingStock[productId] !== undefined) {
+        productsSheet.getRange(index + 2, stockColumn).setValue(remainingStock[productId]);
+      }
     });
 
     return {
@@ -596,6 +624,8 @@ function addProduct(params) {
     costPrice: numberValue(params.costPrice),
     stockQty: integerValue(params.stockQty),
     lowStockThreshold: integerValue(params.lowStockThreshold),
+    unitsPerPack: Math.max(1, integerValue(params.unitsPerPack, 1)),
+    packPrice: numberValue(params.packPrice),
     requiresAgeCheck: booleanValue(params.requiresAgeCheck),
     imageUrl: imageUrl,
     createdAt: new Date().toISOString()
@@ -632,6 +662,8 @@ function updateProduct(params) {
     costPrice: params.costPrice === undefined ? numberValue(current.costPrice) : numberValue(params.costPrice),
     stockQty: params.stockQty === undefined ? integerValue(current.stockQty) : integerValue(params.stockQty),
     lowStockThreshold: params.lowStockThreshold === undefined ? integerValue(current.lowStockThreshold) : integerValue(params.lowStockThreshold),
+    unitsPerPack: params.unitsPerPack === undefined ? Math.max(1, integerValue(current.unitsPerPack, 1)) : Math.max(1, integerValue(params.unitsPerPack, 1)),
+    packPrice: params.packPrice === undefined ? numberValue(current.packPrice) : numberValue(params.packPrice),
     requiresAgeCheck: params.requiresAgeCheck === undefined ? booleanValue(current.requiresAgeCheck) : booleanValue(params.requiresAgeCheck),
     imageUrl: imageUrl,
     createdAt: text(current.createdAt, new Date().toISOString())
