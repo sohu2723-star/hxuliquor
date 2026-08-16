@@ -586,6 +586,17 @@ function createSale(params, actor) {
       }
     });
 
+    // Stock is stored as individual units. One bottle sold subtracts one;
+    // selling a 12-unit pack subtracts 12 through the same quantity field.
+    const headers = productsSheet.getRange(1, 1, 1, productsSheet.getLastColumn()).getValues()[0];
+    const stockColumn = headers.indexOf('stockQty') + 1;
+    products.forEach((product, index) => {
+      const productId = text(product.id);
+      if (remainingStock[productId] !== undefined) {
+        productsSheet.getRange(index + 2, stockColumn).setValue(remainingStock[productId]);
+      }
+    });
+
     return {
       success: true,
       sale: {
