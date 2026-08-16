@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
-import type { Product } from '../lib/api'
+import type { Product, Sale } from '../lib/api'
 import { api, barcodeMatches } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import AppHeader from '../components/AppHeader'
@@ -17,7 +17,9 @@ export default function POS() {
   const [showCheckout, setShowCheckout] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
+  const [completedSale, setCompletedSale] = useState<Sale | null>(null)
   const lastHandledScan = useRef({ code: '', time: 0 })
+  const productsRefreshing = useRef(false)
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type })
@@ -25,6 +27,8 @@ export default function POS() {
   }, [])
 
   const loadProducts = useCallback(async (forceRefresh = false) => {
+    if (productsRefreshing.current) return
+    productsRefreshing.current = true
     if (forceRefresh) {
       setIsLoading(true)
       try {
@@ -34,6 +38,7 @@ export default function POS() {
         showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
       } finally {
         setIsLoading(false)
+        productsRefreshing.current = false
       }
       return
     }
@@ -44,11 +49,16 @@ export default function POS() {
       showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
     } finally {
       setIsLoading(false)
+      productsRefreshing.current = false
     }
   }, [showToast])
 
   useEffect(() => {
     void loadProducts()
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void loadProducts(true)
+    }, 5000)
+    return () => window.clearInterval(timer)
   }, [loadProducts])
 
   const addToCart = useCallback((product: Product, saleUnit: 'unit' | 'pack' = 'unit') => {
@@ -74,7 +84,7 @@ export default function POS() {
       }
       return [...prev, { product, quantity: 1, saleUnit }]
     })
-    showToast(`Added ${product.name}`, 'success')
+    showToast(`✅ ${product.name} — ${saleUnit === 'pack' ? 'တစ်ပါကင်' : 'တစ်ဘူး/တစ်ခု'} Cart ထဲထည့်ပြီးပါပြီ`, 'success')
   }, [showToast])
 
   const removeFromCart = (productId: string, saleUnit: 'unit' | 'pack') => {
@@ -127,9 +137,11 @@ export default function POS() {
 
   const requiresAgeCheck = cart.some((item) => item.product.requiresAgeCheck)
 
-  const handleCheckoutSuccess = () => {
+  const handleCheckoutSuccess = (sale: Sale) => {
     setCart([])
     setShowCheckout(false)
+    setCompletedSale(sale)
+    showToast('✅ Checkout အောင်မြင်ပါသည်။ Slip ထွက်ပြီးပါပြီ။', 'success')
     loadProducts()
   }
 
@@ -353,6 +365,15 @@ export default function POS() {
           onSuccess={handleCheckoutSuccess}
         />
       )}
+      {completedSale && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 print:static print:bg-white print:p-0">
+        <div className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl print:max-h-none print:shadow-none">
+          <div className="text-center"><h2 className="text-xl font-bold">HXU Liquor POS</h2><p className="text-sm text-slate-500">SALE RECEIPT</p></div>
+          <div className="my-4 border-y py-3 text-xs text-slate-600"><p>{new Date(completedSale.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Yangon' })}</p><p>Cashier: {completedSale.cashierName} · {completedSale.cashierEmail}</p><p>Slip: {completedSale.id}</p></div>
+          <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
+          <div className="mt-4 border-t pt-3"><div className="flex justify-between text-lg font-bold"><span>Total</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800">အကြွေး · {completedSale.customerName} · ကျန်ငွေ {formatCurrency(completedSale.balanceDue)}</p>}</div>
+          <div className="mt-5 grid grid-cols-2 gap-2 print:hidden"><button onClick={() => window.print()} className="rounded-lg border px-4 py-2 font-medium">Print Slip</button><button onClick={() => setCompletedSale(null)} className="rounded-lg bg-primary px-4 py-2 font-medium text-white">ပြီးပါပြီ</button></div>
+        </div>
+      </div>}
     </div>
   )
 }

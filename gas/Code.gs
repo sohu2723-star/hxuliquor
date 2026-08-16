@@ -8,7 +8,7 @@ const GOOGLE_CLIENT_ID = ''; // Set to your Google OAuth client ID for token val
 const ss = SpreadsheetApp.openById(SHEET_ID);
 
 const ADMIN_ACTIONS = new Set([
-  'addEmployee', 'deleteEmployee', 'addProduct', 'updateProduct', 'deleteProduct', 'getEmployees'
+  'addEmployee', 'deleteEmployee', 'addProduct', 'updateProduct', 'deleteProduct', 'getEmployees', 'payCredit'
 ]);
 
 // The frontend reaches this web app through its same-origin Vercel proxy because
@@ -76,6 +76,7 @@ function handleRequest(e) {
       case 'addEmployee': result = addEmployee(params); break;
       case 'deleteEmployee': result = deleteEmployee(params.id); break;
       case 'createSale': result = createSale(params, actor); break;
+      case 'payCredit': result = payCredit(params.saleId); break;
       case 'addProduct': result = addProduct(params); break;
       case 'updateProduct': result = updateProduct(params); break;
       case 'deleteProduct': result = deleteProduct(params.id); break;
@@ -114,10 +115,11 @@ function initSheets() {
     'stockQty', 'lowStockThreshold', 'unitsPerPack', 'packPrice', 'requiresAgeCheck', 'imageUrl', 'createdAt'
   ]);
   setupSheet('Sales', [
-    'id', 'cashierId', 'cashierName', 'totalAmount', 'paymentMethod', 'ageVerified', 'createdAt'
+    'id', 'cashierId', 'cashierName', 'cashierEmail', 'totalAmount', 'paidAmount', 'balanceDue',
+    'customerName', 'isCredit', 'settledAt', 'paymentMethod', 'ageVerified', 'createdAt'
   ]);
   setupSheet('SaleItems', [
-    'id', 'saleId', 'productId', 'productName', 'quantity', 'unitPrice', 'subtotal', 'unitCost', 'profit'
+    'id', 'saleId', 'productId', 'productName', 'quantity', 'saleQuantity', 'saleUnit', 'unitPrice', 'subtotal', 'unitCost', 'profit'
   ]);
   const users = setupSheet('Users', [
     'id', 'name', 'email', 'passwordHash', 'role', 'createdAt'
@@ -323,19 +325,23 @@ function getSales(startDate, endDate) {
   const items = sheetToObjects(itemsSheet);
 
   let filtered = sales;
-  if (startDate) {
-    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), 'Asia/Yangon', 'yyyy-MM-dd') >= startDate);
-  }
-  if (endDate) {
-    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), 'Asia/Yangon', 'yyyy-MM-dd') <= endDate);
-  }
+  if (startDate || endDate) filtered = filtered.filter(s => {
+    const dates = [s.createdAt, s.settledAt].filter(Boolean).map(value => Utilities.formatDate(new Date(value), 'Asia/Yangon', 'yyyy-MM-dd'));
+    return dates.some(date => (!startDate || date >= startDate) && (!endDate || date <= endDate));
+  });
 
   return filtered.map(sale => ({
     ...sale,
     id: text(sale.id),
     cashierId: text(sale.cashierId),
     cashierName: text(sale.cashierName, 'Cashier'),
+    cashierEmail: text(sale.cashierEmail),
     totalAmount: numberValue(sale.totalAmount),
+    paidAmount: sale.paidAmount === '' ? numberValue(sale.totalAmount) : numberValue(sale.paidAmount),
+    balanceDue: numberValue(sale.balanceDue),
+    customerName: text(sale.customerName),
+    isCredit: booleanValue(sale.isCredit),
+    settledAt: text(sale.settledAt),
     paymentMethod: text(sale.paymentMethod, 'cash'),
     ageVerified: booleanValue(sale.ageVerified),
     createdAt: text(sale.createdAt),
@@ -346,6 +352,8 @@ function getSales(startDate, endDate) {
       subtotal: parseFloat(i.subtotal) || 0,
       unitCost: parseFloat(i.unitCost) || 0,
       profit: parseFloat(i.profit) || 0
+      ,saleQuantity: parseInt(i.saleQuantity) || parseInt(i.quantity) || 0
+      ,saleUnit: text(i.saleUnit, 'unit')
     }))
   }));
 }
@@ -536,6 +544,8 @@ function createSale(params, actor) {
         productId: productId,
         productName: text(product.name) + (saleUnit === 'pack' ? ' (Pack x' + unitsPerPack + ')' : ''),
         quantity: stockQuantity,
+        saleQuantity: quantity,
+        saleUnit: saleUnit,
         unitPrice: subtotal / stockQuantity,
         subtotal: subtotal,
         unitCost: unitCost,
@@ -546,31 +556,34 @@ function createSale(params, actor) {
     const saleId = generateId();
     const createdAt = new Date();
     const paymentMethod = text(params.paymentMethod, 'cash');
+    const isCredit = booleanValue(params.isCredit) || paymentMethod.toLowerCase() === 'credit';
+    const customerName = text(params.customerName);
+    if (isCredit && !customerName) throw new Error('အကြွေးရောင်းရန် customer name လိုအပ်ပါသည်။');
+    const paidAmount = isCredit ? 0 : totalAmount;
+    const balanceDue = isCredit ? totalAmount : 0;
     const ageVerified = booleanValue(params.ageVerified);
-    ss.getSheetByName('Sales').appendRow([
-      saleId,
-      actor.id,
-      actor.name,
-      totalAmount,
-      paymentMethod,
-      ageVerified,
-      createdAt
-    ]);
+    appendObject(ss.getSheetByName('Sales'), {
+      id: saleId, cashierId: actor.id, cashierName: actor.name, cashierEmail: actor.email,
+      totalAmount: totalAmount, paidAmount: paidAmount, balanceDue: balanceDue,
+      customerName: customerName, isCredit: isCredit, settledAt: '',
+      paymentMethod: paymentMethod, ageVerified: ageVerified, createdAt: createdAt
+    });
 
     const saleItemsSheet = ss.getSheetByName('SaleItems');
     saleItems.forEach(item => {
       item.saleId = saleId;
-      saleItemsSheet.appendRow([
-        item.id,
-        item.saleId,
-        item.productId,
-        item.productName,
-        item.quantity,
-        item.unitPrice,
-        item.subtotal,
-        item.unitCost,
-        item.profit
-      ]);
+      appendObject(saleItemsSheet, item);
+    });
+
+    // Stock is stored as individual units. One bottle sold subtracts one;
+    // selling a 12-unit pack subtracts 12 through the same quantity field.
+    const headers = productsSheet.getRange(1, 1, 1, productsSheet.getLastColumn()).getValues()[0];
+    const stockColumn = headers.indexOf('stockQty') + 1;
+    products.forEach((product, index) => {
+      const productId = text(product.id);
+      if (remainingStock[productId] !== undefined) {
+        productsSheet.getRange(index + 2, stockColumn).setValue(remainingStock[productId]);
+      }
     });
 
     // Stock is stored as individual units. One bottle sold subtracts one;
@@ -590,7 +603,13 @@ function createSale(params, actor) {
         id: saleId,
         cashierId: actor.id,
         cashierName: actor.name,
+        cashierEmail: actor.email,
         totalAmount,
+        paidAmount,
+        balanceDue,
+        customerName,
+        isCredit,
+        settledAt: '',
         paymentMethod,
         ageVerified,
         createdAt: createdAt.toISOString(),
@@ -600,6 +619,22 @@ function createSale(params, actor) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function payCredit(saleId) {
+  initSheets();
+  const sheet = ss.getSheetByName('Sales');
+  const sales = sheetToObjects(sheet);
+  const index = sales.findIndex(sale => text(sale.id) === text(saleId));
+  if (index < 0) throw new Error('အကြွေးစာရင်း မတွေ့ပါ။');
+  const sale = sales[index];
+  if (numberValue(sale.balanceDue) <= 0) throw new Error('ဤအကြွေးစာရင်း ပေးချေပြီးဖြစ်ပါသည်။');
+  sale.paidAmount = numberValue(sale.totalAmount);
+  sale.balanceDue = 0;
+  sale.settledAt = new Date().toISOString();
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  sheet.getRange(index + 2, 1, 1, headers.length).setValues([headers.map(header => sale[header] ?? '')]);
+  return { success: true, sale: getSales().find(item => item.id === text(saleId)) };
 }
 
 function addProduct(params) {

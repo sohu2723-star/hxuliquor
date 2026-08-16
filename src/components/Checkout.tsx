@@ -1,22 +1,23 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
-import type { Product } from '../lib/api'
+import type { Product, Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 
 interface CheckoutProps {
   cart: { product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]
   requiresAgeCheck: boolean
   onClose: () => void
-  onSuccess: () => void
+  onSuccess: (sale: Sale) => void
 }
 
-type PaymentMethod = 'Cash' | 'Card' | 'Mobile Wallet'
+type PaymentMethod = 'Cash' | 'Card' | 'Mobile Wallet' | 'Credit'
 
 export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }: CheckoutProps) {
   const [ageVerified, setAgeVerified] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [customerName, setCustomerName] = useState('')
 
   const total = cart.reduce(
     (sum, item) => sum + (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity,
@@ -34,7 +35,11 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }:
 
     try {
       const user = JSON.parse(localStorage.getItem('minimart-pos-user') || '{}')
-      await api.createSale({
+      if (paymentMethod === 'Credit' && !customerName.trim()) {
+        setError('အကြွေးရောင်းရန် Customer Name ထည့်ပါ။')
+        return
+      }
+      const sale = await api.createSale({
         cashierId: user.id || 'unknown',
         cashierName: user.name || 'Cashier',
         items: cart.map((item) => ({
@@ -44,8 +49,10 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }:
         })),
         ageVerified: requiresAgeCheck ? ageVerified : true,
         paymentMethod,
+        isCredit: paymentMethod === 'Credit',
+        customerName: customerName.trim(),
       })
-      onSuccess()
+      onSuccess(sale)
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Checkout failed')
@@ -127,8 +134,13 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }:
                 <option value="Cash">Cash</option>
                 <option value="Card">Card</option>
                 <option value="Mobile Wallet">Mobile Wallet</option>
+                <option value="Credit">အကြွေး</option>
               </select>
             </div>
+            {paymentMethod === 'Credit' && <label className="block text-sm font-medium text-gray-700">Customer Name
+              <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="အကြွေးယူသူအမည်" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+              <span className="mt-1 block text-xs text-amber-700">အကြွေးမဆပ်မချင်း Daily / Monthly income ထဲ မပေါင်းပါ။</span>
+            </label>}
 
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">

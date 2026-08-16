@@ -9,6 +9,7 @@ const ALLOWED_ACTIONS = new Set([
   "addEmployee",
   "deleteEmployee",
   "createSale",
+  "payCredit",
   "addProduct",
   "updateProduct",
   "deleteProduct",

@@ -20,10 +20,10 @@ export default function AdminProducts() {
     window.setTimeout(() => setToast(null), 4000)
   }, [])
 
-  const refreshProducts = useCallback(async () => {
-    setIsLoading(true)
+  const refreshProducts = useCallback(async (force = false) => {
+    if (!force) setIsLoading(true)
     try {
-      const { products: all } = await api.getProductsStaleFirst()
+      const all = force ? await api.getProducts(true) : (await api.getProductsStaleFirst()).products
       setProducts(all)
     } catch (error) {
       showToast(getErrorMessage(error, 'Product data ဆွဲမရပါ။'), 'error')
@@ -44,6 +44,8 @@ export default function AdminProducts() {
   useEffect(() => {
     void refreshProducts()
     void loadCategories()
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshProducts(true) }, 5000)
+    return () => window.clearInterval(timer)
   }, [refreshProducts, loadCategories])
 
   const handleSave = async (productData: Partial<Product> & { imageFile?: File }) => {

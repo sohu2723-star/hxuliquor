@@ -39,13 +39,21 @@ export type SaleItem = {
   subtotal: number
   unitCost: number
   profit: number
+  saleUnit: 'unit' | 'pack'
+  saleQuantity: number
 }
 
 export type Sale = {
   id: string
   cashierId: string
   cashierName: string
+  cashierEmail: string
   totalAmount: number
+  paidAmount: number
+  balanceDue: number
+  customerName: string
+  isCredit: boolean
+  settledAt: string
   paymentMethod: string
   ageVerified: boolean
   createdAt: string
@@ -112,7 +120,13 @@ function normalizeSale(value: unknown): Sale | null {
     id,
     cashierId: asString(value.cashierId),
     cashierName: asString(value.cashierName),
+    cashierEmail: asString(value.cashierEmail),
     totalAmount: asNumber(value.totalAmount),
+    paidAmount: value.paidAmount === undefined ? asNumber(value.totalAmount) : asNumber(value.paidAmount),
+    balanceDue: asNumber(value.balanceDue),
+    customerName: asString(value.customerName),
+    isCredit: asBoolean(value.isCredit),
+    settledAt: asString(value.settledAt),
     paymentMethod: asString(value.paymentMethod, 'Cash'),
     ageVerified: asBoolean(value.ageVerified),
     createdAt: asString(value.createdAt),
@@ -134,6 +148,8 @@ function normalizeSaleItem(value: unknown): SaleItem | null {
     subtotal: asNumber(value.subtotal),
     unitCost: asNumber(value.unitCost),
     profit: asNumber(value.profit),
+    saleUnit: asString(value.saleUnit) === 'pack' ? 'pack' : 'unit',
+    saleQuantity: asInteger(value.saleQuantity) || asInteger(value.quantity),
   }
 }
 
@@ -372,11 +388,20 @@ export const api = {
     items: { productId: string; quantity: number; saleUnit: 'unit' | 'pack' }[]
     ageVerified: boolean
     paymentMethod: string
+    customerName?: string
+    isCredit?: boolean
   }): Promise<Sale> {
     const data = await gasFetch('createSale', payload)
     clearProductCache()
     const sale = normalizeSale(unwrapObject(data, 'sale'))
     if (!sale) throw new Error('Sale response မမှန်ပါ။')
+    return sale
+  },
+
+  async payCredit(saleId: string): Promise<Sale> {
+    const data = await gasFetch('payCredit', { saleId })
+    const sale = normalizeSale(unwrapObject(data, 'sale'))
+    if (!sale) throw new Error('အကြွေးငွေပေးချေမှု response မမှန်ပါ။')
     return sale
   },
 
