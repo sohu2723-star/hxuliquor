@@ -35,6 +35,9 @@ export default defineConfig(({ mode }) => {
           orientation: 'any',
         },
         workbox: {
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
           runtimeCaching: [
             {
@@ -56,17 +59,6 @@ export default defineConfig(({ mode }) => {
                 expiration: {
                   maxEntries: 50,
                   maxAgeSeconds: 3600
-                }
-              }
-            },
-            {
-              urlPattern: /\.js$/i,
-              handler: 'CacheFirst',
-              options: {
-                cacheName: 'js-cache',
-                expiration: {
-                  maxEntries: 10,
-                  maxAgeSeconds: 86400
                 }
               }
             }

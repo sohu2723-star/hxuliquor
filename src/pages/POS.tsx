@@ -1,12 +1,11 @@
-import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
 import type { Product } from '../lib/api'
 import { api, barcodeMatches } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import AppHeader from '../components/AppHeader'
-
-const Scanner = lazy(() => import('../components/Scanner'))
+import Scanner from '../components/Scanner'
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
@@ -184,7 +183,7 @@ export default function POS() {
           <div className="surface-card p-4 sm:p-5">
             <h2 className="text-lg font-semibold">Scan Product / Barcode ဖတ်ရန်</h2>
             <p className="text-sm text-gray-500 mb-3">Admin နှင့် Employee နှစ်ဦးလုံး အရောင်းအတွက် tablet နောက် camera ဖြင့် scan ဖတ်နိုင်သည်။</p>
-            <Suspense fallback={<div className="h-12 animate-pulse bg-gray-200 rounded-md" />}><Scanner onScan={handleScan} /></Suspense>
+            <Scanner onScan={handleScan} />
           </div>
 
           <div className="surface-card p-4 sm:p-5">
