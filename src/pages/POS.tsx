@@ -195,6 +195,12 @@ export default function POS() {
 
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
+          <section className="rounded-3xl bg-gradient-to-br from-amber-900 via-primary to-amber-700 p-5 text-white shadow-lg">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-100">Fast Sale</p>
+            <h1 className="mt-2 text-2xl font-extrabold tracking-tight">သန့်ရှင်းလွယ်ကူသော HXU Liquor အရောင်းစာမျက်နှာ</h1>
+            <p className="mt-2 text-sm text-amber-50/90">Scan, search, cart စနစ်များကို အပိုရှုပ်ထွေးမှုမရှိဘဲ တစ်နေရာတည်းတွင်အသုံးပြုနိုင်သည်။</p>
+          </section>
+
           <div className="surface-card p-4 sm:p-5">
             <h2 className="text-lg font-semibold">Scan Product / Barcode ဖတ်ရန်</h2>
             <p className="text-sm text-gray-500 mb-3">Admin နှင့် Employee နှစ်ဦးလုံး အရောင်းအတွက် tablet နောက် camera ဖြင့် scan ဖတ်နိုင်သည်။</p>
