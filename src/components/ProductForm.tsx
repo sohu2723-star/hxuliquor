@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useRef } from 'react'
+import { lazy, Suspense, useState, useRef } from 'react'
 import type { Product } from '../lib/api'
 
 const Scanner = lazy(() => import('./Scanner'))

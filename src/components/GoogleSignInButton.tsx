@@ -1,11 +1,11 @@
-import { useRef, useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 declare global {
   interface Window {
     google?: {
       accounts: {
         id: {
-          initialize: (config: { client_id: string; callback: (response: { credential: string }) => void }) => void
+          initialize: (config: { client_id: string; callback: (response: { credential?: string }) => void }) => void
           renderButton: (parent: HTMLElement | null, options: { theme?: string; size?: string; width?: number }) => void
         }
       }
@@ -19,60 +19,85 @@ interface GoogleSignInButtonProps {
   onError?: (error: string) => void
 }
 
+let googleScriptPromise: Promise<void> | null = null
+
+function loadGoogleIdentityScript(): Promise<void> {
+  if (window.google?.accounts?.id) return Promise.resolve()
+  if (googleScriptPromise) return googleScriptPromise
+
+  googleScriptPromise = new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>('script[data-google-gsi]')
+    const script = existing || document.createElement('script')
+    const handleLoad = () => {
+      if (window.google?.accounts?.id) resolve()
+      else reject(new Error('Google Identity Services loaded without an API'))
+    }
+    const handleError = () => reject(new Error('Failed to load Google Sign-In script'))
+
+    if (!existing) {
+      script.src = 'https://accounts.google.com/gsi/client'
+      script.async = true
+      script.defer = true
+      script.dataset.googleGsi = 'true'
+      document.head.appendChild(script)
+    }
+    script.addEventListener('load', handleLoad, { once: true })
+    script.addEventListener('error', handleError, { once: true })
+
+    if (window.google?.accounts?.id) handleLoad()
+  }).catch((error) => {
+    googleScriptPromise = null
+    throw error
+  })
+
+  return googleScriptPromise
+}
+
 export default function GoogleSignInButton({ clientId, onSuccess, onError }: GoogleSignInButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null)
   const onSuccessRef = useRef(onSuccess)
   const onErrorRef = useRef(onError)
-  const [isScriptLoaded, setIsScriptLoaded] = useState(false)
+  const [isScriptLoaded, setIsScriptLoaded] = useState(Boolean(window.google?.accounts?.id))
 
   useEffect(() => {
     onSuccessRef.current = onSuccess
     onErrorRef.current = onError
-  })
+  }, [onSuccess, onError])
 
   useEffect(() => {
-    if (!isScriptLoaded) return
-    if (!buttonRef.current) return
+    let cancelled = false
+    void loadGoogleIdentityScript()
+      .then(() => {
+        if (!cancelled) setIsScriptLoaded(true)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) onErrorRef.current?.(error instanceof Error ? error.message : 'Google Sign-In failed')
+      })
+    return () => { cancelled = true }
+  }, [])
 
-    if (!window.google?.accounts?.id) {
-      onErrorRef.current?.('Google Identity Services not loaded')
-      return
-    }
+  useEffect(() => {
+    if (!isScriptLoaded || !buttonRef.current || !window.google?.accounts?.id) return
+    const container = buttonRef.current
+    container.replaceChildren()
 
     window.google.accounts.id.initialize({
       client_id: clientId,
       callback: (response) => {
-        if (response.credential) {
-          onSuccessRef.current(response.credential)
-        } else {
-          onErrorRef.current?.('Google Sign-In failed')
-        }
+        if (response.credential) onSuccessRef.current(response.credential)
+        else onErrorRef.current?.('Google Sign-In failed')
       },
     })
 
-    window.google.accounts.id.renderButton(buttonRef.current, {
+    window.google.accounts.id.renderButton(container, {
       theme: 'outline',
       size: 'large',
-      width: buttonRef.current.offsetWidth || 320,
+      width: container.offsetWidth || 320,
     })
   }, [isScriptLoaded, clientId])
 
-  useEffect(() => {
-    const script = document.createElement('script')
-    script.src = 'https://accounts.google.com/gsi/client'
-    script.async = true
-    script.defer = true
-    script.onload = () => setIsScriptLoaded(true)
-    script.onerror = () => onError?.('Failed to load Google Sign-In script')
-    document.head.appendChild(script)
-
-    return () => {
-      document.head.removeChild(script)
-    }
-  }, [])
-
   if (!isScriptLoaded) {
-    return <div className="flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
+    return <div className="flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>
   }
 
   return <div ref={buttonRef} className="flex justify-center" />

@@ -50,12 +50,23 @@ export default async function handler(request, response) {
       typeof request.body === "string"
         ? request.body
         : JSON.stringify(request.body ?? {});
-    const upstream = await fetch(upstreamUrl, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body,
-      redirect: "follow",
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    let upstream;
+    try {
+      upstream = await fetch(upstreamUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8",
+          Accept: "application/json",
+        },
+        body,
+        redirect: "follow",
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     const text = await upstream.text();
 
     if (!upstream.ok) {
@@ -66,14 +77,13 @@ export default async function handler(request, response) {
         // Google commonly returns an HTML sign-in/error page for a deployment
         // whose access or execution identity is configured incorrectly.
       }
-      return response.status(502).json({
-        success: false,
-        message:
-          upstreamMessage ||
-          upstream.status === 404
-            ? "Apps Script deployment မတွေ့ပါ (HTTP 404)။ Apps Script → Deploy → Manage deployments မှ /exec URL အသစ်ကို Vercel GAS_URL တွင် အစားထိုးပြီး Redeploy လုပ်ပါ။"
-            : `Apps Script returned HTTP ${upstream.status}. Check the web app deployment access and authorization.`,
-      });
+      response.setHeader("Cache-Control", "no-store");
+      const message = upstreamMessage || (
+        upstream.status === 404
+          ? "Apps Script deployment မတွေ့ပါ (HTTP 404)။ Apps Script → Deploy → Manage deployments မှ /exec URL အသစ်ကို Vercel GAS_URL တွင် အစားထိုးပြီး Redeploy လုပ်ပါ။"
+          : `Apps Script returned HTTP ${upstream.status}. Check the web app deployment access and authorization.`
+      );
+      return response.status(502).json({ success: false, message });
     }
 
     let data;
@@ -91,8 +101,10 @@ export default async function handler(request, response) {
     return response.status(200).json(data);
   } catch (error) {
     console.error("Apps Script proxy request failed", error);
-    return response
-      .status(502)
-      .json({ success: false, message: "Unable to reach Apps Script" });
+    response.setHeader("Cache-Control", "no-store");
+    const message = error?.name === "AbortError"
+      ? "Apps Script response ကြာနေပါသည်။ Google Apps Script deployment နှင့် Spreadsheet access ကို စစ်ပါ။"
+      : "Network error: Apps Script ကို မဆက်သွယ်နိုင်ပါ။ ခဏစောင့်ပြီး Retry ပြန်လုပ်ပါ။";
+    return response.status(502).json({ success: false, message });
   }
 }
