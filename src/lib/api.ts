@@ -3,7 +3,7 @@ const API_URL = '/api/gas'
 export const AUTH_TOKEN_KEY = 'minimart-pos-token'
 
 const PRODUCT_CACHE_KEY = 'hxu-products-v2'
-const PRODUCT_CACHE_MS = 2 * 60 * 1000
+const PRODUCT_CACHE_MS = 15 * 60 * 1000
 
 const RETRYABLE_ACTIONS = new Set(['getProducts', 'getProductByBarcode', 'searchProducts', 'getCategories', 'getSales', 'getEmployees'])
 const MAX_READ_RETRIES = 2
@@ -189,6 +189,26 @@ function clearProductCache() {
   try { localStorage.removeItem(PRODUCT_CACHE_KEY) } catch { /* storage unavailable */ }
 }
 
+export function normalizeBarcode(value: string): string {
+  return String(value || '').trim().replace(/[\s-]+/g, '').toUpperCase()
+}
+
+export function barcodeMatches(savedValue: string, scannedValue: string): boolean {
+  const scanned = normalizeBarcode(scannedValue)
+  if (!scanned) return false
+  return String(savedValue || '').split(/[,\n;]/).some((entry) => {
+    const saved = normalizeBarcode(entry)
+    if (!saved) return false
+    if (saved.endsWith('*')) return scanned.startsWith(saved.slice(0, -1))
+    return saved === scanned || `0${saved}` === scanned || saved === `0${scanned}`
+  })
+}
+
+function upsertProductCache(product: Product) {
+  const cached = readProductCache() || []
+  saveProductCache([product, ...cached.filter((item) => item.id !== product.id)])
+}
+
 class ApiError extends Error {
   readonly retryable: boolean
 
@@ -287,6 +307,8 @@ export const api = {
   },
 
   async getProductByBarcode(barcode: string): Promise<Product | null> {
+    const localProduct = readProductCache()?.find((product) => barcodeMatches(product.barcode, barcode))
+    if (localProduct) return localProduct
     const data = await gasFetch('getProductByBarcode', { barcode })
     return normalizeProduct(unwrapObject(data, 'product'))
   },
@@ -367,9 +389,9 @@ export const api = {
     imageFileName?: string
   }): Promise<Product> {
     const data = await gasFetch('addProduct', payload)
-    clearProductCache()
     const product = normalizeProduct(unwrapObject(data, 'product'))
     if (!product) throw new Error('Product response မမှန်ပါ။')
+    upsertProductCache(product)
     return product
   },
 
@@ -385,9 +407,12 @@ export const api = {
     requiresAgeCheck?: boolean
     imageBase64?: string
     imageFileName?: string
-  }): Promise<void> {
-    await gasFetch('updateProduct', payload)
-    clearProductCache()
+  }): Promise<Product> {
+    const data = await gasFetch('updateProduct', payload)
+    const product = normalizeProduct(unwrapObject(data, 'product'))
+    if (!product) throw new Error('Product response မမှန်ပါ။')
+    upsertProductCache(product)
+    return product
   },
 
   async deleteProduct(id: string): Promise<void> {
