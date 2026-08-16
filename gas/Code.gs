@@ -4,7 +4,7 @@
 
 const SHEET_ID = '1o0a1cRxDdk0dyfysq4jx3HL6OqNWT75iCZEBKygOoPY'; // Replace with your Sheet ID
 const ADMIN_EMAIL = 'copy2723@gmail.com'; // Only this Google email can login
-const GOOGLE_CLIENT_ID = ''; // Set to your Google OAuth client ID for token validation
+const GOOGLE_CLIENT_ID = '524254578493-9ce8ttte7c63hjo61rn9seo2m6jpfbjb.apps.googleusercontent.com'; // Set to your Google OAuth client ID for token validation
 const ss = SpreadsheetApp.openById(SHEET_ID);
 
 const ADMIN_ACTIONS = new Set([
