@@ -25,16 +25,40 @@ export default function POS() {
   }, [])
 
   const loadProducts = useCallback(async (forceRefresh = false) => {
-    setIsLoading(true)
+    if (forceRefresh) {
+      setIsLoading(true)
+      try {
+        const all = await api.getProducts(true)
+        setProducts(all)
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
     try {
-      const all = await api.getProducts(forceRefresh)
+      const { products: cached } = await api.getProductsStaleFirst()
+      if (cached.length > 0) {
+        setProducts(cached)
+        setIsLoading(false)
+      } else {
+        setIsLoading(true)
+      }
+    } catch {
+      setIsLoading(true)
+    }
+    try {
+      const all = await api.getProducts(true)
       setProducts(all)
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
+      if (products.length === 0) {
+        showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
+      }
     } finally {
       setIsLoading(false)
     }
-  }, [showToast])
+  }, [showToast, products.length])
 
   useEffect(() => {
     void loadProducts()
@@ -138,11 +162,21 @@ export default function POS() {
   return (
     <div className="min-h-screen bg-gray-100">
       <AppHeader />
-      {products.some((product) => product.stockQty <= product.lowStockThreshold) && (
-        <div className="bg-red-50 border-b border-red-200 text-red-800 px-4 py-2 text-sm font-medium">
-          ⚠️ ကုန်တော့မည့်ပစ္စည်း {products.filter((product) => product.stockQty <= product.lowStockThreshold).length} မျိုးရှိသည်။ Admin Income dashboard တွင်ကြည့်ပါ။
-        </div>
-      )}
+      {(() => {
+        const lowStock = products.filter((p) => p.stockQty <= p.lowStockThreshold)
+        if (lowStock.length === 0) return null
+        const visible = lowStock.slice(0, 5)
+        const remaining = lowStock.length - visible.length
+        return (
+          <div className="bg-red-50 border-b border-red-200 text-red-800 px-4 py-2 text-sm font-medium">
+            <p>⚠️ ကုန်တော့မည့်ပစ္စည်း {lowStock.length} မျိုးရှိသည်။ Admin Income dashboard တွင်ကြည့်ပါ။</p>
+            <p className="mt-1 text-xs text-red-600">
+              {visible.map((p) => p.name).join('၊ ')}
+              {remaining > 0 && ` နှင့် အခြား ${remaining} မျိုး`}
+            </p>
+          </div>
+        )
+      })()}
       {toast && (
         <div
           className={`fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg z-50 ${

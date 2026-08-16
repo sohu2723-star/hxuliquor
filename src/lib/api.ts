@@ -3,7 +3,7 @@ const API_URL = '/api/gas'
 export const AUTH_TOKEN_KEY = 'minimart-pos-token'
 
 const PRODUCT_CACHE_KEY = 'hxu-products-v2'
-const PRODUCT_CACHE_MS = 5 * 60 * 1000
+const PRODUCT_CACHE_MS = 2 * 60 * 1000
 
 const RETRYABLE_ACTIONS = new Set(['getProducts', 'getProductByBarcode', 'searchProducts', 'getCategories', 'getSales', 'getEmployees'])
 const MAX_READ_RETRIES = 2
@@ -267,6 +267,23 @@ export const api = {
     const products = unwrapArray(data, 'products').map(normalizeProduct).filter((product): product is Product => product !== null)
     saveProductCache(products)
     return products
+  },
+
+  async getProductsStaleFirst(): Promise<{ products: Product[]; fromCache: boolean }> {
+    const cached = readProductCache()
+    if (cached) {
+      void gasFetch('getProducts')
+        .then((data) => {
+          const fresh = unwrapArray(data, 'products').map(normalizeProduct).filter((p): p is Product => p !== null)
+          if (fresh.length > 0) saveProductCache(fresh)
+        })
+        .catch(() => {})
+      return { products: cached, fromCache: true }
+    }
+    const data = await gasFetch('getProducts')
+    const products = unwrapArray(data, 'products').map(normalizeProduct).filter((product): product is Product => product !== null)
+    saveProductCache(products)
+    return { products, fromCache: false }
   },
 
   async getProductByBarcode(barcode: string): Promise<Product | null> {
