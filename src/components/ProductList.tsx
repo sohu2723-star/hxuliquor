@@ -50,7 +50,7 @@ export default function ProductList({ products, onEdit, onDelete }: ProductListP
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap font-medium">{product.name}</td>
                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{product.barcode}</td>
-                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{product.category}</td>
+                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{product.category}{product.unitsPerPack > 1 && product.packPrice > 0 && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">Pack × {product.unitsPerPack} · {formatCurrency(product.packPrice)}</span>}</td>
                   <td className="px-4 py-3 whitespace-nowrap font-semibold">{formatCurrency(product.price)}</td>
                 <td className={`px-4 py-3 whitespace-nowrap font-medium ${product.stockQty <= product.lowStockThreshold ? 'text-red-600' : ''}`}>
                   {product.stockQty}
