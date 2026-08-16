@@ -24,7 +24,7 @@ export default function POS() {
     window.setTimeout(() => setToast(null), 3000)
   }, [])
 
-  const loadProducts = async (forceRefresh = false) => {
+  const loadProducts = useCallback(async (forceRefresh = false) => {
     setIsLoading(true)
     try {
       const all = await api.getProducts(forceRefresh)

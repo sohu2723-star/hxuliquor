@@ -1,43 +1,84 @@
-// Keep Apps Script behind our same-origin serverless endpoint. Apps Script web-app
-// responses do not reliably include CORS headers, so browsers cannot call them
-// directly even when the request itself does not trigger a preflight.
 const API_URL = '/api/gas'
 
-type Json = Record<string, unknown>
+export const AUTH_TOKEN_KEY = 'minimart-pos-token'
 
 const PRODUCT_CACHE_KEY = 'hxu-products-v2'
 const PRODUCT_CACHE_MS = 5 * 60 * 1000
+
+const RETRYABLE_ACTIONS = new Set(['getProducts', 'getProductByBarcode', 'searchProducts', 'getCategories', 'getSales', 'getEmployees'])
+const MAX_READ_RETRIES = 2
+const REQUEST_TIMEOUT_MS = 20000
+
 let productCache: { products: Product[]; savedAt: number } | null = null
 
-function readProductCache(): Product[] | null {
-  if (productCache && Date.now() - productCache.savedAt < PRODUCT_CACHE_MS) return productCache.products
-  try {
-    const stored = JSON.parse(localStorage.getItem(PRODUCT_CACHE_KEY) || 'null')
-    if (stored && Date.now() - stored.savedAt < PRODUCT_CACHE_MS && Array.isArray(stored.products)) {
-      productCache = stored
-      return stored.products
-    }
-  } catch { localStorage.removeItem(PRODUCT_CACHE_KEY) }
-  return null
+type Json = Record<string, unknown>
+
+export type Product = {
+  id: string
+  barcode: string
+  name: string
+  category: string
+  price: number
+  costPrice: number
+  stockQty: number
+  lowStockThreshold: number
+  requiresAgeCheck: boolean
+  imageUrl: string
+  createdAt: string
 }
 
-function saveProductCache(products: Product[]) {
-  productCache = { products, savedAt: Date.now() }
-  try { localStorage.setItem(PRODUCT_CACHE_KEY, JSON.stringify(productCache)) } catch { /* storage may be full */ }
+export type SaleItem = {
+  id: string
+  saleId: string
+  productId: string
+  productName: string
+  quantity: number
+  unitPrice: number
+  subtotal: number
+  unitCost: number
+  profit: number
 }
 
-function clearProductCache() {
-  productCache = null
-  try { localStorage.removeItem(PRODUCT_CACHE_KEY) } catch { /* storage unavailable */ }
+export type Sale = {
+  id: string
+  cashierId: string
+  cashierName: string
+  totalAmount: number
+  paymentMethod: string
+  ageVerified: boolean
+  createdAt: string
+  items: SaleItem[]
 }
 
-function normalizeProduct(value: unknown): Product {
-  const product = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
-  return { id: String(product.id ?? ''), barcode: String(product.barcode ?? ''), name: String(product.name ?? ''), category: String(product.category ?? ''), price: Number(product.price) || 0, costPrice: Number(product.costPrice) || 0, stockQty: Number(product.stockQty) || 0, lowStockThreshold: Number(product.lowStockThreshold) || 0, requiresAgeCheck: product.requiresAgeCheck === true || String(product.requiresAgeCheck).toLowerCase() === 'true', imageUrl: String(product.imageUrl ?? ''), createdAt: String(product.createdAt ?? '') }
+export type User = {
+  id: string
+  name: string
+  email: string
+  role: string
 }
 
-async function gasFetch(action: string, payload?: Json): Promise<Json> {
-  const url = `${API_URL}?action=${encodeURIComponent(action)}`
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value
+    : typeof value === 'number' || typeof value === 'boolean' ? String(value)
+    : fallback
+}
+
+function asNumber(value: unknown): number {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : 0
+}
+
+function asInteger(value: unknown): number {
+  return Math.trunc(asNumber(value))
+}
+
+function asBoolean(value: unknown): boolean {
+  return value === true || asString(value).toLowerCase() === 'true'
+}
 
 function normalizeProduct(value: unknown): Product | null {
   if (!isRecord(value)) return null
@@ -58,6 +99,40 @@ function normalizeProduct(value: unknown): Product | null {
   }
 }
 
+function normalizeSale(value: unknown): Sale | null {
+  if (!isRecord(value)) return null
+  const id = asString(value.id)
+  if (!id) return null
+  const items = Array.isArray(value.items) ? value.items.map(normalizeSaleItem).filter((item): item is SaleItem => item !== null) : []
+  return {
+    id,
+    cashierId: asString(value.cashierId),
+    cashierName: asString(value.cashierName),
+    totalAmount: asNumber(value.totalAmount),
+    paymentMethod: asString(value.paymentMethod, 'Cash'),
+    ageVerified: asBoolean(value.ageVerified),
+    createdAt: asString(value.createdAt),
+    items,
+  }
+}
+
+function normalizeSaleItem(value: unknown): SaleItem | null {
+  if (!isRecord(value)) return null
+  const id = asString(value.id) || asString(value.productId)
+  if (!id) return null
+  return {
+    id,
+    saleId: asString(value.saleId),
+    productId: asString(value.productId),
+    productName: asString(value.productName),
+    quantity: asInteger(value.quantity),
+    unitPrice: asNumber(value.unitPrice),
+    subtotal: asNumber(value.subtotal),
+    unitCost: asNumber(value.unitCost),
+    profit: asNumber(value.profit),
+  }
+}
+
 function normalizeUser(value: unknown): User | null {
   if (!isRecord(value)) return null
   const id = asString(value.id)
@@ -71,19 +146,21 @@ function normalizeUser(value: unknown): User | null {
   }
 }
 
-  if (!response.ok) {
-    let message = `HTTP ${response.status}: ${response.statusText}`
-    try {
-      const error = await response.json()
-      if (typeof error?.message === 'string') message = error.message
-    } catch {
-      // Keep the HTTP fallback when the proxy did not return JSON.
-    }
-    throw new Error(message)
-  }
+function unwrapArray(value: unknown, label: string): unknown[] {
+  if (Array.isArray(value)) return value
+  if (isRecord(value) && Array.isArray(value.data)) return value.data
+  if (isRecord(value) && Array.isArray(value[label])) return value[label]
+  return []
 }
 
-let productCache: { products: Product[]; savedAt: number } | null = null
+function unwrapObject(value: unknown, label: string): unknown {
+  if (isRecord(value)) {
+    if (isRecord(value.data)) return value.data
+    if (isRecord(value[label])) return value[label]
+    return value
+  }
+  return {}
+}
 
 function readProductCache(): Product[] | null {
   if (productCache && Date.now() - productCache.savedAt < PRODUCT_CACHE_MS) return productCache.products
@@ -122,7 +199,7 @@ class ApiError extends Error {
   }
 }
 
-async function gasFetch(action: string, payload?: JsonObject): Promise<unknown> {
+async function gasFetch(action: string, payload?: Json): Promise<unknown> {
   const url = `${API_URL}?action=${encodeURIComponent(action)}`
   const token = action === 'googleLogin' ? '' : (() => {
     try { return localStorage.getItem(AUTH_TOKEN_KEY) || '' } catch { return '' }
@@ -180,50 +257,6 @@ async function gasFetch(action: string, payload?: JsonObject): Promise<unknown> 
   throw new Error('Network error. Internet သို့မဟုတ် server connection ကို စစ်ပြီး Retry ပြန်လုပ်ပါ။')
 }
 
-export type Product = {
-  id: string
-  barcode: string
-  name: string
-  category: string
-  price: number
-  costPrice: number
-  stockQty: number
-  lowStockThreshold: number
-  requiresAgeCheck: boolean
-  imageUrl: string
-  createdAt: string
-}
-
-export type SaleItem = {
-  id: string
-  saleId: string
-  productId: string
-  productName: string
-  quantity: number
-  unitPrice: number
-  subtotal: number
-  unitCost: number
-  profit: number
-}
-
-export type Sale = {
-  id: string
-  cashierId: string
-  cashierName: string
-  totalAmount: number
-  paymentMethod: string
-  ageVerified: boolean
-  createdAt: string
-  items: SaleItem[]
-}
-
-export type User = {
-  id: string
-  name: string
-  email: string
-  role: string
-}
-
 export const api = {
   async getProducts(forceRefresh = false): Promise<Product[]> {
     if (!forceRefresh) {
@@ -231,24 +264,27 @@ export const api = {
       if (cached) return cached
     }
     const data = await gasFetch('getProducts')
-    const products = Array.isArray(data) ? data.map(normalizeProduct) : []
+    const products = unwrapArray(data, 'products').map(normalizeProduct).filter((product): product is Product => product !== null)
     saveProductCache(products)
     return products
   },
 
   async getProductByBarcode(barcode: string): Promise<Product | null> {
     const data = await gasFetch('getProductByBarcode', { barcode })
-    return data && 'id' in data ? normalizeProduct(data) : null
+    return normalizeProduct(unwrapObject(data, 'product'))
   },
 
   async searchProducts(query: string): Promise<Product[]> {
     const cached = readProductCache()
     if (cached) {
       const normalized = query.trim().toLowerCase()
-      return cached.filter((product) => product.name.toLowerCase().includes(normalized) || product.category.toLowerCase().includes(normalized) || product.barcode.includes(normalized))
+      return cached.filter((product) =>
+        product.name.toLowerCase().includes(normalized) ||
+        product.category.toLowerCase().includes(normalized) ||
+        product.barcode.includes(normalized))
     }
     const data = await gasFetch('searchProducts', { query })
-    return Array.isArray(data) ? data.map(normalizeProduct) : []
+    return unwrapArray(data, 'products').map(normalizeProduct).filter((product): product is Product => product !== null)
   },
 
   async getCategories(): Promise<string[]> {
@@ -257,7 +293,7 @@ export const api = {
   },
 
   async getSales(startDate?: string, endDate?: string): Promise<Sale[]> {
-    const params: JsonObject = {}
+    const params: Json = {}
     if (startDate) params.startDate = startDate
     if (endDate) params.endDate = endDate
     const data = unwrapArray(await gasFetch('getSales', params), 'sales')
@@ -287,20 +323,6 @@ export const api = {
     await gasFetch('deleteEmployee', { id })
   },
 
-  async getEmployees(): Promise<User[]> {
-    const data = await gasFetch('getEmployees')
-    return Array.isArray(data) ? data as User[] : []
-  },
-
-  async addEmployee(payload: { name: string; email: string }): Promise<User> {
-    const data = await gasFetch('addEmployee', payload)
-    return data.user as User
-  },
-
-  async deleteEmployee(id: string): Promise<void> {
-    await gasFetch('deleteEmployee', { id })
-  },
-
   async createSale(payload: {
     cashierId: string
     cashierName: string
@@ -310,7 +332,9 @@ export const api = {
   }): Promise<Sale> {
     const data = await gasFetch('createSale', payload)
     clearProductCache()
-    return data.sale as Sale
+    const sale = normalizeSale(unwrapObject(data, 'sale'))
+    if (!sale) throw new Error('Sale response မမှန်ပါ။')
+    return sale
   },
 
   async addProduct(payload: {
@@ -327,7 +351,9 @@ export const api = {
   }): Promise<Product> {
     const data = await gasFetch('addProduct', payload)
     clearProductCache()
-    return data.product as Product
+    const product = normalizeProduct(unwrapObject(data, 'product'))
+    if (!product) throw new Error('Product response မမှန်ပါ။')
+    return product
   },
 
   async updateProduct(payload: {
