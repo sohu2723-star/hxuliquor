@@ -7,6 +7,7 @@ import { formatCurrency } from '../lib/format'
 import AppHeader from '../components/AppHeader'
 import Scanner from '../components/Scanner'
 import Icon from '../components/Icon'
+import ReceiptLogo from '../components/ReceiptLogo'
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
@@ -200,6 +201,12 @@ export default function POS() {
 
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
+          <section className="rounded-3xl bg-gradient-to-br from-amber-900 via-primary to-amber-700 p-5 text-white shadow-lg">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-100">Fast Sale</p>
+            <h1 className="mt-2 text-2xl font-extrabold tracking-tight">သန့်ရှင်းလွယ်ကူသော HXU Liquor အရောင်းစာမျက်နှာ</h1>
+            <p className="mt-2 text-sm text-amber-50/90">Scan, search, cart စနစ်များကို အပိုရှုပ်ထွေးမှုမရှိဘဲ တစ်နေရာတည်းတွင်အသုံးပြုနိုင်သည်။</p>
+          </section>
+
           <div className="surface-card p-4 sm:p-5">
             <h2 className="text-lg font-semibold">Scan Product / Barcode ဖတ်ရန်</h2>
             <p className="text-sm text-gray-500 mb-3">Admin နှင့် Employee နှစ်ဦးလုံး အရောင်းအတွက် tablet နောက် camera ဖြင့် scan ဖတ်နိုင်သည်။</p>
@@ -278,9 +285,9 @@ export default function POS() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 max-h-[50vh] overflow-y-auto pr-1">
                 {products.map((product) => (
-                  <div key={product.id} className="product-card p-3 text-left flex flex-col">
+                  <div key={product.id} className="product-card p-3 text-left flex flex-col shadow-sm">
                   <div className="text-left flex-1">
                     <div className="flex justify-center mb-2">
                       <ProductImage url={product.imageUrl} name={product.name} />
@@ -372,13 +379,22 @@ export default function POS() {
           onSuccess={handleCheckoutSuccess}
         />
       )}
-      {completedSale && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 print:static print:bg-white print:p-0">
-        <div className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl print:max-h-none print:shadow-none">
-          <div className="text-center"><h2 className="text-xl font-bold">HXU Liquor POS</h2><p className="text-sm text-slate-500">SALE RECEIPT</p></div>
-          <div className="my-4 border-y py-3 text-xs text-slate-600"><p>{new Date(completedSale.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Yangon' })}</p><p>Cashier: {completedSale.cashierName} · {completedSale.cashierEmail}</p><p>Slip: {completedSale.id}</p></div>
-          <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
-          <div className="mt-4 border-t pt-3"><div className="flex justify-between text-lg font-bold"><span>Total</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800">အကြွေး · {completedSale.customerName} · ကျန်ငွေ {formatCurrency(completedSale.balanceDue)}</p>}</div>
-          <div className="mt-5 grid grid-cols-2 gap-2 print:hidden"><button onClick={() => window.print()} className="rounded-lg border px-4 py-2 font-medium">Print Slip</button><button onClick={() => setCompletedSale(null)} className="rounded-lg bg-primary px-4 py-2 font-medium text-white">ပြီးပါပြီ</button></div>
+      {completedSale && <div className="receipt-modal fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 print:static print:bg-white print:p-0">
+        <div className="receipt-slip max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl print:max-h-none print:w-[80mm] print:overflow-visible print:rounded-none print:p-3 print:shadow-none">
+          <div className="text-center">
+            <ReceiptLogo className="mx-auto mb-2 h-16 w-16 print:h-12 print:w-12" />
+            <h2 className="text-2xl font-extrabold tracking-tight print:text-lg">HXU Liquor</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700 print:text-[10px]">Sale Receipt</p>
+          </div>
+          <div className="my-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600 print:my-2 print:rounded-none print:border-x-0 print:bg-white print:px-0">
+            <p>{new Date(completedSale.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Yangon' })}</p>
+            <p>Cashier: {completedSale.cashierName}</p>
+            <p>Slip: {completedSale.id}</p>
+          </div>
+          <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm print:text-xs"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
+          <div className="mt-4 border-t pt-3 print:mt-2 print:pt-2"><div className="flex justify-between text-lg font-bold print:text-sm"><span>Total</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800 print:text-xs">အကြွေး · {completedSale.customerName} · ကျန်ငွေ {formatCurrency(completedSale.balanceDue)}</p>}</div>
+          <p className="mt-4 text-center text-xs text-slate-500 print:mt-2">Thank you for shopping with HXU Liquor</p>
+          <div className="mt-5 grid grid-cols-2 gap-2 print:hidden"><button onClick={() => window.print()} className="rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-800 shadow-sm">Print Slip</button><button onClick={() => setCompletedSale(null)} className="rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm">ပြီးပါပြီ</button></div>
         </div>
       </div>}
     </div>
