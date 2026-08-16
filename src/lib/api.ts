@@ -3,6 +3,8 @@ const API_URL = '/api/gas'
 export const AUTH_TOKEN_KEY = 'minimart-pos-token'
 
 const PRODUCT_CACHE_KEY = 'hxu-products-v2'
+const EMPLOYEE_CACHE_KEY = 'hxu-employees-v1'
+const SALES_CACHE_PREFIX = 'hxu-sales-v1:'
 const PRODUCT_CACHE_MS = 15 * 60 * 1000
 
 const RETRYABLE_ACTIONS = new Set(['getProducts', 'getProductByBarcode', 'searchProducts', 'getCategories', 'getSales', 'getEmployees'])
@@ -10,6 +12,8 @@ const MAX_READ_RETRIES = 2
 const REQUEST_TIMEOUT_MS = 20000
 
 let productCache: { products: Product[]; savedAt: number } | null = null
+let employeeCache: User[] | null = null
+const salesCache = new Map<string, Sale[]>()
 
 type Json = Record<string, unknown>
 
@@ -209,6 +213,48 @@ function clearProductCache() {
   try { localStorage.removeItem(PRODUCT_CACHE_KEY) } catch { /* storage unavailable */ }
 }
 
+function readEmployeeCache(): User[] | null {
+  if (employeeCache) return employeeCache
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(EMPLOYEE_CACHE_KEY) || 'null')
+    if (!Array.isArray(stored)) return null
+    employeeCache = stored.map(normalizeUser).filter((user): user is User => user !== null)
+    return employeeCache
+  } catch { return null }
+}
+
+function saveEmployeeCache(users: User[]) {
+  employeeCache = users
+  try { localStorage.setItem(EMPLOYEE_CACHE_KEY, JSON.stringify(users)) } catch { /* storage unavailable */ }
+}
+
+function salesCacheKey(startDate?: string, endDate?: string) {
+  return `${SALES_CACHE_PREFIX}${startDate || ''}:${endDate || ''}`
+}
+
+function readSalesCache(key: string): Sale[] | null {
+  if (salesCache.has(key)) return salesCache.get(key) || null
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(key) || 'null')
+    if (!Array.isArray(stored)) return null
+    const sales = stored.map(normalizeSale).filter((sale): sale is Sale => sale !== null)
+    salesCache.set(key, sales)
+    return sales
+  } catch { return null }
+}
+
+function saveSalesCache(key: string, sales: Sale[]) {
+  salesCache.set(key, sales)
+  try { localStorage.setItem(key, JSON.stringify(sales)) } catch { /* storage unavailable */ }
+}
+
+function clearSalesCache() {
+  salesCache.clear()
+  try {
+    Object.keys(localStorage).filter((key) => key.startsWith(SALES_CACHE_PREFIX)).forEach((key) => localStorage.removeItem(key))
+  } catch { /* storage unavailable */ }
+}
+
 export function normalizeBarcode(value: string): string {
   return String(value || '').trim().replace(/[\s-]+/g, '').toUpperCase()
 }
@@ -347,16 +393,25 @@ export const api = {
   },
 
   async getCategories(): Promise<string[]> {
+    const cached = readProductCache()
+    if (cached) return [...new Set(cached.map((product) => product.category).filter(Boolean))].sort()
     const data = unwrapArray(await gasFetch('getCategories'), 'categories')
     return data.map((category) => asString(category)).filter(Boolean)
   },
 
-  async getSales(startDate?: string, endDate?: string): Promise<Sale[]> {
+  async getSales(startDate?: string, endDate?: string, forceRefresh = false): Promise<Sale[]> {
+    const cacheKey = salesCacheKey(startDate, endDate)
+    if (!forceRefresh) {
+      const cached = readSalesCache(cacheKey)
+      if (cached) return cached
+    }
     const params: Json = {}
     if (startDate) params.startDate = startDate
     if (endDate) params.endDate = endDate
     const data = unwrapArray(await gasFetch('getSales', params), 'sales')
-    return data.map(normalizeSale).filter((sale): sale is Sale => sale !== null)
+    const sales = data.map(normalizeSale).filter((sale): sale is Sale => sale !== null)
+    saveSalesCache(cacheKey, sales)
+    return sales
   },
 
   async googleLogin(idToken: string): Promise<User> {
@@ -366,20 +421,28 @@ export const api = {
     return user
   },
 
-  async getEmployees(): Promise<User[]> {
+  async getEmployees(forceRefresh = false): Promise<User[]> {
+    if (!forceRefresh) {
+      const cached = readEmployeeCache()
+      if (cached) return cached
+    }
     const data = unwrapArray(await gasFetch('getEmployees'), 'employees')
-    return data.map(normalizeUser).filter((user): user is User => user !== null)
+    const users = data.map(normalizeUser).filter((user): user is User => user !== null)
+    saveEmployeeCache(users)
+    return users
   },
 
   async addEmployee(payload: { name: string; email: string }): Promise<User> {
     const data = unwrapObject(await gasFetch('addEmployee', payload), 'user')
     const user = normalizeUser(data)
     if (!user) throw new Error('Employee response မမှန်ပါ။ Backend deployment ကို စစ်ပါ။')
+    saveEmployeeCache([...(readEmployeeCache() || []).filter((item) => item.id !== user.id), user])
     return user
   },
 
   async deleteEmployee(id: string): Promise<void> {
     await gasFetch('deleteEmployee', { id })
+    saveEmployeeCache((readEmployeeCache() || []).filter((user) => user.id !== id))
   },
 
   async createSale(payload: {
@@ -393,6 +456,7 @@ export const api = {
   }): Promise<Sale> {
     const data = await gasFetch('createSale', payload)
     clearProductCache()
+    clearSalesCache()
     const sale = normalizeSale(unwrapObject(data, 'sale'))
     if (!sale) throw new Error('Sale response မမှန်ပါ။')
     return sale
@@ -402,6 +466,7 @@ export const api = {
     const data = await gasFetch('payCredit', { saleId })
     const sale = normalizeSale(unwrapObject(data, 'sale'))
     if (!sale) throw new Error('အကြွေးငွေပေးချေမှု response မမှန်ပါ။')
+    clearSalesCache()
     return sale
   },
 

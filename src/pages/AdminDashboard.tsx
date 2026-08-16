@@ -38,7 +38,7 @@ export default function AdminDashboard() {
     if (!quiet) setLoading(true)
     setError('')
     try {
-      const [saleData, productData] = await Promise.all([api.getSales(start, end), api.getProducts(true)])
+      const [saleData, productData] = await Promise.all([api.getSales(start, end, quiet), api.getProducts(quiet)])
       setSales(saleData); setProducts(productData)
     } catch (error) { setError(error instanceof Error ? error.message : 'Data ဆွဲမရပါ။') }
     finally { setLoading(false); loadingRef.current = false }
@@ -46,8 +46,9 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     void loadDashboard()
-    const timer = window.setInterval(() => void loadDashboard(true), 5000)
-    return () => window.clearInterval(timer)
+    const initialRefresh = window.setTimeout(() => void loadDashboard(true), 100)
+    const timer = window.setInterval(() => void loadDashboard(true), 30000)
+    return () => { window.clearTimeout(initialRefresh); window.clearInterval(timer) }
   }, [loadDashboard])
 
   const report = useMemo(() => {

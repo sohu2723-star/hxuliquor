@@ -286,15 +286,14 @@ export default function POS() {
                     </div>
                     <p className="font-medium truncate">{product.name}</p>
                     <p className="text-sm text-gray-500">{product.category}</p>
-                    <p className="font-semibold text-primary mt-1">
-                      {formatCurrency(product.price)}
-                    </p>
                     <p className="text-xs text-gray-400">Stock: {product.stockQty}</p>
                   </div>
                   <div className="mt-3 grid gap-2">
-                    <button onClick={() => addToCart(product, 'unit')} className="w-full rounded-lg bg-primary px-2 py-2 text-sm font-semibold text-white">+ တစ်ဘူး / တစ်ခု</button>
-                    {product.unitsPerPack > 1 && product.packPrice > 0 && <button onClick={() => addToCart(product, 'pack')} disabled={product.stockQty < product.unitsPerPack} className="w-full rounded-lg border border-primary/30 bg-amber-50 px-2 py-2 text-sm font-semibold text-primary disabled:opacity-40">
-                      + တစ်ပါကင် ({product.unitsPerPack} ခု) · {formatCurrency(product.packPrice)}
+                    <button onClick={() => addToCart(product, 'unit')} className="w-full rounded-xl bg-primary px-3 py-2.5 text-left text-white shadow-sm">
+                      <span className="block text-[11px] font-medium text-white/80">🍾 တစ်ဘူး / တစ်ခု ဈေး</span><strong className="block text-base">{formatCurrency(product.price)}</strong>
+                    </button>
+                    {product.unitsPerPack > 1 && product.packPrice > 0 && <button onClick={() => addToCart(product, 'pack')} disabled={product.stockQty < product.unitsPerPack} className="w-full rounded-xl border-2 border-amber-400 bg-amber-50 px-3 py-2.5 text-left text-amber-950 shadow-sm disabled:opacity-40">
+                      <span className="block text-[11px] font-semibold text-amber-700">📦 တစ်ပါကင် ({product.unitsPerPack} ခု) ဈေး</span><strong className="block text-base">{formatCurrency(product.packPrice)}</strong>
                     </button>}
                   </div>
                   {!product.barcode && <span className="mt-2 text-center text-[11px] font-medium text-slate-500">Manual sale · Barcode မရှိ</span>}

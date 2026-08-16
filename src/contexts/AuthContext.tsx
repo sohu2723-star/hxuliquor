@@ -34,6 +34,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  useEffect(() => {
+    if (user?.role !== 'admin') return
+    const timer = window.setTimeout(() => {
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Yangon', year: 'numeric', month: '2-digit' }).formatToParts(new Date())
+      const year = parts.find((part) => part.type === 'year')?.value
+      const month = parts.find((part) => part.type === 'month')?.value
+      if (!year || !month) return
+      const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()
+      void api.getEmployees(true).catch(() => {})
+      void api.getSales(`${year}-${month}-01`, `${year}-${month}-${String(lastDay).padStart(2, '0')}`, true).catch(() => {})
+    }, 800)
+    return () => window.clearTimeout(timer)
+  }, [user])
+
   const googleLogin = async (idToken: string) => {
     const userData = await api.googleLogin(idToken)
     setUser(userData)
