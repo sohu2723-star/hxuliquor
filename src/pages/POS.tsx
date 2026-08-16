@@ -2,7 +2,7 @@ import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
 import type { Product } from '../lib/api'
-import { api } from '../lib/api'
+import { api, barcodeMatches } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import AppHeader from '../components/AppHeader'
 
@@ -38,27 +38,14 @@ export default function POS() {
       return
     }
     try {
-      const { products: cached } = await api.getProductsStaleFirst()
-      if (cached.length > 0) {
-        setProducts(cached)
-        setIsLoading(false)
-      } else {
-        setIsLoading(true)
-      }
-    } catch {
-      setIsLoading(true)
-    }
-    try {
-      const all = await api.getProducts(true)
+      const { products: all } = await api.getProductsStaleFirst()
       setProducts(all)
     } catch (error) {
-      if (products.length === 0) {
-        showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
-      }
+      showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
     } finally {
       setIsLoading(false)
     }
-  }, [showToast, products.length])
+  }, [showToast])
 
   useEffect(() => {
     void loadProducts()
@@ -104,16 +91,13 @@ export default function POS() {
   }
 
   const handleScan = (code: string) => {
-    const product = products.find((p) => String(p.barcode).split(/[,\n]/).some((value) => {
-      const savedCode = value.trim()
-      return savedCode.endsWith('*') ? code.startsWith(savedCode.slice(0, -1)) : savedCode === code
-    }))
+    const product = products.find((p) => barcodeMatches(p.barcode, code))
     if (product) {
       playScanSound(true)
       addToCart(product)
     } else {
       playScanSound(false)
-      showToast(`No product found for barcode: ${code}`, 'error')
+      showToast(`Barcode ${code} ကို product စာရင်းတွင် မတွေ့ပါ။ Products ကို Refresh လုပ်ပြီး စစ်ပါ။`, 'error')
     }
   }
 
@@ -160,7 +144,7 @@ export default function POS() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-slate-50">
       <AppHeader />
       {(() => {
         const lowStock = products.filter((p) => p.stockQty <= p.lowStockThreshold)
@@ -188,14 +172,14 @@ export default function POS() {
       )}
 
       <div className="flex flex-col lg:flex-row">
-        <div className="flex-1 p-4 lg:p-6 space-y-6">
-          <div className="bg-white rounded-lg shadow p-4">
+        <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
+          <div className="surface-card p-4 sm:p-5">
             <h2 className="text-lg font-semibold">Scan Product / Barcode ဖတ်ရန်</h2>
             <p className="text-sm text-gray-500 mb-3">Admin နှင့် Employee နှစ်ဦးလုံး အရောင်းအတွက် tablet နောက် camera ဖြင့် scan ဖတ်နိုင်သည်။</p>
             <Suspense fallback={<div className="h-12 animate-pulse bg-gray-200 rounded-md" />}><Scanner onScan={handleScan} /></Suspense>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="surface-card p-4 sm:p-5">
             <h2 className="text-lg font-semibold mb-3">Search Product</h2>
             <input
               type="text"
@@ -238,7 +222,7 @@ export default function POS() {
             )}
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="surface-card p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3 mb-3">
               <h2 className="text-lg font-semibold">Products ({products.length})</h2>
               <button onClick={() => void loadProducts(true)} disabled={isLoading} className="text-sm border border-gray-300 rounded px-3 py-1 disabled:opacity-50">
@@ -272,7 +256,7 @@ export default function POS() {
                   <button
                     key={product.id}
                     onClick={() => addToCart(product)}
-                    className="p-3 border border-gray-200 rounded-md hover:bg-gray-50 text-left"
+                    className="product-card p-3 text-left"
                   >
                     <div className="flex justify-center mb-2">
                       <ProductImage url={product.imageUrl} name={product.name} />

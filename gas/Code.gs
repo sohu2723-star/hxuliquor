@@ -285,11 +285,17 @@ function getProducts() {
 
 function getProductByBarcode(barcode) {
   const products = getProducts();
-  const scanned = String(barcode).trim();
-  return products.find(p => String(p.barcode).split(/[,\n]/).some(code => {
-    const saved = code.trim();
-    return saved.endsWith('*') ? scanned.startsWith(saved.slice(0, -1)) : saved === scanned;
+  const scanned = normalizeBarcode(barcode);
+  return products.find(p => String(p.barcode).split(/[,\n;]/).some(code => {
+    const saved = normalizeBarcode(code);
+    if (!saved) return false;
+    return saved.endsWith('*') ? scanned.startsWith(saved.slice(0, -1))
+      : saved === scanned || '0' + saved === scanned || saved === '0' + scanned;
   })) || null;
+}
+
+function normalizeBarcode(value) {
+  return String(value || '').trim().replace(/[\s-]+/g, '').toUpperCase();
 }
 
 function searchProducts(query) {
@@ -461,7 +467,7 @@ function uploadImageToDrive(base64Data, fileName) {
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
-    return file.getUrl();
+    return 'https://drive.google.com/uc?export=view&id=' + file.getId();
   } catch (err) {
     throw new Error('Failed to upload image: ' + err.message);
   }

@@ -6,7 +6,7 @@ const Scanner = lazy(() => import('./Scanner'))
 interface ProductFormProps {
   product: Product | null
   categories: string[]
-  onSave: (data: Partial<Product> & { imageFile?: File }) => void
+  onSave: (data: Partial<Product> & { imageFile?: File }) => Promise<void>
   onClose: () => void
 }
 
@@ -38,8 +38,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Image must be less than 2MB')
+      if (file.size > 10 * 1024 * 1024) {
+        alert('ပုံဖိုင် 10MB ထက်ငယ်ရပါမည်။')
         return
       }
       setImageFile(file)
@@ -75,13 +75,12 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       data.imageFile = imageFile
     }
 
-    await onSave(data)
-    setIsSubmitting(false)
+    try { await onSave(data) } finally { setIsSubmitting(false) }
   }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">{product ? 'Edit Product' : 'Add Product'}</h2>
@@ -246,6 +245,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 onChange={handleImageChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               />
+              <p className="mt-1.5 text-xs text-gray-500">ပုံကို upload မတင်မီ အလိုအလျောက် ချုံ့ပေးပါမည် (JPG, PNG, WebP)။</p>
               {imagePreview && (
                 <img
                   src={imagePreview}
