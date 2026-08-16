@@ -39,15 +39,37 @@ function normalizeProduct(value: unknown): Product {
 async function gasFetch(action: string, payload?: Json): Promise<Json> {
   const url = `${API_URL}?action=${encodeURIComponent(action)}`
 
-  const body = payload ? JSON.stringify(payload) : undefined
+function normalizeProduct(value: unknown): Product | null {
+  if (!isRecord(value)) return null
+  const id = asString(value.id)
+  if (!id) return null
+  return {
+    id,
+    barcode: asString(value.barcode),
+    name: asString(value.name, 'Unnamed product'),
+    category: asString(value.category),
+    price: asNumber(value.price),
+    costPrice: asNumber(value.costPrice),
+    stockQty: asInteger(value.stockQty),
+    lowStockThreshold: asInteger(value.lowStockThreshold),
+    requiresAgeCheck: asBoolean(value.requiresAgeCheck),
+    imageUrl: asString(value.imageUrl),
+    createdAt: asString(value.createdAt),
+  }
+}
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/plain',
-    },
-    body,
-  })
+function normalizeUser(value: unknown): User | null {
+  if (!isRecord(value)) return null
+  const id = asString(value.id)
+  const email = asString(value.email).toLowerCase()
+  if (!id || !email) return null
+  return {
+    id,
+    name: asString(value.name, email.split('@')[0]),
+    email,
+    role: asString(value.role, 'employee').toLowerCase(),
+  }
+}
 
   if (!response.ok) {
     let message = `HTTP ${response.status}: ${response.statusText}`
@@ -59,14 +81,103 @@ async function gasFetch(action: string, payload?: Json): Promise<Json> {
     }
     throw new Error(message)
   }
+}
 
-  const data = await response.json()
+let productCache: { products: Product[]; savedAt: number } | null = null
 
-  if (data && data.success === false) {
-    throw new Error(data.message || 'Request failed')
+function readProductCache(): Product[] | null {
+  if (productCache && Date.now() - productCache.savedAt < PRODUCT_CACHE_MS) return productCache.products
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(PRODUCT_CACHE_KEY) || 'null')
+    if (isRecord(stored) && Array.isArray(stored.products) && Number.isFinite(Number(stored.savedAt))) {
+      const products = stored.products.map(normalizeProduct).filter((product): product is Product => product !== null)
+      if (products.length === stored.products.length && Date.now() - Number(stored.savedAt) < PRODUCT_CACHE_MS) {
+        productCache = { products, savedAt: Number(stored.savedAt) }
+        return products
+      }
+    }
+  } catch {
+    try { localStorage.removeItem(PRODUCT_CACHE_KEY) } catch { /* storage unavailable */ }
+  }
+  return null
+}
+
+function saveProductCache(products: Product[]) {
+  productCache = { products, savedAt: Date.now() }
+  try { localStorage.setItem(PRODUCT_CACHE_KEY, JSON.stringify(productCache)) } catch { /* storage may be full */ }
+}
+
+function clearProductCache() {
+  productCache = null
+  try { localStorage.removeItem(PRODUCT_CACHE_KEY) } catch { /* storage unavailable */ }
+}
+
+class ApiError extends Error {
+  readonly retryable: boolean
+
+  constructor(message: string, retryable = false) {
+    super(message)
+    this.name = 'ApiError'
+    this.retryable = retryable
+  }
+}
+
+async function gasFetch(action: string, payload?: JsonObject): Promise<unknown> {
+  const url = `${API_URL}?action=${encodeURIComponent(action)}`
+  const token = action === 'googleLogin' ? '' : (() => {
+    try { return localStorage.getItem(AUTH_TOKEN_KEY) || '' } catch { return '' }
+  })()
+  const requestPayload = token ? { ...(payload ?? {}), accessToken: token } : (payload ?? {})
+  const body = JSON.stringify(requestPayload)
+  const maxAttempts = RETRYABLE_ACTIONS.has(action) ? MAX_READ_RETRIES + 1 : 1
+  let lastError: unknown
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body,
+        signal: controller.signal,
+      })
+      const text = await response.text()
+      let data: unknown = null
+      try {
+        data = text ? JSON.parse(text) : null
+      } catch {
+        throw new ApiError('Server returned an invalid response. Please reload and try again.', response.status >= 500)
+      }
+
+      if (!response.ok) {
+        const message = isRecord(data) && typeof data.message === 'string'
+          ? data.message
+          : `Server error (${response.status})`
+        throw new ApiError(message, response.status >= 500 || response.status === 429)
+      }
+
+      if (isRecord(data) && data.success === false) {
+        throw new ApiError(asString(data.message, 'Request failed'))
+      }
+
+      return data
+    } catch (error) {
+      lastError = error
+      const retryable = error instanceof ApiError ? error.retryable : true
+      if (!retryable || attempt >= maxAttempts - 1) break
+      await new Promise((resolve) => window.setTimeout(resolve, 600 * (attempt + 1)))
+    } finally {
+      window.clearTimeout(timeoutId)
+    }
   }
 
-  return data
+  if (lastError instanceof ApiError) throw lastError
+  if (lastError instanceof DOMException && lastError.name === 'AbortError') {
+    throw new Error('Network timeout. Server response ကြာနေပါသည်။ Retry ပြန်လုပ်ပါ။')
+  }
+  throw new Error('Network error. Internet သို့မဟုတ် server connection ကို စစ်ပြီး Retry ပြန်လုပ်ပါ။')
 }
 
 export type Product = {
@@ -141,21 +252,39 @@ export const api = {
   },
 
   async getCategories(): Promise<string[]> {
-    const data = await gasFetch('getCategories')
-    return Array.isArray(data) ? data : []
+    const data = unwrapArray(await gasFetch('getCategories'), 'categories')
+    return data.map((category) => asString(category)).filter(Boolean)
   },
 
   async getSales(startDate?: string, endDate?: string): Promise<Sale[]> {
-    const params: Json = {}
+    const params: JsonObject = {}
     if (startDate) params.startDate = startDate
     if (endDate) params.endDate = endDate
-    const data = await gasFetch('getSales', params)
-    return Array.isArray(data) ? data : []
+    const data = unwrapArray(await gasFetch('getSales', params), 'sales')
+    return data.map(normalizeSale).filter((sale): sale is Sale => sale !== null)
   },
 
   async googleLogin(idToken: string): Promise<User> {
-    const data = await gasFetch('googleLogin', { idToken })
-    return data.user as User
+    const data = unwrapObject(await gasFetch('googleLogin', { idToken }), 'user')
+    const user = normalizeUser(data)
+    if (!user) throw new Error('Login response မမှန်ပါ။ Google login ပြန်လုပ်ပါ။')
+    return user
+  },
+
+  async getEmployees(): Promise<User[]> {
+    const data = unwrapArray(await gasFetch('getEmployees'), 'employees')
+    return data.map(normalizeUser).filter((user): user is User => user !== null)
+  },
+
+  async addEmployee(payload: { name: string; email: string }): Promise<User> {
+    const data = unwrapObject(await gasFetch('addEmployee', payload), 'user')
+    const user = normalizeUser(data)
+    if (!user) throw new Error('Employee response မမှန်ပါ။ Backend deployment ကို စစ်ပါ။')
+    return user
+  },
+
+  async deleteEmployee(id: string): Promise<void> {
+    await gasFetch('deleteEmployee', { id })
   },
 
   async getEmployees(): Promise<User[]> {

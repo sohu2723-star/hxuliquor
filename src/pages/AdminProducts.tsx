@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { Product } from '../lib/api'
-import { formatCurrency } from '../lib/format'
 import ProductList from '../components/ProductList'
 import ProductForm from '../components/ProductForm'
 import AppHeader from '../components/AppHeader'
@@ -14,71 +13,67 @@ export default function AdminProducts() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [categories, setCategories] = useState<string[]>([])
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    loadProducts()
-    loadCategories()
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+    setToast({ message, type })
+    window.setTimeout(() => setToast(null), 4000)
   }, [])
 
-  const loadProducts = async () => {
+  const refreshProducts = useCallback(async () => {
+    setIsLoading(true)
     try {
-      const all = await api.getProducts()
+      const all = await api.getProducts(true)
       setProducts(all)
-    } catch {
-      showToast('Failed to load products', 'error')
+    } catch (error) {
+      showToast(getErrorMessage(error, 'Product data ဆွဲမရပါ။'), 'error')
+    } finally {
+      setIsLoading(false)
     }
-  }
+  }, [showToast])
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     try {
       const cats = await api.getCategories()
       setCategories(cats)
-    } catch {
-      // ignore
+    } catch (error) {
+      showToast(getErrorMessage(error, 'Category data ဆွဲမရပါ။'), 'error')
     }
-  }
+  }, [showToast])
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
+  useEffect(() => {
+    void refreshProducts()
+    void loadCategories()
+  }, [refreshProducts, loadCategories])
 
   const handleSave = async (productData: Partial<Product> & { imageFile?: File }) => {
     try {
-      const processProduct = async (isEdit: boolean): Promise<void> => {
-        let imageBase64: string | undefined
-        let imageFileName: string | undefined
+      let imageBase64: string | undefined
+      let imageFileName: string | undefined
 
-        if (productData.imageFile) {
-          imageBase64 = await fileToBase64(productData.imageFile)
-          imageFileName = productData.imageFile.name
-        }
+      if (productData.imageFile) {
+        imageBase64 = await fileToBase64(productData.imageFile)
+        imageFileName = productData.imageFile.name
+      }
 
-        const payload = {
-          barcode: productData.barcode || '',
-          name: productData.name || '',
-          category: productData.category || '',
-          price: productData.price || 0,
-          costPrice: productData.costPrice || 0,
-          stockQty: productData.stockQty || 0,
-          lowStockThreshold: productData.lowStockThreshold || 0,
-          requiresAgeCheck: productData.requiresAgeCheck || false,
-          ...(imageBase64 && { imageBase64, imageFileName }),
-        }
-
-        if (isEdit && productData.id) {
-          await api.updateProduct({ id: productData.id, ...payload })
-          showToast('Product updated', 'success')
-        } else {
-          await api.addProduct(payload)
-          showToast('Product added', 'success')
-        }
+      const payload = {
+        barcode: String(productData.barcode || '').trim(),
+        name: String(productData.name || '').trim(),
+        category: String(productData.category || '').trim(),
+        price: productData.price || 0,
+        costPrice: productData.costPrice || 0,
+        stockQty: productData.stockQty || 0,
+        lowStockThreshold: productData.lowStockThreshold || 0,
+        requiresAgeCheck: productData.requiresAgeCheck || false,
+        ...(imageBase64 && { imageBase64, imageFileName }),
       }
 
       if (editingProduct) {
-        await processProduct(true)
+        await api.updateProduct({ id: editingProduct.id, ...payload })
+        showToast('Product updated', 'success')
       } else {
-        await processProduct(false)
+        await api.addProduct(payload)
+        showToast('Product added', 'success')
       }
 
       setShowForm(false)
@@ -141,27 +136,18 @@ export default function AdminProducts() {
           </button>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <input
-              type="text"
-              placeholder="Search by name or barcode..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="">All Categories</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <h1 className="text-2xl font-bold">Product Management</h1>
+            <div className="flex gap-2">
+              <button onClick={() => void refreshProducts()} disabled={isLoading} className="border border-gray-300 px-4 py-2 rounded-md disabled:opacity-50">
+                {isLoading ? 'Loading...' : 'Refresh'}
+              </button>
+              <button onClick={() => { setEditingProduct(null); setShowForm(true) }} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                Add Product
+              </button>
+            </div>
           </div>
-        </div>
 
         <ProductList
           products={filteredProducts}
@@ -193,4 +179,8 @@ function fileToBase64(file: File): Promise<string> {
     reader.onload = () => resolve(reader.result as string)
     reader.onerror = (error) => reject(error)
   })
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback
 }
