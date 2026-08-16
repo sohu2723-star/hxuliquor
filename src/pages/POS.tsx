@@ -51,7 +51,7 @@ export default function POS() {
     void loadProducts()
   }, [loadProducts])
 
-  const addToCart = useCallback((product: Product) => {
+  const addToCart = useCallback((product: Product, amount = 1) => {
     if (product.stockQty <= 0) {
       showToast(`${product.name} stock ကုန်နေပါသည်`, 'error')
       return
@@ -59,17 +59,21 @@ export default function POS() {
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id)
       if (existing) {
-        if (existing.quantity >= product.stockQty) {
+        if (existing.quantity + amount > product.stockQty) {
           showToast('Not enough stock', 'error')
           return prev
         }
         return prev.map((item) =>
           item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + amount }
             : item
         )
       }
-      return [...prev, { product, quantity: 1 }]
+      if (amount > product.stockQty) {
+        showToast('ပါကင်အတွက် stock မလုံလောက်ပါ', 'error')
+        return prev
+      }
+      return [...prev, { product, quantity: amount }]
     })
     showToast(`Added ${product.name}`, 'success')
   }, [showToast])
@@ -253,11 +257,8 @@ export default function POS() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto">
                 {products.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => addToCart(product)}
-                    className="product-card p-3 text-left"
-                  >
+                  <div key={product.id} className="product-card p-3 text-left flex flex-col">
+                  <button onClick={() => addToCart(product)} className="text-left flex-1" aria-label={`${product.name} တစ်ခုထည့်ရန်`}>
                     <div className="flex justify-center mb-2">
                       <ProductImage url={product.imageUrl} name={product.name} />
                     </div>
@@ -268,6 +269,11 @@ export default function POS() {
                     </p>
                     <p className="text-xs text-gray-400">Stock: {product.stockQty}</p>
                   </button>
+                  {product.unitsPerPack > 1 && <button onClick={() => addToCart(product, product.unitsPerPack)} disabled={product.stockQty < product.unitsPerPack} className="mt-2 w-full rounded-lg border border-primary/30 bg-amber-50 px-2 py-2 text-sm font-semibold text-primary disabled:opacity-40">
+                    + ၁ ပါကင် ({product.unitsPerPack} ခု)
+                  </button>}
+                  {!product.barcode && <span className="mt-2 text-center text-[11px] font-medium text-slate-500">Manual sale · Barcode မရှိ</span>}
+                  </div>
                 ))}
               </div>
             )}

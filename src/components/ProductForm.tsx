@@ -19,6 +19,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     costPrice: product?.costPrice?.toString() || '',
     stockQty: product?.stockQty?.toString() || '',
     lowStockThreshold: product?.lowStockThreshold?.toString() || '5',
+    unitsPerPack: product?.unitsPerPack?.toString() || '1',
     requiresAgeCheck: product?.requiresAgeCheck || false,
   })
   const [imageFile, setImageFile] = useState<File | undefined>()
@@ -68,6 +69,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       costPrice: parseFloat(formData.costPrice) || 0,
       stockQty: parseInt(formData.stockQty) || 0,
       lowStockThreshold: parseInt(formData.lowStockThreshold) || 0,
+      unitsPerPack: Math.max(1, parseInt(formData.unitsPerPack) || 1),
       requiresAgeCheck: formData.requiresAgeCheck,
     }
 
@@ -190,6 +192,12 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">တစ်ပါကင်တွင် ပါဝင်သည့် အရေအတွက်</label>
+              <input type="number" name="unitsPerPack" min="1" value={formData.unitsPerPack} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
+              <p className="mt-1 text-xs text-gray-500">ဥပမာ တစ်ပါကင် 12 ဘူးဆိုလျှင် 12 ထည့်ပါ။ Stock ကို ဘူး/ခု အရေအတွက်ဖြင့်ထားပါ။</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

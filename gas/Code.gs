@@ -111,7 +111,7 @@ function initSheets() {
 
   const products = setupSheet('Products', [
     'id', 'barcode', 'name', 'category', 'price', 'costPrice',
-    'stockQty', 'lowStockThreshold', 'requiresAgeCheck', 'imageUrl', 'createdAt'
+    'stockQty', 'lowStockThreshold', 'unitsPerPack', 'requiresAgeCheck', 'imageUrl', 'createdAt'
   ]);
   setupSheet('Sales', [
     'id', 'cashierId', 'cashierName', 'totalAmount', 'paymentMethod', 'ageVerified', 'createdAt'
@@ -277,6 +277,7 @@ function getProducts() {
     costPrice: numberValue(p.costPrice),
     stockQty: integerValue(p.stockQty),
     lowStockThreshold: integerValue(p.lowStockThreshold),
+    unitsPerPack: Math.max(1, integerValue(p.unitsPerPack, 1)),
     requiresAgeCheck: booleanValue(p.requiresAgeCheck),
     imageUrl: text(p.imageUrl),
     createdAt: text(p.createdAt)
@@ -322,10 +323,10 @@ function getSales(startDate, endDate) {
 
   let filtered = sales;
   if (startDate) {
-    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), Session.getScriptTimeZone(), 'yyyy-MM-dd') >= startDate);
+    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), 'Asia/Yangon', 'yyyy-MM-dd') >= startDate);
   }
   if (endDate) {
-    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), Session.getScriptTimeZone(), 'yyyy-MM-dd') <= endDate);
+    filtered = filtered.filter(s => Utilities.formatDate(new Date(s.createdAt), 'Asia/Yangon', 'yyyy-MM-dd') <= endDate);
   }
 
   return filtered.map(sale => ({
@@ -501,6 +502,7 @@ function createSale(params, actor) {
 
     const productsSheet = ss.getSheetByName('Products');
     const products = sheetToObjects(productsSheet);
+    const remainingStock = {};
     let totalAmount = 0;
     const saleItems = [];
 
@@ -510,6 +512,7 @@ function createSale(params, actor) {
       if (!product) throw new Error('Product ' + productId + ' not found');
       const stockQty = integerValue(product.stockQty);
       if (stockQty < quantity) throw new Error('Insufficient stock for ' + text(product.name, 'Unnamed product'));
+      remainingStock[productId] = stockQty - quantity;
       if (booleanValue(product.requiresAgeCheck) && !booleanValue(params.ageVerified)) {
         throw new Error('Age verification required for restricted items');
       }
@@ -562,6 +565,17 @@ function createSale(params, actor) {
       ]);
     });
 
+    // Stock is stored as individual units. One bottle sold subtracts one;
+    // selling a 12-unit pack subtracts 12 through the same quantity field.
+    const headers = productsSheet.getRange(1, 1, 1, productsSheet.getLastColumn()).getValues()[0];
+    const stockColumn = headers.indexOf('stockQty') + 1;
+    products.forEach((product, index) => {
+      const productId = text(product.id);
+      if (remainingStock[productId] !== undefined) {
+        productsSheet.getRange(index + 2, stockColumn).setValue(remainingStock[productId]);
+      }
+    });
+
     return {
       success: true,
       sale: {
@@ -602,6 +616,7 @@ function addProduct(params) {
     costPrice: numberValue(params.costPrice),
     stockQty: integerValue(params.stockQty),
     lowStockThreshold: integerValue(params.lowStockThreshold),
+    unitsPerPack: Math.max(1, integerValue(params.unitsPerPack, 1)),
     requiresAgeCheck: booleanValue(params.requiresAgeCheck),
     imageUrl: imageUrl,
     createdAt: new Date().toISOString()
@@ -638,6 +653,7 @@ function updateProduct(params) {
     costPrice: params.costPrice === undefined ? numberValue(current.costPrice) : numberValue(params.costPrice),
     stockQty: params.stockQty === undefined ? integerValue(current.stockQty) : integerValue(params.stockQty),
     lowStockThreshold: params.lowStockThreshold === undefined ? integerValue(current.lowStockThreshold) : integerValue(params.lowStockThreshold),
+    unitsPerPack: params.unitsPerPack === undefined ? Math.max(1, integerValue(current.unitsPerPack, 1)) : Math.max(1, integerValue(params.unitsPerPack, 1)),
     requiresAgeCheck: params.requiresAgeCheck === undefined ? booleanValue(current.requiresAgeCheck) : booleanValue(params.requiresAgeCheck),
     imageUrl: imageUrl,
     createdAt: text(current.createdAt, new Date().toISOString())

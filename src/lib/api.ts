@@ -22,6 +22,7 @@ export type Product = {
   costPrice: number
   stockQty: number
   lowStockThreshold: number
+  unitsPerPack: number
   requiresAgeCheck: boolean
   imageUrl: string
   createdAt: string
@@ -93,6 +94,7 @@ function normalizeProduct(value: unknown): Product | null {
     costPrice: asNumber(value.costPrice),
     stockQty: asInteger(value.stockQty),
     lowStockThreshold: asInteger(value.lowStockThreshold),
+    unitsPerPack: Math.max(1, asInteger(value.unitsPerPack) || 1),
     requiresAgeCheck: asBoolean(value.requiresAgeCheck),
     imageUrl: asString(value.imageUrl),
     createdAt: asString(value.createdAt),
@@ -384,6 +386,7 @@ export const api = {
     costPrice: number
     stockQty: number
     lowStockThreshold: number
+    unitsPerPack: number
     requiresAgeCheck: boolean
     imageBase64?: string
     imageFileName?: string
@@ -404,6 +407,7 @@ export const api = {
     costPrice?: number
     stockQty?: number
     lowStockThreshold?: number
+    unitsPerPack?: number
     requiresAgeCheck?: boolean
     imageBase64?: string
     imageFileName?: string
