@@ -4,6 +4,7 @@ import type { Product } from '../lib/api'
 import ProductList from '../components/ProductList'
 import ProductForm from '../components/ProductForm'
 import AppHeader from '../components/AppHeader'
+import AppToast, { type ToastMessage } from '../components/AppToast'
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([])
@@ -12,10 +13,10 @@ export default function AdminProducts() {
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [categories, setCategories] = useState<string[]>([])
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [toast, setToast] = useState<ToastMessage | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+  const showToast = useCallback((message: string, type: ToastMessage['type']) => {
     setToast({ message, type })
     window.setTimeout(() => setToast(null), 4000)
   }, [])
@@ -49,6 +50,7 @@ export default function AdminProducts() {
   }, [refreshProducts, loadCategories])
 
   const handleSave = async (productData: Partial<Product> & { imageFile?: File }) => {
+    showToast(editingProduct ? 'Product update ကို နောက်ကွယ်မှာ သိမ်းနေပါသည်…' : 'Product add ကို နောက်ကွယ်မှာ သိမ်းနေပါသည်…', 'info')
     try {
       let imageBase64: string | undefined
       let imageFileName: string | undefined
@@ -62,6 +64,8 @@ export default function AdminProducts() {
         barcode: String(productData.barcode || '').trim(),
         name: String(productData.name || '').trim(),
         category: String(productData.category || '').trim(),
+        productColor: String(productData.productColor || '').trim(),
+        productSize: String(productData.productSize || '').trim(),
         price: productData.price || 0,
         costPrice: productData.costPrice || 0,
         stockQty: productData.stockQty || 0,
@@ -76,11 +80,11 @@ export default function AdminProducts() {
       if (editingProduct) {
         const updated = await api.updateProduct({ id: editingProduct.id, ...payload })
         setProducts((current) => current.map((item) => item.id === updated.id ? updated : item))
-        showToast('Product updated', 'success')
+        showToast('Product updated အောင်မြင်ပါသည်', 'success')
       } else {
         const added = await api.addProduct(payload)
-        setProducts((current) => [added, ...current])
-        showToast('Product added', 'success')
+        setProducts((current) => [added, ...current.filter((item) => item.id !== added.id)])
+        showToast('Product added အောင်မြင်ပါသည်', 'success')
       }
 
       setShowForm(false)
@@ -118,15 +122,7 @@ export default function AdminProducts() {
     <div className="min-h-screen bg-slate-50">
       <AppHeader />
       <main className="p-4 lg:p-6">
-      {toast && (
-        <div
-          className={`fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg z-50 ${
-            toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
-          } text-white font-medium`}
-        >
-          {toast.message}
-        </div>
-      )}
+      <AppToast toast={toast} />
 
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
