@@ -4,7 +4,7 @@ import type { Product } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 
 interface CheckoutProps {
-  cart: { product: Product; quantity: number }[]
+  cart: { product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]
   requiresAgeCheck: boolean
   onClose: () => void
   onSuccess: () => void
@@ -19,7 +19,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }:
   const [error, setError] = useState('')
 
   const total = cart.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
+    (sum, item) => sum + (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity,
     0
   )
 
@@ -40,6 +40,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }:
         items: cart.map((item) => ({
           productId: item.product.id,
           quantity: item.quantity,
+          saleUnit: item.saleUnit,
         })),
         ageVerified: requiresAgeCheck ? ageVerified : true,
         paymentMethod,
@@ -70,12 +71,12 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess }:
           <div className="space-y-4">
             <div className="bg-gray-50 p-4 rounded-md">
               <h3 className="font-semibold mb-2">Items</h3>
-              {cart.map(({ product, quantity }) => (
-                <div key={product.id} className="flex justify-between text-sm mb-1">
+              {cart.map(({ product, quantity, saleUnit }) => (
+                <div key={`${product.id}-${saleUnit}`} className="flex justify-between text-sm mb-1">
                   <span>
-                    {product.name} × {quantity}
+                    {product.name} ({saleUnit === 'pack' ? `ပါကင် × ${product.unitsPerPack}` : 'ဘူး/ခု'}) × {quantity}
                   </span>
-                  <span>{formatCurrency(product.price * quantity)}</span>
+                  <span>{formatCurrency((saleUnit === 'pack' ? product.packPrice : product.price) * quantity)}</span>
                 </div>
               ))}
               <div className="border-t mt-2 pt-2 flex justify-between font-bold">

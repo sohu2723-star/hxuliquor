@@ -1,8 +1,8 @@
-import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
 import type { Product } from '../lib/api'
-import { api } from '../lib/api'
+import { api, barcodeMatches } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import AppHeader from '../components/AppHeader'
 
@@ -10,7 +10,7 @@ const Scanner = lazy(() => import('../components/Scanner'))
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
-  const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([])
+  const [cart, setCart] = useState<{ product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Product[]>([])
   const [isSearching, setIsSearching] = useState(false)
@@ -18,6 +18,7 @@ export default function POS() {
   const [showCheckout, setShowCheckout] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
+  const lastHandledScan = useRef({ code: '', time: 0 })
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type })
@@ -38,82 +39,73 @@ export default function POS() {
       return
     }
     try {
-      const { products: cached } = await api.getProductsStaleFirst()
-      if (cached.length > 0) {
-        setProducts(cached)
-        setIsLoading(false)
-      } else {
-        setIsLoading(true)
-      }
-    } catch {
-      setIsLoading(true)
-    }
-    try {
-      const all = await api.getProducts(true)
+      const { products: all } = await api.getProductsStaleFirst()
       setProducts(all)
     } catch (error) {
-      if (products.length === 0) {
-        showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
-      }
+      showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
     } finally {
       setIsLoading(false)
     }
-  }, [showToast, products.length])
+  }, [showToast])
 
   useEffect(() => {
     void loadProducts()
   }, [loadProducts])
 
-  const addToCart = useCallback((product: Product) => {
+  const addToCart = useCallback((product: Product, saleUnit: 'unit' | 'pack' = 'unit') => {
+    const stockUnits = saleUnit === 'pack' ? product.unitsPerPack : 1
     if (product.stockQty <= 0) {
       showToast(`${product.name} stock ကုန်နေပါသည်`, 'error')
       return
     }
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id)
+      const reservedStock = prev.filter((item) => item.product.id === product.id)
+        .reduce((sum, item) => sum + item.quantity * (item.saleUnit === 'pack' ? product.unitsPerPack : 1), 0)
+      const existing = prev.find((item) => item.product.id === product.id && item.saleUnit === saleUnit)
+      if (reservedStock + stockUnits > product.stockQty) {
+        showToast('ရောင်းရန် stock မလုံလောက်ပါ', 'error')
+        return prev
+      }
       if (existing) {
-        if (existing.quantity >= product.stockQty) {
-          showToast('Not enough stock', 'error')
-          return prev
-        }
         return prev.map((item) =>
-          item.product.id === product.id
+          item.product.id === product.id && item.saleUnit === saleUnit
             ? { ...item, quantity: item.quantity + 1 }
             : item
         )
       }
-      return [...prev, { product, quantity: 1 }]
+      return [...prev, { product, quantity: 1, saleUnit }]
     })
     showToast(`Added ${product.name}`, 'success')
   }, [showToast])
 
-  const removeFromCart = (productId: string) => {
-    setCart((prev) => prev.filter((item) => item.product.id !== productId))
+  const removeFromCart = (productId: string, saleUnit: 'unit' | 'pack') => {
+    setCart((prev) => prev.filter((item) => item.product.id !== productId || item.saleUnit !== saleUnit))
   }
 
-  const updateQuantity = (productId: string, delta: number) => {
-    setCart((prev) =>
-      prev
-        .map((item) =>
-          item.product.id === productId
-            ? { ...item, quantity: item.quantity + delta }
-            : item
-        )
-        .filter((item) => item.quantity > 0)
-    )
+  const updateQuantity = (productId: string, saleUnit: 'unit' | 'pack', delta: number) => {
+    setCart((prev) => {
+      const target = prev.find((item) => item.product.id === productId && item.saleUnit === saleUnit)
+      if (!target) return prev
+      const nextQuantity = target.quantity + delta
+      const reservedByOthers = prev.filter((item) => item.product.id === productId && item.saleUnit !== saleUnit)
+        .reduce((sum, item) => sum + item.quantity * (item.saleUnit === 'pack' ? item.product.unitsPerPack : 1), 0)
+      const requested = Math.max(0, nextQuantity) * (saleUnit === 'pack' ? target.product.unitsPerPack : 1)
+      if (requested + reservedByOthers > target.product.stockQty) return prev
+      return prev.map((item) => item === target ? { ...item, quantity: nextQuantity } : item).filter((item) => item.quantity > 0)
+    })
   }
 
   const handleScan = (code: string) => {
-    const product = products.find((p) => String(p.barcode).split(/[,\n]/).some((value) => {
-      const savedCode = value.trim()
-      return savedCode.endsWith('*') ? code.startsWith(savedCode.slice(0, -1)) : savedCode === code
-    }))
+    const now = Date.now()
+    if (lastHandledScan.current.code === code && now - lastHandledScan.current.time < 3000) return
+    lastHandledScan.current = { code, time: now }
+    const product = products.find((p) => barcodeMatches(p.barcode, code))
     if (product) {
       playScanSound(true)
-      addToCart(product)
+      addToCart(product, 'unit')
     } else {
       playScanSound(false)
-      showToast(`No product found for barcode: ${code}`, 'error')
+      showToast(`Barcode ${code} ကို product စာရင်းတွင် မတွေ့ပါ။ Products ကို Refresh လုပ်ပြီး စစ်ပါ။`, 'error')
     }
   }
 
@@ -160,7 +152,7 @@ export default function POS() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-slate-50">
       <AppHeader />
       {(() => {
         const lowStock = products.filter((p) => p.stockQty <= p.lowStockThreshold)
@@ -188,14 +180,14 @@ export default function POS() {
       )}
 
       <div className="flex flex-col lg:flex-row">
-        <div className="flex-1 p-4 lg:p-6 space-y-6">
-          <div className="bg-white rounded-lg shadow p-4">
+        <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
+          <div className="surface-card p-4 sm:p-5">
             <h2 className="text-lg font-semibold">Scan Product / Barcode ဖတ်ရန်</h2>
             <p className="text-sm text-gray-500 mb-3">Admin နှင့် Employee နှစ်ဦးလုံး အရောင်းအတွက် tablet နောက် camera ဖြင့် scan ဖတ်နိုင်သည်။</p>
             <Suspense fallback={<div className="h-12 animate-pulse bg-gray-200 rounded-md" />}><Scanner onScan={handleScan} /></Suspense>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="surface-card p-4 sm:p-5">
             <h2 className="text-lg font-semibold mb-3">Search Product</h2>
             <input
               type="text"
@@ -213,7 +205,7 @@ export default function POS() {
                   <button
                     key={product.id}
                     onClick={() => {
-                      addToCart(product)
+                      addToCart(product, 'unit')
                       setSearchQuery('')
                       setSearchResults([])
                     }}
@@ -238,7 +230,7 @@ export default function POS() {
             )}
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4">
+          <div className="surface-card p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3 mb-3">
               <h2 className="text-lg font-semibold">Products ({products.length})</h2>
               <button onClick={() => void loadProducts(true)} disabled={isLoading} className="text-sm border border-gray-300 rounded px-3 py-1 disabled:opacity-50">
@@ -269,11 +261,8 @@ export default function POS() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[50vh] overflow-y-auto">
                 {products.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => addToCart(product)}
-                    className="p-3 border border-gray-200 rounded-md hover:bg-gray-50 text-left"
-                  >
+                  <div key={product.id} className="product-card p-3 text-left flex flex-col">
+                  <div className="text-left flex-1">
                     <div className="flex justify-center mb-2">
                       <ProductImage url={product.imageUrl} name={product.name} />
                     </div>
@@ -283,7 +272,15 @@ export default function POS() {
                       {formatCurrency(product.price)}
                     </p>
                     <p className="text-xs text-gray-400">Stock: {product.stockQty}</p>
-                  </button>
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    <button onClick={() => addToCart(product, 'unit')} className="w-full rounded-lg bg-primary px-2 py-2 text-sm font-semibold text-white">+ တစ်ဘူး / တစ်ခု</button>
+                    {product.unitsPerPack > 1 && product.packPrice > 0 && <button onClick={() => addToCart(product, 'pack')} disabled={product.stockQty < product.unitsPerPack} className="w-full rounded-lg border border-primary/30 bg-amber-50 px-2 py-2 text-sm font-semibold text-primary disabled:opacity-40">
+                      + တစ်ပါကင် ({product.unitsPerPack} ခု) · {formatCurrency(product.packPrice)}
+                    </button>}
+                  </div>
+                  {!product.barcode && <span className="mt-2 text-center text-[11px] font-medium text-slate-500">Manual sale · Barcode မရှိ</span>}
+                  </div>
                 ))}
               </div>
             )}

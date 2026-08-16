@@ -30,6 +30,10 @@ export default function Scanner({ onScan }: ScannerProps) {
   const [zoom, setZoom] = useState(1)
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const lastScan = useRef({ code: '', time: 0 })
+  const onScanRef = useRef(onScan)
+  const scanLockedUntil = useRef(0)
+
+  useEffect(() => { onScanRef.current = onScan }, [onScan])
 
   const stopScanning = async () => {
     const scanner = scannerRef.current
@@ -63,13 +67,17 @@ export default function Scanner({ onScan }: ScannerProps) {
         selected,
         // Scan the complete video instead of a fixed qrbox. This catches large
         // QR codes and barcodes even when they are not perfectly centered.
-        { fps: 24, aspectRatio: 1.333 },
+        { fps: 30, aspectRatio: 1.777 },
         (rawCode) => {
           const code = rawCode.trim()
           const now = Date.now()
-          if (code && (code !== lastScan.current.code || now - lastScan.current.time > 800)) {
+          const sameCodeTooSoon = code === lastScan.current.code && now - lastScan.current.time < 3000
+          if (code && now >= scanLockedUntil.current && !sameCodeTooSoon) {
             lastScan.current = { code, time: now }
-            onScan(code)
+            // A decoder reports the same visible barcode on many consecutive
+            // video frames. Lock briefly so one physical scan adds exactly once.
+            scanLockedUntil.current = now + 650
+            onScanRef.current(code)
           }
         },
         () => undefined,
@@ -81,7 +89,7 @@ export default function Scanner({ onScan }: ScannerProps) {
       const advanced = [{ ...(focusMode && { focusMode }), ...(initialZoom !== undefined && { zoom: initialZoom }) }]
       try {
         await scanner.applyVideoConstraints({
-          width: { ideal: 1920 }, height: { ideal: 1080 },
+          width: { ideal: 1280 }, height: { ideal: 720 },
           ...(advanced[0].focusMode || advanced[0].zoom !== undefined ? { advanced } : {}),
         } as ExtendedConstraints)
       } catch { /* Some browsers report capabilities but reject constraints. */ }
@@ -117,7 +125,7 @@ export default function Scanner({ onScan }: ScannerProps) {
       <button type="button" onClick={() => void stopScanning()} className="bg-red-600 text-white py-2 px-4 rounded-md">Camera ပိတ်မည်</button>
     </div>}
     {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>}
-    {isScanning && <p className="my-2 text-sm text-center text-gray-600">Code ကို camera မြင်ကွင်းထဲဝင်ရုံပါပဲ—ဘောင်အလယ်တည့်ရန် မလိုပါ</p>}
+    {isScanning && <p className="my-2 text-sm text-center text-gray-600">Code တစ်ခုဖတ်ပြီး အသံကြားလျှင် နောက် product ကို ပြောင်းဖတ်ပါ။ တစ်ခါဖတ်လျှင် တစ်ခုသာထည့်ပါမည်။</p>}
     {isScanning && <div className="flex flex-wrap items-center gap-2 mb-2">
       <button type="button" onClick={() => void applyCameraControl({ focusMode: 'single-shot' })} className="border rounded-md px-3 py-2 text-sm bg-white">🎯 ပြန် Focus</button>
       {canTorch && <button type="button" onClick={() => { const next = !torchOn; setTorchOn(next); void applyCameraControl({ torch: next }) }} className="border rounded-md px-3 py-2 text-sm bg-white">{torchOn ? '🔦 မီးပိတ်' : '🔦 မီးဖွင့်'}</button>}
