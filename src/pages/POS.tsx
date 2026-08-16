@@ -8,6 +8,7 @@ import AppHeader from '../components/AppHeader'
 import Scanner from '../components/Scanner'
 import Icon from '../components/Icon'
 import ReceiptLogo from '../components/ReceiptLogo'
+import AppToast, { type ToastMessage } from '../components/AppToast'
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
@@ -15,7 +16,7 @@ export default function POS() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Product[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [toast, setToast] = useState<ToastMessage | null>(null)
   const [showCheckout, setShowCheckout] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
@@ -23,7 +24,7 @@ export default function POS() {
   const lastHandledScan = useRef({ code: '', time: 0 })
   const productsRefreshing = useRef(false)
 
-  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+  const showToast = useCallback((message: string, type: ToastMessage['type']) => {
     setToast({ message, type })
     window.setTimeout(() => setToast(null), 3000)
   }, [])
@@ -93,7 +94,7 @@ export default function POS() {
       }
       return [...prev, { product, quantity: 1, saleUnit }]
     })
-    showToast(`✅ ${product.name} — ${saleUnit === 'pack' ? 'တစ်ပါကင်' : 'တစ်ဘူး/တစ်ခု'} Cart ထဲထည့်ပြီးပါပြီ`, 'success')
+    showToast(`${product.name} — ${saleUnit === 'pack' ? 'တစ်ပါကင်' : 'တစ်ဘူး/တစ်ခု'} Cart ထဲထည့်ပြီးပါပြီ`, 'success')
   }, [showToast])
 
   const removeFromCart = (productId: string, saleUnit: 'unit' | 'pack') => {
@@ -189,15 +190,7 @@ export default function POS() {
           </div>
         )
       })()}
-      {toast && (
-        <div
-          className={`fixed top-4 right-4 px-6 py-3 rounded-md shadow-lg z-50 ${
-            toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
-          } text-white font-medium`}
-        >
-          {toast.message}
-        </div>
-      )}
+      <AppToast toast={toast} />
 
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
@@ -409,10 +402,10 @@ function playScanSound(success: boolean) {
     const oscillator = context.createOscillator()
     const gain = context.createGain()
     oscillator.frequency.value = success ? 1050 : 240
-    gain.gain.setValueAtTime(.16, context.currentTime)
-    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + (success ? .1 : .25))
+    gain.gain.setValueAtTime(success ? .55 : .45, context.currentTime)
+    gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + (success ? .22 : .35))
     oscillator.connect(gain); gain.connect(context.destination)
-    oscillator.start(); oscillator.stop(context.currentTime + (success ? .1 : .25))
+    oscillator.start(); oscillator.stop(context.currentTime + (success ? .22 : .35))
     oscillator.onended = () => void context.close()
   } catch { /* sound is optional when the browser blocks audio */ }
 }
