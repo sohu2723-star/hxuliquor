@@ -28,6 +28,7 @@ export type Product = {
   lowStockThreshold: number
   unitsPerPack: number
   packPrice: number
+  saleType: 'unit' | 'pack' | 'both'
   requiresAgeCheck: boolean
   imageUrl: string
   createdAt: string
@@ -109,6 +110,7 @@ function normalizeProduct(value: unknown): Product | null {
     lowStockThreshold: asInteger(value.lowStockThreshold),
     unitsPerPack: Math.max(1, asInteger(value.unitsPerPack) || 1),
     packPrice: asNumber(value.packPrice),
+    saleType: value.saleType === 'pack' || value.saleType === 'unit' ? value.saleType : 'both',
     requiresAgeCheck: asBoolean(value.requiresAgeCheck),
     imageUrl: asString(value.imageUrl),
     createdAt: asString(value.createdAt),
@@ -480,6 +482,7 @@ export const api = {
     lowStockThreshold: number
     unitsPerPack: number
     packPrice: number
+    saleType: 'unit' | 'pack' | 'both'
     requiresAgeCheck: boolean
     imageBase64?: string
     imageFileName?: string
@@ -502,6 +505,7 @@ export const api = {
     lowStockThreshold?: number
     unitsPerPack?: number
     packPrice?: number
+    saleType?: 'unit' | 'pack' | 'both'
     requiresAgeCheck?: boolean
     imageBase64?: string
     imageFileName?: string

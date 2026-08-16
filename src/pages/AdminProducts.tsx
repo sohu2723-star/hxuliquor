@@ -68,6 +68,7 @@ export default function AdminProducts() {
         lowStockThreshold: productData.lowStockThreshold || 0,
         unitsPerPack: productData.unitsPerPack || 1,
         packPrice: productData.packPrice || 0,
+        saleType: productData.saleType || 'unit',
         requiresAgeCheck: productData.requiresAgeCheck || false,
         ...(imageBase64 && { imageBase64, imageFileName }),
       }

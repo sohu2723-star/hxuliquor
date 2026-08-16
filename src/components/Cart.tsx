@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Product } from '../lib/api'
 import { formatCurrency } from '../lib/format'
+import Icon from './Icon'
 
 interface CartProps {
   items: { product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]
@@ -42,7 +43,7 @@ export default function Cart({
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <p className="font-medium">{product.name}</p>
-                  <p className="text-sm font-medium text-gray-500">{saleUnit === 'pack' ? `📦 ပါကင် (${product.unitsPerPack} ခု)` : '🍾 တစ်ဘူး / တစ်ခု'}</p>
+                  <p className="flex items-center gap-1 text-sm font-medium text-gray-500"><Icon name={saleUnit === 'pack' ? 'box' : 'bottle'} className="h-4 w-4" />{saleUnit === 'pack' ? `ပါကင် (${product.unitsPerPack} ခု)` : 'တစ်ဘူး / တစ်ခု'}</p>
                   <p className="font-semibold text-primary mt-1">
                     {formatCurrency(saleUnit === 'pack' ? product.packPrice : product.price)}
                   </p>
@@ -86,7 +87,7 @@ export default function Cart({
                   <span className="w-8 text-center font-medium">{quantity}</span>
                   <button
                     onClick={() => onUpdateQuantity(product.id, saleUnit, 1)}
-                    disabled={quantity * (saleUnit === 'pack' ? product.unitsPerPack : 1) >= product.stockQty}
+                    disabled={quantity * (saleUnit === 'pack' && product.saleType !== 'pack' ? product.unitsPerPack : 1) >= product.stockQty}
                     className="w-8 h-8 rounded-md bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold disabled:opacity-50"
                   >
                     +

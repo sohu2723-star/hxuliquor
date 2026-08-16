@@ -6,6 +6,7 @@ import { api, barcodeMatches } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import AppHeader from '../components/AppHeader'
 import Scanner from '../components/Scanner'
+import Icon from '../components/Icon'
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
@@ -69,14 +70,14 @@ export default function POS() {
   }, [loadProducts])
 
   const addToCart = useCallback((product: Product, saleUnit: 'unit' | 'pack' = 'unit') => {
-    const stockUnits = saleUnit === 'pack' ? product.unitsPerPack : 1
+    const stockUnits = saleUnit === 'pack' && product.saleType !== 'pack' ? product.unitsPerPack : 1
     if (product.stockQty <= 0) {
       showToast(`${product.name} stock ကုန်နေပါသည်`, 'error')
       return
     }
     setCart((prev) => {
       const reservedStock = prev.filter((item) => item.product.id === product.id)
-        .reduce((sum, item) => sum + item.quantity * (item.saleUnit === 'pack' ? product.unitsPerPack : 1), 0)
+        .reduce((sum, item) => sum + item.quantity * (item.saleUnit === 'pack' && product.saleType !== 'pack' ? product.unitsPerPack : 1), 0)
       const existing = prev.find((item) => item.product.id === product.id && item.saleUnit === saleUnit)
       if (reservedStock + stockUnits > product.stockQty) {
         showToast('ရောင်းရန် stock မလုံလောက်ပါ', 'error')
@@ -104,8 +105,8 @@ export default function POS() {
       if (!target) return prev
       const nextQuantity = target.quantity + delta
       const reservedByOthers = prev.filter((item) => item.product.id === productId && item.saleUnit !== saleUnit)
-        .reduce((sum, item) => sum + item.quantity * (item.saleUnit === 'pack' ? item.product.unitsPerPack : 1), 0)
-      const requested = Math.max(0, nextQuantity) * (saleUnit === 'pack' ? target.product.unitsPerPack : 1)
+        .reduce((sum, item) => sum + item.quantity * (item.saleUnit === 'pack' && item.product.saleType !== 'pack' ? item.product.unitsPerPack : 1), 0)
+      const requested = Math.max(0, nextQuantity) * (saleUnit === 'pack' && target.product.saleType !== 'pack' ? target.product.unitsPerPack : 1)
       if (requested + reservedByOthers > target.product.stockQty) return prev
       return prev.map((item) => item === target ? { ...item, quantity: nextQuantity } : item).filter((item) => item.quantity > 0)
     })
@@ -118,7 +119,7 @@ export default function POS() {
     const product = products.find((p) => barcodeMatches(p.barcode, code))
     if (product) {
       playScanSound(true)
-      addToCart(product, 'unit')
+      addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit')
     } else {
       playScanSound(false)
       showToast(`Barcode ${code} ကို product စာရင်းတွင် မတွေ့ပါ။ Products ကို Refresh လုပ်ပြီး စစ်ပါ။`, 'error')
@@ -223,7 +224,7 @@ export default function POS() {
                   <button
                     key={product.id}
                     onClick={() => {
-                      addToCart(product, 'unit')
+                      addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit')
                       setSearchQuery('')
                       setSearchResults([])
                     }}
@@ -286,14 +287,14 @@ export default function POS() {
                     </div>
                     <p className="font-medium truncate">{product.name}</p>
                     <p className="text-sm text-gray-500">{product.category}</p>
-                    <p className="text-xs text-gray-400">Stock: {product.stockQty}</p>
+                    <p className={`mt-1 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${product.saleType === 'pack' ? 'bg-violet-100 text-violet-800' : 'bg-slate-100 text-slate-700'}`}>Stock: {product.stockQty} {product.saleType === 'pack' ? 'ပါကင်' : 'ခု/ဘူး'}</p>
                   </div>
                   <div className="mt-3 grid gap-2">
-                    <button onClick={() => addToCart(product, 'unit')} className="w-full rounded-xl bg-primary px-3 py-2.5 text-left text-white shadow-sm">
-                      <span className="block text-[11px] font-medium text-white/80">🍾 တစ်ဘူး / တစ်ခု ဈေး</span><strong className="block text-base">{formatCurrency(product.price)}</strong>
-                    </button>
-                    {product.unitsPerPack > 1 && product.packPrice > 0 && <button onClick={() => addToCart(product, 'pack')} disabled={product.stockQty < product.unitsPerPack} className="w-full rounded-xl border-2 border-amber-400 bg-amber-50 px-3 py-2.5 text-left text-amber-950 shadow-sm disabled:opacity-40">
-                      <span className="block text-[11px] font-semibold text-amber-700">📦 တစ်ပါကင် ({product.unitsPerPack} ခု) ဈေး</span><strong className="block text-base">{formatCurrency(product.packPrice)}</strong>
+                    {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} className="w-full rounded-xl bg-primary px-3 py-2.5 text-left text-white shadow-sm">
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-white/80"><Icon name="bottle" className="h-4 w-4" />တစ်ဘူး / တစ်ခု ဈေး</span><strong className="block text-base">{formatCurrency(product.price)}</strong>
+                    </button>}
+                    {product.saleType !== 'unit' && product.unitsPerPack > 1 && product.packPrice > 0 && <button onClick={() => addToCart(product, 'pack')} disabled={product.stockQty < (product.saleType === 'pack' ? 1 : product.unitsPerPack)} className="w-full rounded-xl border-2 border-violet-400 bg-violet-50 px-3 py-2.5 text-left text-violet-950 shadow-sm disabled:opacity-40">
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-700"><Icon name="box" className="h-4 w-4" />တစ်ပါကင် ({product.unitsPerPack} ခု) ဈေး</span><strong className="block text-base">{formatCurrency(product.packPrice)}</strong>
                     </button>}
                   </div>
                   {!product.barcode && <span className="mt-2 text-center text-[11px] font-medium text-slate-500">Manual sale · Barcode မရှိ</span>}

@@ -20,6 +20,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     lowStockThreshold: product?.lowStockThreshold?.toString() || '5',
     unitsPerPack: product?.unitsPerPack?.toString() || '1',
     packPrice: product?.packPrice?.toString() || '',
+    saleType: product?.saleType === 'pack' ? 'pack' : 'unit',
     requiresAgeCheck: product?.requiresAgeCheck || false,
   })
   const [imageFile, setImageFile] = useState<File | undefined>()
@@ -70,7 +71,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       stockQty: parseInt(formData.stockQty) || 0,
       lowStockThreshold: parseInt(formData.lowStockThreshold) || 0,
       unitsPerPack: Math.max(1, parseInt(formData.unitsPerPack) || 1),
-      packPrice: parseFloat(formData.packPrice) || 0,
+      packPrice: formData.saleType === 'pack' ? (parseFloat(formData.price) || 0) : 0,
+      saleType: formData.saleType as 'unit' | 'pack' | 'both',
       requiresAgeCheck: formData.requiresAgeCheck,
     }
 
@@ -96,6 +98,13 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <fieldset className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <legend className="px-1 text-sm font-semibold">Product အမျိုးအစား</legend>
+              <div className="grid grid-cols-2 gap-2">
+                <label className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'unit' ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><input className="sr-only" type="radio" name="saleType" value="unit" checked={formData.saleType === 'unit'} onChange={handleChange} /><span className="block font-semibold">တစ်ခုချင်း Product</span><small>Stock ကို ဘူး/ခုဖြင့်ထည့်ပါ</small></label>
+                <label className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><input className="sr-only" type="radio" name="saleType" value="pack" checked={formData.saleType === 'pack'} onChange={handleChange} /><span className="block font-semibold">ပါကင် Product</span><small>Stock ကို ပါကင်ဖြင့်ထည့်ပါ</small></label>
+              </div>
+            </fieldset>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Barcode / QR codes
@@ -167,7 +176,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Selling Price (Ks)
+                  {formData.saleType === 'pack' ? 'တစ်ပါကင် ရောင်းဈေး (Ks)' : 'တစ်ဘူး / တစ်ခု ရောင်းဈေး (Ks)'}
                 </label>
                 <input
                   type="number"
@@ -195,18 +204,15 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
             </div>
 
-            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
-              <h3 className="font-semibold text-slate-900">ပါကင်လိုက် ရောင်းရန် (မရှိလျှင် မဖြည့်ပါနှင့်)</h3>
-              <p className="mb-3 mt-1 text-xs text-slate-600">POS တွင် “တစ်ဘူး” နှင့် “တစ်ပါကင်” ခွဲပြပါမည်။ Stock ကို ဘူးအရေအတွက်ဖြင့်သာ ထည့်ပါ။</p>
-              <div className="grid grid-cols-2 gap-3">
+            {formData.saleType === 'pack' && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
+              <h3 className="font-semibold text-slate-900">ပါကင် Product အချက်အလက်</h3>
+              <p className="mb-3 mt-1 text-xs text-slate-600">Stock Quantity တွင် ကျန်သည့် “ပါကင်အရေအတွက်” ကို ထည့်ပါ။ Barcode မရှိလျှင် ကွက်လပ်ထားနိုင်ပါသည်။</p>
+              <div>
                 <label className="text-sm font-medium text-gray-700">တစ်ပါကင်ပါဝင်မှု
-                  <input type="number" name="unitsPerPack" min="1" value={formData.unitsPerPack} onChange={handleChange} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
-                </label>
-                <label className="text-sm font-medium text-gray-700">တစ်ပါကင်ဈေး (Ks)
-                  <input type="number" name="packPrice" min="0" value={formData.packPrice} onChange={handleChange} placeholder="ဥပမာ 33000" className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
+                  <input type="number" name="unitsPerPack" min="2" value={formData.unitsPerPack} onChange={handleChange} required className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
                 </label>
               </div>
-            </div>
+            </div>}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

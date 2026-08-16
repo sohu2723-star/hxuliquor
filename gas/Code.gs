@@ -112,7 +112,7 @@ function initSheets() {
 
   const products = setupSheet('Products', [
     'id', 'barcode', 'name', 'category', 'price', 'costPrice',
-    'stockQty', 'lowStockThreshold', 'unitsPerPack', 'packPrice', 'requiresAgeCheck', 'imageUrl', 'createdAt'
+    'stockQty', 'lowStockThreshold', 'unitsPerPack', 'packPrice', 'saleType', 'requiresAgeCheck', 'imageUrl', 'createdAt'
   ]);
   setupSheet('Sales', [
     'id', 'cashierId', 'cashierName', 'cashierEmail', 'totalAmount', 'paidAmount', 'balanceDue',
@@ -281,6 +281,7 @@ function getProducts() {
     lowStockThreshold: integerValue(p.lowStockThreshold),
     unitsPerPack: Math.max(1, integerValue(p.unitsPerPack, 1)),
     packPrice: numberValue(p.packPrice),
+    saleType: ['unit', 'pack'].includes(text(p.saleType)) ? text(p.saleType) : 'both',
     requiresAgeCheck: booleanValue(p.requiresAgeCheck),
     imageUrl: text(p.imageUrl),
     createdAt: text(p.createdAt)
@@ -524,7 +525,8 @@ function createSale(params, actor) {
       if (!product) throw new Error('Product ' + productId + ' not found');
       const stockQty = integerValue(product.stockQty);
       const unitsPerPack = Math.max(1, integerValue(product.unitsPerPack, 1));
-      const stockQuantity = quantity * (saleUnit === 'pack' ? unitsPerPack : 1);
+      const separatePackStock = text(product.saleType) === 'pack';
+      const stockQuantity = quantity * (saleUnit === 'pack' && !separatePackStock ? unitsPerPack : 1);
       stockUsed[productId] = (stockUsed[productId] || 0) + stockQuantity;
       if (stockQty < stockUsed[productId]) throw new Error('Insufficient stock for ' + text(product.name, 'Unnamed product'));
       remainingStock[productId] = stockQty - stockUsed[productId];
@@ -532,7 +534,7 @@ function createSale(params, actor) {
         throw new Error('Age verification required for restricted items');
       }
 
-      const sellingPrice = saleUnit === 'pack' ? numberValue(product.packPrice) : numberValue(product.price);
+      const sellingPrice = saleUnit === 'pack' ? numberValue(product.packPrice, numberValue(product.price)) : numberValue(product.price);
       if (saleUnit === 'pack' && (unitsPerPack <= 1 || sellingPrice <= 0)) throw new Error('Pack price is not configured for ' + text(product.name));
       const subtotal = sellingPrice * quantity;
       const unitCost = numberValue(product.costPrice);
@@ -650,6 +652,7 @@ function addProduct(params) {
     lowStockThreshold: integerValue(params.lowStockThreshold),
     unitsPerPack: Math.max(1, integerValue(params.unitsPerPack, 1)),
     packPrice: numberValue(params.packPrice),
+    saleType: ['unit', 'pack'].includes(text(params.saleType)) ? text(params.saleType) : 'both',
     requiresAgeCheck: booleanValue(params.requiresAgeCheck),
     imageUrl: imageUrl,
     createdAt: new Date().toISOString()
@@ -688,6 +691,7 @@ function updateProduct(params) {
     lowStockThreshold: params.lowStockThreshold === undefined ? integerValue(current.lowStockThreshold) : integerValue(params.lowStockThreshold),
     unitsPerPack: params.unitsPerPack === undefined ? Math.max(1, integerValue(current.unitsPerPack, 1)) : Math.max(1, integerValue(params.unitsPerPack, 1)),
     packPrice: params.packPrice === undefined ? numberValue(current.packPrice) : numberValue(params.packPrice),
+    saleType: params.saleType === undefined ? text(current.saleType, 'both') : (['unit', 'pack'].includes(text(params.saleType)) ? text(params.saleType) : 'both'),
     requiresAgeCheck: params.requiresAgeCheck === undefined ? booleanValue(current.requiresAgeCheck) : booleanValue(params.requiresAgeCheck),
     imageUrl: imageUrl,
     createdAt: text(current.createdAt, new Date().toISOString())
