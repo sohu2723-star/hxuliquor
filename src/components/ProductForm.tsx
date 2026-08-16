@@ -1,12 +1,11 @@
-import { lazy, Suspense, useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import type { Product } from '../lib/api'
-
-const Scanner = lazy(() => import('./Scanner'))
+import Scanner from './Scanner'
 
 interface ProductFormProps {
   product: Product | null
   categories: string[]
-  onSave: (data: Partial<Product> & { imageFile?: File }) => void
+  onSave: (data: Partial<Product> & { imageFile?: File }) => Promise<void>
   onClose: () => void
 }
 
@@ -19,6 +18,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     costPrice: product?.costPrice?.toString() || '',
     stockQty: product?.stockQty?.toString() || '',
     lowStockThreshold: product?.lowStockThreshold?.toString() || '5',
+    unitsPerPack: product?.unitsPerPack?.toString() || '1',
+    packPrice: product?.packPrice?.toString() || '',
     requiresAgeCheck: product?.requiresAgeCheck || false,
   })
   const [imageFile, setImageFile] = useState<File | undefined>()
@@ -38,8 +39,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Image must be less than 2MB')
+      if (file.size > 10 * 1024 * 1024) {
+        alert('ပုံဖိုင် 10MB ထက်ငယ်ရပါမည်။')
         return
       }
       setImageFile(file)
@@ -68,6 +69,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       costPrice: parseFloat(formData.costPrice) || 0,
       stockQty: parseInt(formData.stockQty) || 0,
       lowStockThreshold: parseInt(formData.lowStockThreshold) || 0,
+      unitsPerPack: Math.max(1, parseInt(formData.unitsPerPack) || 1),
+      packPrice: parseFloat(formData.packPrice) || 0,
       requiresAgeCheck: formData.requiresAgeCheck,
     }
 
@@ -75,13 +78,12 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       data.imageFile = imageFile
     }
 
-    await onSave(data)
-    setIsSubmitting(false)
+    try { await onSave(data) } finally { setIsSubmitting(false) }
   }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">{product ? 'Edit Product' : 'Add Product'}</h2>
@@ -117,7 +119,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
               {isScanning && (
                 <div className="mt-2">
-                  <Suspense fallback={<div className="h-12 animate-pulse bg-gray-200 rounded-md" />}><Scanner onScan={handleScan} /></Suspense>
+                  <Scanner onScan={handleScan} />
                 </div>
               )}
               <p className="mt-1 text-xs text-gray-500">QR မတူလျှင် code အားလုံးကို comma ခြားထည့်ပါ။ အစပိုင်းတူပြီး အဆုံးသာပြောင်းလျှင် တူသောအစနောက်တွင် * ထည့်နိုင်သည် (ဥပမာ ABC123*)။ Code မရှိလျှင် ကွက်လပ်ထားပြီး POS product ပုံကိုနှိပ်ရောင်းနိုင်သည်။</p>
@@ -193,6 +195,19 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
             </div>
 
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+              <h3 className="font-semibold text-slate-900">ပါကင်လိုက် ရောင်းရန် (မရှိလျှင် မဖြည့်ပါနှင့်)</h3>
+              <p className="mb-3 mt-1 text-xs text-slate-600">POS တွင် “တစ်ဘူး” နှင့် “တစ်ပါကင်” ခွဲပြပါမည်။ Stock ကို ဘူးအရေအတွက်ဖြင့်သာ ထည့်ပါ။</p>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-sm font-medium text-gray-700">တစ်ပါကင်ပါဝင်မှု
+                  <input type="number" name="unitsPerPack" min="1" value={formData.unitsPerPack} onChange={handleChange} className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
+                </label>
+                <label className="text-sm font-medium text-gray-700">တစ်ပါကင်ဈေး (Ks)
+                  <input type="number" name="packPrice" min="0" value={formData.packPrice} onChange={handleChange} placeholder="ဥပမာ 33000" className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
+                </label>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -246,6 +261,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 onChange={handleImageChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               />
+              <p className="mt-1.5 text-xs text-gray-500">ပုံကို upload မတင်မီ အလိုအလျောက် ချုံ့ပေးပါမည် (JPG, PNG, WebP)။</p>
               {imagePreview && (
                 <img
                   src={imagePreview}

@@ -20,10 +20,10 @@ export default function AdminProducts() {
     window.setTimeout(() => setToast(null), 4000)
   }, [])
 
-  const refreshProducts = useCallback(async () => {
-    setIsLoading(true)
+  const refreshProducts = useCallback(async (force = false) => {
+    if (!force) setIsLoading(true)
     try {
-      const all = await api.getProducts(true)
+      const all = force ? await api.getProducts(true) : (await api.getProductsStaleFirst()).products
       setProducts(all)
     } catch (error) {
       showToast(getErrorMessage(error, 'Product data ဆွဲမရပါ။'), 'error')
@@ -44,6 +44,8 @@ export default function AdminProducts() {
   useEffect(() => {
     void refreshProducts()
     void loadCategories()
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshProducts(true) }, 30000)
+    return () => window.clearInterval(timer)
   }, [refreshProducts, loadCategories])
 
   const handleSave = async (productData: Partial<Product> & { imageFile?: File }) => {
@@ -64,21 +66,24 @@ export default function AdminProducts() {
         costPrice: productData.costPrice || 0,
         stockQty: productData.stockQty || 0,
         lowStockThreshold: productData.lowStockThreshold || 0,
+        unitsPerPack: productData.unitsPerPack || 1,
+        packPrice: productData.packPrice || 0,
         requiresAgeCheck: productData.requiresAgeCheck || false,
         ...(imageBase64 && { imageBase64, imageFileName }),
       }
 
       if (editingProduct) {
-        await api.updateProduct({ id: editingProduct.id, ...payload })
+        const updated = await api.updateProduct({ id: editingProduct.id, ...payload })
+        setProducts((current) => current.map((item) => item.id === updated.id ? updated : item))
         showToast('Product updated', 'success')
       } else {
-        await api.addProduct(payload)
+        const added = await api.addProduct(payload)
+        setProducts((current) => [added, ...current])
         showToast('Product added', 'success')
       }
 
       setShowForm(false)
       setEditingProduct(null)
-      void refreshProducts()
       void loadCategories()
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to save product', 'error')
@@ -109,7 +114,7 @@ export default function AdminProducts() {
   })
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-slate-50">
       <AppHeader />
       <main className="p-4 lg:p-6">
       {toast && (
@@ -181,9 +186,32 @@ export default function AdminProducts() {
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
-    reader.readAsDataURL(file)
-    reader.onload = () => resolve(reader.result as string)
+    reader.onload = () => {
+      const image = new Image()
+      image.onload = () => {
+        const scale = Math.min(1, 640 / Math.max(image.width, image.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.round(image.width * scale)
+        canvas.height = Math.round(image.height * scale)
+        const context = canvas.getContext('2d')
+        if (!context) return reject(new Error('ပုံကို ပြင်ဆင်၍မရပါ။ အခြားပုံရွေးပါ။'))
+        context.drawImage(image, 0, 0, canvas.width, canvas.height)
+        let quality = .76
+        let result = canvas.toDataURL('image/jpeg', quality)
+        while (result.length > 45000 && quality > .3) {
+          quality -= .08
+          result = canvas.toDataURL('image/jpeg', quality)
+        }
+        if (result.length > 48000) {
+          return reject(new Error('ပုံဖိုင်ကို ချုံ့၍မရပါ။ ပိုသေးသောပုံကို ရွေးပါ။'))
+        }
+        resolve(result)
+      }
+      image.onerror = () => reject(new Error('ပုံဖိုင်ကို ဖတ်၍မရပါ။ JPG/PNG ပုံရွေးပါ။'))
+      image.src = String(reader.result)
+    }
     reader.onerror = (error) => reject(error)
+    reader.readAsDataURL(file)
   })
 }
 
