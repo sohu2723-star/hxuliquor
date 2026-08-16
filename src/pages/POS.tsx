@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
 import type { Product } from '../lib/api'
@@ -19,26 +19,26 @@ export default function POS() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
 
-  useEffect(() => {
-    loadProducts()
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+    setToast({ message, type })
+    window.setTimeout(() => setToast(null), 3000)
   }, [])
 
-  const loadProducts = async (forceRefresh = false) => {
+  const loadProducts = useCallback(async (forceRefresh = false) => {
     setIsLoading(true)
     try {
       const all = await api.getProducts(forceRefresh)
       setProducts(all)
-    } catch {
-      showToast('Failed to load products', 'error')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [showToast])
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
+  useEffect(() => {
+    void loadProducts()
+  }, [loadProducts])
 
   const addToCart = useCallback((product: Product) => {
     setCart((prev) => {
@@ -75,17 +75,35 @@ export default function POS() {
     )
   }
 
-  const handleScan = (code: string) => {
-    const product = products.find((p) => p.barcode.split(/[,\n]/).some((value) => {
+  const handleScan = async (code: string) => {
+    const normalizedCode = code.trim()
+    const findByBarcode = (list: Product[], scannedCode: string) => list.find((product) => String(product.barcode || '').split(/[,\n]/).some((value) => {
       const savedCode = value.trim()
-      return savedCode.endsWith('*') ? code.startsWith(savedCode.slice(0, -1)) : savedCode === code
+      return savedCode.endsWith('*') ? scannedCode.startsWith(savedCode.slice(0, -1)) : savedCode === scannedCode
     }))
+
+    let product = findByBarcode(products, normalizedCode)
+    if (!product) {
+      try {
+        // The POS list can be stale after an admin adds a product. Ask the
+        // backend directly, then add the fresh product to the visible list.
+        product = await api.getProductByBarcode(normalizedCode) || undefined
+        if (product) {
+          setProducts((current) => current.some((item) => item.id === product?.id) ? current : [...current, product as Product])
+        }
+      } catch (error) {
+        playScanSound(false)
+        showToast(error instanceof Error ? error.message : 'Barcode lookup failed', 'error')
+        return
+      }
+    }
+
     if (product) {
       playScanSound(true)
       addToCart(product)
     } else {
       playScanSound(false)
-      showToast(`No product found for barcode: ${code}`, 'error')
+      showToast(`Product မတွေ့ပါ: ${normalizedCode}`, 'error')
     }
   }
 
@@ -99,8 +117,8 @@ export default function POS() {
     try {
       const results = await api.searchProducts(query)
       setSearchResults(results)
-    } catch {
-      showToast('Search failed', 'error')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Search failed', 'error')
     } finally {
       setIsSearching(false)
     }
@@ -201,7 +219,12 @@ export default function POS() {
           </div>
 
           <div className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-lg font-semibold mb-3">Products ({products.length})</h2>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <h2 className="text-lg font-semibold">Products ({products.length})</h2>
+              <button onClick={() => void loadProducts(true)} disabled={isLoading} className="text-sm border border-gray-300 rounded px-3 py-1 disabled:opacity-50">
+                {isLoading ? 'Loading...' : 'Refresh'}
+              </button>
+            </div>
             {isLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {Array.from({ length: 8 }).map((_, i) => (

@@ -1,23 +1,133 @@
-// Keep Apps Script behind our same-origin serverless endpoint. Apps Script web-app
-// responses do not reliably include CORS headers, so browsers cannot call them
-// directly even when the request itself does not trigger a preflight.
+// The Apps Script response does not reliably include CORS headers, so the browser
+// reaches it through the same-origin Vercel proxy.
 const API_URL = '/api/gas'
-
-type Json = Record<string, unknown>
-
-const PRODUCT_CACHE_KEY = 'hxu-products-v2'
+export const AUTH_TOKEN_KEY = 'hxu-google-id-token'
+const REQUEST_TIMEOUT_MS = 20_000
+const MAX_READ_RETRIES = 2
+const PRODUCT_CACHE_KEY = 'hxu-products-v3'
 const PRODUCT_CACHE_MS = 5 * 60 * 1000
+
+const RETRYABLE_ACTIONS = new Set([
+  'getProducts',
+  'getProductByBarcode',
+  'searchProducts',
+  'getCategories',
+  'getSales',
+  'getEmployees',
+  'googleLogin',
+])
+
+type JsonObject = Record<string, unknown>
+
+function isRecord(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function asString(value: unknown, fallback = ''): string {
+  return value === null || value === undefined ? fallback : String(value).trim()
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  const number = typeof value === 'number' ? value : Number.parseFloat(String(value ?? ''))
+  return Number.isFinite(number) ? number : fallback
+}
+
+function asInteger(value: unknown, fallback = 0): number {
+  const number = asNumber(value, fallback)
+  return Number.isFinite(number) ? Math.trunc(number) : fallback
+}
+
+function asBoolean(value: unknown): boolean {
+  return value === true || value === 'TRUE' || value === 'true' || value === 1 || value === '1'
+}
+
+function unwrapArray(value: unknown, key: string): unknown[] {
+  if (Array.isArray(value)) return value
+  if (isRecord(value) && Array.isArray(value[key])) return value[key]
+  return []
+}
+
+function unwrapObject(value: unknown, key: string): JsonObject | null {
+  if (isRecord(value) && isRecord(value[key])) return value[key]
+  return isRecord(value) ? value : null
+}
+
+function normalizeProduct(value: unknown): Product | null {
+  if (!isRecord(value)) return null
+  const id = asString(value.id)
+  if (!id) return null
+  return {
+    id,
+    barcode: asString(value.barcode),
+    name: asString(value.name, 'Unnamed product'),
+    category: asString(value.category),
+    price: asNumber(value.price),
+    costPrice: asNumber(value.costPrice),
+    stockQty: asInteger(value.stockQty),
+    lowStockThreshold: asInteger(value.lowStockThreshold),
+    requiresAgeCheck: asBoolean(value.requiresAgeCheck),
+    imageUrl: asString(value.imageUrl),
+    createdAt: asString(value.createdAt),
+  }
+}
+
+function normalizeUser(value: unknown): User | null {
+  if (!isRecord(value)) return null
+  const id = asString(value.id)
+  const email = asString(value.email).toLowerCase()
+  if (!id || !email) return null
+  return {
+    id,
+    name: asString(value.name, email.split('@')[0]),
+    email,
+    role: asString(value.role, 'employee').toLowerCase(),
+  }
+}
+
+function normalizeSale(value: unknown): Sale | null {
+  if (!isRecord(value)) return null
+  const id = asString(value.id)
+  if (!id) return null
+  const rawItems = Array.isArray(value.items) ? value.items : []
+  const items: SaleItem[] = rawItems.filter(isRecord).map((item) => ({
+    id: asString(item.id),
+    saleId: asString(item.saleId, id),
+    productId: asString(item.productId),
+    productName: asString(item.productName, 'Unnamed product'),
+    quantity: asInteger(item.quantity),
+    unitPrice: asNumber(item.unitPrice),
+    subtotal: asNumber(item.subtotal),
+    unitCost: asNumber(item.unitCost),
+    profit: asNumber(item.profit),
+  }))
+  return {
+    id,
+    cashierId: asString(value.cashierId),
+    cashierName: asString(value.cashierName, 'Cashier'),
+    totalAmount: asNumber(value.totalAmount),
+    paymentMethod: asString(value.paymentMethod),
+    ageVerified: asBoolean(value.ageVerified),
+    createdAt: asString(value.createdAt),
+    items,
+  }
+}
+
 let productCache: { products: Product[]; savedAt: number } | null = null
 
 function readProductCache(): Product[] | null {
   if (productCache && Date.now() - productCache.savedAt < PRODUCT_CACHE_MS) return productCache.products
   try {
-    const stored = JSON.parse(localStorage.getItem(PRODUCT_CACHE_KEY) || 'null')
-    if (stored && Date.now() - stored.savedAt < PRODUCT_CACHE_MS && Array.isArray(stored.products)) {
-      productCache = stored
-      return stored.products
+    const stored: unknown = JSON.parse(localStorage.getItem(PRODUCT_CACHE_KEY) || 'null')
+    if (isRecord(stored) && Array.isArray(stored.products) && Number.isFinite(Number(stored.savedAt))) {
+      const products = stored.products.map(normalizeProduct).filter((product): product is Product => product !== null)
+      if (products.length === stored.products.length && Date.now() - Number(stored.savedAt) < PRODUCT_CACHE_MS) {
+        productCache = { products, savedAt: Number(stored.savedAt) }
+        return products
+      }
     }
-  } catch { localStorage.removeItem(PRODUCT_CACHE_KEY) }
+  } catch {
+    try { localStorage.removeItem(PRODUCT_CACHE_KEY) } catch { /* storage unavailable */ }
+  }
   return null
 }
 
@@ -31,37 +141,72 @@ function clearProductCache() {
   try { localStorage.removeItem(PRODUCT_CACHE_KEY) } catch { /* storage unavailable */ }
 }
 
-async function gasFetch(action: string, payload?: Json): Promise<Json> {
+class ApiError extends Error {
+  readonly retryable: boolean
+
+  constructor(message: string, retryable = false) {
+    super(message)
+    this.name = 'ApiError'
+    this.retryable = retryable
+  }
+}
+
+async function gasFetch(action: string, payload?: JsonObject): Promise<unknown> {
   const url = `${API_URL}?action=${encodeURIComponent(action)}`
+  const token = action === 'googleLogin' ? '' : (() => {
+    try { return localStorage.getItem(AUTH_TOKEN_KEY) || '' } catch { return '' }
+  })()
+  const requestPayload = token ? { ...(payload ?? {}), accessToken: token } : (payload ?? {})
+  const body = JSON.stringify(requestPayload)
+  const maxAttempts = RETRYABLE_ACTIONS.has(action) ? MAX_READ_RETRIES + 1 : 1
+  let lastError: unknown
 
-  const body = payload ? JSON.stringify(payload) : undefined
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/plain',
-    },
-    body,
-  })
-
-  if (!response.ok) {
-    let message = `HTTP ${response.status}: ${response.statusText}`
     try {
-      const error = await response.json()
-      if (typeof error?.message === 'string') message = error.message
-    } catch {
-      // Keep the HTTP fallback when the proxy did not return JSON.
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body,
+        signal: controller.signal,
+      })
+      const text = await response.text()
+      let data: unknown = null
+      try {
+        data = text ? JSON.parse(text) : null
+      } catch {
+        throw new ApiError('Server returned an invalid response. Please reload and try again.', response.status >= 500)
+      }
+
+      if (!response.ok) {
+        const message = isRecord(data) && typeof data.message === 'string'
+          ? data.message
+          : `Server error (${response.status})`
+        throw new ApiError(message, response.status >= 500 || response.status === 429)
+      }
+
+      if (isRecord(data) && data.success === false) {
+        throw new ApiError(asString(data.message, 'Request failed'))
+      }
+
+      return data
+    } catch (error) {
+      lastError = error
+      const retryable = error instanceof ApiError ? error.retryable : true
+      if (!retryable || attempt >= maxAttempts - 1) break
+      await new Promise((resolve) => window.setTimeout(resolve, 600 * (attempt + 1)))
+    } finally {
+      window.clearTimeout(timeoutId)
     }
-    throw new Error(message)
   }
 
-  const data = await response.json()
-
-  if (data && data.success === false) {
-    throw new Error(data.message || 'Request failed')
+  if (lastError instanceof ApiError) throw lastError
+  if (lastError instanceof DOMException && lastError.name === 'AbortError') {
+    throw new Error('Network timeout. Server response ကြာနေပါသည်။ Retry ပြန်လုပ်ပါ။')
   }
-
-  return data
+  throw new Error('Network error. Internet သို့မဟုတ် server connection ကို စစ်ပြီး Retry ပြန်လုပ်ပါ။')
 }
 
 export type Product = {
@@ -110,57 +255,71 @@ export type User = {
 
 export const api = {
   async getProducts(forceRefresh = false): Promise<Product[]> {
-    if (!forceRefresh) {
+    if (forceRefresh) clearProductCache()
+    else {
       const cached = readProductCache()
       if (cached) return cached
     }
-    const data = await gasFetch('getProducts')
-    const products = Array.isArray(data) ? data as Product[] : []
+    const data = unwrapArray(await gasFetch('getProducts'), 'products')
+    const products = data.map(normalizeProduct).filter((product): product is Product => product !== null)
     saveProductCache(products)
     return products
   },
 
   async getProductByBarcode(barcode: string): Promise<Product | null> {
-    const data = await gasFetch('getProductByBarcode', { barcode })
-    return data && 'id' in data ? data as Product : null
+    const data = unwrapObject(await gasFetch('getProductByBarcode', { barcode: asString(barcode) }), 'product')
+    return normalizeProduct(data)
   },
 
   async searchProducts(query: string): Promise<Product[]> {
+    const normalized = asString(query).toLowerCase()
     const cached = readProductCache()
     if (cached) {
-      const normalized = query.trim().toLowerCase()
-      return cached.filter((product) => product.name.toLowerCase().includes(normalized) || product.category.toLowerCase().includes(normalized) || product.barcode.includes(normalized))
+      const cachedResults = cached.filter((product) => (
+        asString(product.name).toLowerCase().includes(normalized) ||
+        asString(product.category).toLowerCase().includes(normalized) ||
+        asString(product.barcode).toLowerCase().includes(normalized)
+      ))
+      // A product may have been added from another device while this cache is
+      // still alive. If cache misses, ask the backend before showing "not found".
+      if (cachedResults.length > 0) return cachedResults
     }
-    const data = await gasFetch('searchProducts', { query })
-    return Array.isArray(data) ? data : []
+    const data = unwrapArray(await gasFetch('searchProducts', { query: normalized }), 'products')
+    const products = data.map(normalizeProduct).filter((product): product is Product => product !== null)
+    if (products.length > 0) saveProductCache(products)
+    return products
   },
 
   async getCategories(): Promise<string[]> {
-    const data = await gasFetch('getCategories')
-    return Array.isArray(data) ? data : []
+    const data = unwrapArray(await gasFetch('getCategories'), 'categories')
+    return data.map((category) => asString(category)).filter(Boolean)
   },
 
   async getSales(startDate?: string, endDate?: string): Promise<Sale[]> {
-    const params: Json = {}
+    const params: JsonObject = {}
     if (startDate) params.startDate = startDate
     if (endDate) params.endDate = endDate
-    const data = await gasFetch('getSales', params)
-    return Array.isArray(data) ? data : []
+    const data = unwrapArray(await gasFetch('getSales', params), 'sales')
+    return data.map(normalizeSale).filter((sale): sale is Sale => sale !== null)
   },
 
   async googleLogin(idToken: string): Promise<User> {
-    const data = await gasFetch('googleLogin', { idToken })
-    return data.user as User
+    const data = unwrapObject(await gasFetch('googleLogin', { idToken }), 'user')
+    const user = normalizeUser(data)
+    if (!user) throw new Error('Login response မမှန်ပါ။ Google login ပြန်လုပ်ပါ။')
+    return user
   },
 
   async getEmployees(): Promise<User[]> {
-    const data = await gasFetch('getEmployees')
-    return Array.isArray(data) ? data as User[] : []
+    const data = unwrapArray(await gasFetch('getEmployees'), 'employees')
+    return data.map(normalizeUser).filter((user): user is User => user !== null)
   },
 
   async addEmployee(payload: { name: string; email: string }): Promise<User> {
-    const data = await gasFetch('addEmployee', payload)
-    return data.user as User
+    const data = unwrapObject(await gasFetch('addEmployee', payload), 'user')
+    const user = normalizeUser(data)
+    if (!user) throw new Error('Employee response မမှန်ပါ။ Backend deployment ကို စစ်ပါ။')
+    return user
   },
 
   async deleteEmployee(id: string): Promise<void> {
@@ -174,9 +333,11 @@ export const api = {
     ageVerified: boolean
     paymentMethod: string
   }): Promise<Sale> {
-    const data = await gasFetch('createSale', payload)
+    const data = unwrapObject(await gasFetch('createSale', payload), 'sale')
     clearProductCache()
-    return data.sale as Sale
+    const sale = normalizeSale(data)
+    if (!sale) throw new Error('Sale response မမှန်ပါ။')
+    return sale
   },
 
   async addProduct(payload: {
@@ -191,9 +352,11 @@ export const api = {
     imageBase64?: string
     imageFileName?: string
   }): Promise<Product> {
-    const data = await gasFetch('addProduct', payload)
+    const data = unwrapObject(await gasFetch('addProduct', payload), 'product')
     clearProductCache()
-    return data.product as Product
+    const product = normalizeProduct(data)
+    if (!product) throw new Error('Product response မမှန်ပါ။ Backend deployment ကို စစ်ပါ။')
+    return product
   },
 
   async updateProduct(payload: {

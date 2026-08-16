@@ -117,3 +117,28 @@ test("explains how to recover from a removed Apps Script deployment", async (con
   assert.match(response.body.message, /HTTP 404/);
   assert.match(response.body.message, /Redeploy/);
 });
+
+test("preserves a JSON Apps Script error message for non-404 responses", async (context) => {
+  const originalFetch = globalThis.fetch;
+  const originalUrl = process.env.GAS_URL;
+  context.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalUrl === undefined) delete process.env.GAS_URL;
+    else process.env.GAS_URL = originalUrl;
+  });
+
+  process.env.GAS_URL = "https://script.google.com/macros/s/deployment/exec";
+  globalThis.fetch = async () => new Response(
+    JSON.stringify({ success: false, message: "Admin permission required" }),
+    { status: 500, headers: { "Content-Type": "application/json" } },
+  );
+
+  const response = createResponse();
+  await handler(
+    { method: "POST", query: { action: "addEmployee" }, body: "{}" },
+    response,
+  );
+
+  assert.equal(response.statusCode, 502);
+  assert.equal(response.body.message, "Admin permission required");
+});
