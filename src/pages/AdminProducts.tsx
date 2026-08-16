@@ -64,6 +64,8 @@ export default function AdminProducts() {
         barcode: String(productData.barcode || '').trim(),
         name: String(productData.name || '').trim(),
         category: String(productData.category || '').trim(),
+        productColor: String(productData.productColor || '').trim(),
+        productSize: String(productData.productSize || '').trim(),
         price: productData.price || 0,
         costPrice: productData.costPrice || 0,
         stockQty: productData.stockQty || 0,
@@ -81,7 +83,7 @@ export default function AdminProducts() {
         showToast('Product updated အောင်မြင်ပါသည်', 'success')
       } else {
         const added = await api.addProduct(payload)
-        setProducts((current) => [added, ...current])
+        setProducts((current) => [added, ...current.filter((item) => item.id !== added.id)])
         showToast('Product added အောင်မြင်ပါသည်', 'success')
       }
 

@@ -2,7 +2,7 @@ const API_URL = '/api/gas'
 
 export const AUTH_TOKEN_KEY = 'minimart-pos-token'
 
-const PRODUCT_CACHE_KEY = 'hxu-products-v2'
+const PRODUCT_CACHE_KEY = 'hxu-products-v3'
 const EMPLOYEE_CACHE_KEY = 'hxu-employees-v1'
 const SALES_CACHE_PREFIX = 'hxu-sales-v1:'
 const PRODUCT_CACHE_MS = 15 * 60 * 1000
@@ -22,6 +22,8 @@ export type Product = {
   barcode: string
   name: string
   category: string
+  productColor: string
+  productSize: string
   price: number
   costPrice: number
   stockQty: number
@@ -104,6 +106,8 @@ function normalizeProduct(value: unknown): Product | null {
     barcode: asString(value.barcode),
     name: asString(value.name, 'Unnamed product'),
     category: asString(value.category),
+    productColor: asString(value.productColor),
+    productSize: asString(value.productSize),
     price: asNumber(value.price),
     costPrice: asNumber(value.costPrice),
     stockQty: asInteger(value.stockQty),
@@ -476,6 +480,8 @@ export const api = {
     barcode: string
     name: string
     category: string
+    productColor?: string
+    productSize?: string
     price: number
     costPrice: number
     stockQty: number
@@ -499,6 +505,8 @@ export const api = {
     barcode?: string
     name?: string
     category?: string
+    productColor?: string
+    productSize?: string
     price?: number
     costPrice?: number
     stockQty?: number

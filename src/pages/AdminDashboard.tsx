@@ -90,6 +90,18 @@ export default function AdminDashboard() {
     return [...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, amount]) => ({ date, amount, percent: amount / max * 100 }))
   }, [sales])
 
+  const monthlyIncomeChart = useMemo(() => {
+    const paid = sales.reduce((sum, sale) => sum + sale.paidAmount, 0)
+    const credit = sales.reduce((sum, sale) => sum + sale.balanceDue, 0)
+    const profit = sales.filter((sale) => sale.paidAmount > 0).flatMap((sale) => sale.items).reduce((sum, item) => sum + item.profit, 0)
+    const max = Math.max(paid, credit, profit, 1)
+    return [
+      { label: 'Paid', my: 'ရပြီး', amount: paid, className: 'bg-emerald-600' },
+      { label: 'Credit', my: 'အကြွေးကျန်', amount: credit, className: 'bg-amber-500' },
+      { label: 'Profit', my: 'အမြတ်', amount: profit, className: 'bg-primary' },
+    ].map((item) => ({ ...item, percent: item.amount / max * 100 }))
+  }, [sales])
+
   const markCreditPaid = useCallback((sale: Sale) => {
     const settledAt = new Date().toISOString()
     setConfirmCredit(null)
@@ -138,7 +150,16 @@ export default function AdminDashboard() {
         <Card title={`${selectedMonth} Monthly`} data={report.month} />
       </div>}
       <section className="mt-5 surface-card p-5"><h2 className="font-bold text-lg text-red-700">ကုန်တော့မည့်ပစ္စည်း Warning ({lowStock.length})</h2><div className="mt-3 divide-y">{lowStock.length ? lowStock.map((product) => <div key={product.id} className="py-2 flex justify-between"><span>{product.name} <small className="text-slate-500">({product.saleType === 'pack' ? 'ပါကင် Product' : 'တစ်ခုချင်း Product'})</small></span><b className="text-red-600">Stock {product.stockQty} {product.saleType === 'pack' ? 'ပါကင်' : 'ခု/ဘူး'}</b></div>) : <p className="text-green-700">Stock အားလုံးလုံလောက်ပါသည်</p>}</div></section>
-      <section className="mt-5 surface-card p-5"><h2 className="text-lg font-bold">Daily Income Chart</h2><div className="mt-4 flex h-44 items-end gap-1 overflow-x-auto border-b pb-1">{dailyIncome.map((day) => <div key={day.date} className="group flex min-w-8 flex-1 flex-col items-center justify-end"><span className="mb-1 hidden text-[10px] group-hover:block">{formatCurrency(day.amount)}</span><div className="w-full rounded-t bg-primary" style={{ height: `${Math.max(day.percent, 3)}%` }} /><span className="mt-1 text-[9px] text-slate-500">{day.date.slice(8)}</span></div>)}</div></section>
+      <section className="mt-5 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="surface-card p-5">
+          <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">Daily Income Chart</h2><p className="text-xs text-slate-500">နေ့စဉ် ဝင်ငွေကို bar chart ဖြင့်ပြထားသည်။</p></div><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{dailyIncome.length} days</span></div>
+          <div className="mt-4 flex h-48 items-end gap-2 overflow-x-auto rounded-2xl bg-slate-50 p-3">{dailyIncome.length ? dailyIncome.map((day) => <div key={day.date} className="group flex min-w-10 flex-1 flex-col items-center justify-end"><span className="mb-2 rounded bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white opacity-0 transition group-hover:opacity-100">{formatCurrency(day.amount)}</span><div className="w-full rounded-t-xl bg-gradient-to-t from-primary to-amber-500" style={{ height: `${Math.max(day.percent, 4)}%` }} /><span className="mt-2 text-[10px] font-semibold text-slate-500">{day.date.slice(8)}</span></div>) : <p className="m-auto text-sm text-slate-500">Daily income မရှိသေးပါ</p>}</div>
+        </div>
+        <div className="surface-card p-5">
+          <h2 className="text-lg font-bold">Monthly Income Chart</h2><p className="text-xs text-slate-500">လအတွင်း ငွေရပြီး၊ အကြွေးကျန်၊ အမြတ်</p>
+          <div className="mt-5 space-y-4">{monthlyIncomeChart.map((item) => <div key={item.label}><div className="mb-1 flex justify-between text-sm"><b>{item.my}</b><span>{formatCurrency(item.amount)}</span></div><div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className={`h-full ${item.className}`} style={{ width: `${Math.max(item.percent, item.amount ? 4 : 0)}%` }} /></div></div>)}</div>
+        </div>
+      </section>
       <section className="mt-5 surface-card p-5"><h2 className="text-lg font-bold text-amber-700">အကြွေးစာရင်း ({unpaidCredits.length})</h2><div className="mt-3 divide-y">{unpaidCredits.length ? unpaidCredits.map((sale) => <div key={sale.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center"><div className="flex-1"><b>{sale.customerName}</b><p className="text-xs text-slate-500">{myanmarDate(sale.createdAt)} · {sale.cashierName} ({sale.cashierEmail})</p></div><b className="text-amber-700">{formatCurrency(sale.balanceDue)}</b><button onClick={() => setConfirmCredit(sale)} className="rounded-lg bg-green-700 px-3 py-2 text-sm font-medium text-white">အကြွေးဆပ်ပြီး</button></div>) : <p className="py-3 text-green-700">ပေးရန်ကျန်သည့်အကြွေး မရှိပါ</p>}</div></section>
       <section className="mt-5 surface-card p-5"><h2 className="text-lg font-bold">ရောင်းချမှု History · {selectedMonth}</h2><p className="text-xs text-slate-500">Calendar ဖြင့် လအလိုက်ခွဲကြည့်နိုင်ပါသည်။ စာရင်းများကို အလိုအလျောက်မဖျက်ဘဲ audit အတွက်သိမ်းထားပါသည်။</p><div className="mt-3 max-h-96 divide-y overflow-y-auto">{sales.map((sale) => <details key={sale.id} className="py-3"><summary className="flex cursor-pointer list-none flex-wrap justify-between gap-2"><span><b>{new Date(sale.createdAt).toLocaleString('en-GB', { timeZone: MYANMAR_TIME_ZONE })}</b><small className="block text-slate-500">{sale.cashierName} · {sale.cashierEmail}</small></span><span className="text-right"><b>{formatCurrency(sale.totalAmount)}</b><small className={`block ${sale.balanceDue ? 'text-amber-700' : 'text-green-700'}`}>{sale.balanceDue ? `အကြွေးကျန် ${formatCurrency(sale.balanceDue)}` : 'ငွေရပြီး'}</small></span></summary><div className="mt-2 rounded-lg bg-slate-50 p-3 text-sm">{sale.items.map((item) => <div key={item.id} className="flex justify-between"><span>{item.productName} · {item.saleUnit === 'pack' ? 'ပါကင်' : 'တစ်ခု'} × {item.saleQuantity}</span><span>{formatCurrency(item.subtotal)}</span></div>)}</div></details>)}</div></section>
     </main>

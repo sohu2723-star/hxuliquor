@@ -118,13 +118,13 @@ export default function POS() {
     const now = Date.now()
     if (lastHandledScan.current.code === code && now - lastHandledScan.current.time < 3000) return
     lastHandledScan.current = { code, time: now }
-    const product = products.find((p) => barcodeMatches(p.barcode, code))
+    const product = products.find((p) => barcodeMatches(p.barcode, code)) || findProductByVisualFallback(products, code)
     if (product) {
       playScanSound(true)
       addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit')
     } else {
       playScanSound(false)
-      showToast(`Barcode ${code} ကို product စာရင်းတွင် မတွေ့ပါ။ Products ကို Refresh လုပ်ပြီး စစ်ပါ။`, 'error')
+      showToast(`Code/Text ${code} ကို product စာရင်းတွင် မတွေ့ပါ။ Product name/color/size သို့မဟုတ် QR code ကို စစ်ပါ။`, 'error')
     }
   }
 
@@ -234,7 +234,7 @@ export default function POS() {
                       <ProductImage url={product.imageUrl} name={product.name} />
                       <div>
                         <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-gray-500">{product.category}</p>
+                        <p className="text-sm text-gray-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
                       </div>
                     </div>
                     <span className="font-semibold text-primary">
@@ -286,7 +286,7 @@ export default function POS() {
                       <ProductImage url={product.imageUrl} name={product.name} />
                     </div>
                     <p className="font-medium truncate">{product.name}</p>
-                    <p className="text-sm text-gray-500">{product.category}</p>
+                    <p className="text-sm text-gray-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
                     <p className={`mt-1 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${product.saleType === 'pack' ? 'bg-violet-100 text-violet-800' : 'bg-slate-100 text-slate-700'}`}>Stock: {product.stockQty} {product.saleType === 'pack' ? 'ပါကင်' : 'ခု/ဘူး'}</p>
                   </div>
                   <div className="mt-3 grid gap-2">
@@ -382,6 +382,7 @@ export default function POS() {
           <div className="my-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600 print:my-2 print:rounded-none print:border-x-0 print:bg-white print:px-0">
             <p>{new Date(completedSale.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Yangon' })}</p>
             <p>Cashier: {completedSale.cashierName}</p>
+            <p>Payment: {completedSale.paymentMethod}</p>
             <p>Slip: {completedSale.id}</p>
           </div>
           <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm print:text-xs"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
@@ -392,6 +393,24 @@ export default function POS() {
       </div>}
     </div>
   )
+}
+
+
+function findProductByVisualFallback(products: Product[], scannedValue: string) {
+  const scanned = normalizeVisualText(scannedValue)
+  if (!scanned) return undefined
+  return products.find((product) => {
+    const tokens = [product.name, product.productColor, product.productSize, product.category]
+      .map(normalizeVisualText)
+      .filter(Boolean)
+    if (!tokens.length) return false
+    const strongTokens = tokens.filter((token) => token.length >= 2)
+    return strongTokens.every((token) => scanned.includes(token)) || scanned.includes(tokens.join(''))
+  })
+}
+
+function normalizeVisualText(value: string) {
+  return String(value || '').toLowerCase().replace(/[|:;,_\-\s]+/g, '')
 }
 
 function playScanSound(success: boolean) {
