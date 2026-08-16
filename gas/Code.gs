@@ -577,19 +577,8 @@ function createSale(params, actor) {
 
     // Stock is stored as individual units. One bottle sold subtracts one;
     // selling a 12-unit pack subtracts 12 through the same quantity field.
-    const headers = productsSheet.getRange(1, 1, 1, productsSheet.getLastColumn()).getValues()[0];
-    const stockColumn = headers.indexOf('stockQty') + 1;
-    products.forEach((product, index) => {
-      const productId = text(product.id);
-      if (remainingStock[productId] !== undefined) {
-        productsSheet.getRange(index + 2, stockColumn).setValue(remainingStock[productId]);
-      }
-    });
-
-    // Stock is stored as individual units. One bottle sold subtracts one;
-    // selling a 12-unit pack subtracts 12 through the same quantity field.
-    const headers = productsSheet.getRange(1, 1, 1, productsSheet.getLastColumn()).getValues()[0];
-    const stockColumn = headers.indexOf('stockQty') + 1;
+    const productSheetHeaders = productsSheet.getRange(1, 1, 1, productsSheet.getLastColumn()).getValues()[0];
+    const stockColumn = productSheetHeaders.indexOf('stockQty') + 1;
     products.forEach((product, index) => {
       const productId = text(product.id);
       if (remainingStock[productId] !== undefined) {
@@ -632,8 +621,8 @@ function payCredit(saleId) {
   sale.paidAmount = numberValue(sale.totalAmount);
   sale.balanceDue = 0;
   sale.settledAt = new Date().toISOString();
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  sheet.getRange(index + 2, 1, 1, headers.length).setValues([headers.map(header => sale[header] ?? '')]);
+  const salesSheetHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  sheet.getRange(index + 2, 1, 1, salesSheetHeaders.length).setValues([salesSheetHeaders.map(header => sale[header] ?? '')]);
   return { success: true, sale: getSales().find(item => item.id === text(saleId)) };
 }
 
@@ -704,9 +693,9 @@ function updateProduct(params) {
     createdAt: text(current.createdAt, new Date().toISOString())
   };
 
-  const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
-  const row = headers.map(header => updated[header] ?? '');
-  sheet.getRange(index + 2, 1, 1, headers.length).setValues([row]);
+  const productUpdateHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  const row = productUpdateHeaders.map(header => updated[header] ?? '');
+  sheet.getRange(index + 2, 1, 1, productUpdateHeaders.length).setValues([row]);
   return { success: true, product: updated };
 }
 
