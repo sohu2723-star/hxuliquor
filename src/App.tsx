@@ -5,6 +5,8 @@ import POS from './pages/POS'
 import AdminProducts from './pages/AdminProducts'
 import AdminEmployees from './pages/AdminEmployees'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminCredits from './pages/AdminCredits'
+import AdminSalesHistory from './pages/AdminSalesHistory'
 import LoadingSpinner from './components/LoadingSpinner'
 import { ToastProvider } from './contexts/ToastContext'
 
@@ -42,6 +44,14 @@ function App() {
       <Route
         path="/admin/employees"
         element={<ProtectedRoute adminOnly><AdminEmployees /></ProtectedRoute>}
+      />
+      <Route
+        path="/admin/credits"
+        element={<ProtectedRoute adminOnly><AdminCredits /></ProtectedRoute>}
+      />
+      <Route
+        path="/admin/sales-history"
+        element={<ProtectedRoute adminOnly><AdminSalesHistory /></ProtectedRoute>}
       />
       <Route
         path="/pos"

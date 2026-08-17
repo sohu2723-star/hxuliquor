@@ -24,7 +24,7 @@ export default function AppHeader() {
     return () => document.removeEventListener('mousedown', close)
   }, [])
 
-  const labels = language === 'my' ? { sale: 'အရောင်း', products: 'ပစ္စည်းများ', employees: 'ဝန်ထမ်း', income: 'ဝင်ငွေ', logout: 'ထွက်မည်', roleAdmin: 'Admin', roleEmployee: 'Employee', profile: 'Profile', agent: 'User agent' } : { sale: 'Scan / Sale', products: 'Products', employees: 'Employees', income: 'Income', logout: 'Logout', roleAdmin: 'Admin', roleEmployee: 'Employee', profile: 'Profile', agent: 'User agent' }
+  const labels = language === 'my' ? { sale: 'အရောင်း', products: 'ပစ္စည်းများ', employees: 'ဝန်ထမ်း', income: 'ဝင်ငွေ', credits: 'အကြွေး', history: 'ရောင်းမှတ်တမ်း', logout: 'ထွက်မည်', roleAdmin: 'Admin', roleEmployee: 'Employee', profile: 'Profile', agent: 'User agent' } : { sale: 'Scan / Sale', products: 'Products', employees: 'Employees', income: 'Income', credits: 'Credits', history: 'Sales History', logout: 'Logout', roleAdmin: 'Admin', roleEmployee: 'Employee', profile: 'Profile', agent: 'User agent' }
   const roleLabel = user?.role === 'admin' ? labels.roleAdmin : labels.roleEmployee
   const initials = (user?.name || user?.email || 'U').split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
 
@@ -39,6 +39,8 @@ export default function AppHeader() {
           {user?.role === 'admin' && <Link className={linkClass('/admin/products')} to="/admin/products"><Icon name="products" className="h-4 w-4" />{labels.products}</Link>}
           {user?.role === 'admin' && <Link className={linkClass('/admin/employees')} to="/admin/employees"><Icon name="users" className="h-4 w-4" />{labels.employees}</Link>}
           {user?.role === 'admin' && <Link className={linkClass('/admin/dashboard')} to="/admin/dashboard"><Icon name="chart" className="h-4 w-4" />{labels.income}</Link>}
+          {user?.role === 'admin' && <Link className={linkClass('/admin/credits')} to="/admin/credits"><Icon name="box" className="h-4 w-4" />{labels.credits}</Link>}
+          {user?.role === 'admin' && <Link className={linkClass('/admin/sales-history')} to="/admin/sales-history"><Icon name="chart" className="h-4 w-4" />{labels.history}</Link>}
         </nav>
         <button onClick={() => setLanguage(language === 'my' ? 'en' : 'my')} className="whitespace-nowrap rounded-xl bg-amber-50 px-3.5 py-2 text-sm font-semibold text-amber-800 ring-1 ring-amber-200">{language === 'my' ? 'EN' : 'မြန်မာ'}</button>
         <div ref={profileRef} className="relative shrink-0">

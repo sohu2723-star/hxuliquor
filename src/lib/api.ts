@@ -342,14 +342,11 @@ export const api = {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     if (sessionError) throwDatabaseError(sessionError)
     if (!session?.user) return null
-    const metadata = session.user.user_metadata || {}
-    const fallback = { id: session.user.id, name: metadata.full_name || metadata.name || session.user.email?.split('@')[0] || '', email: session.user.email || '', role: 'employee' }
     const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
     if (error) throwDatabaseError(error)
-    if (!data) {
-      const { data: created, error: createError } = await supabase.from('profiles').upsert({ id: session.user.id, name: fallback.name, email: fallback.email }, { onConflict: 'id' }).select().single()
-      if (createError) throwDatabaseError(createError)
-      return normalizeUser(created)
+    if (!data || data.is_authorized === false) {
+      await supabase.auth.signOut()
+      throw new Error('ဒီ Google Gmail ကို Admin က Employee Accounts ထဲ အရင်ထည့်ပေးရပါမယ်။')
     }
     return normalizeUser(data)
   },

@@ -2,9 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import { api, type Product, type Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
-import ConfirmDialog from '../components/ConfirmDialog'
-import { useToast } from '../contexts/ToastContext'
-import { useActionLoading } from '../contexts/ActionLoadingContext'
 
 const MYANMAR_TIME_ZONE = 'Asia/Yangon'
 
@@ -32,11 +29,8 @@ export default function AdminDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(currentMyanmarMonth)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
-  const [confirmCredit, setConfirmCredit] = useState<Sale | null>(null)
+  const [welcomeOpen, setWelcomeOpen] = useState(true)
   const loadingRef = useRef(false)
-
-  const { showToast } = useToast()
-  const { runWithLoading } = useActionLoading()
 
   const loadDashboard = useCallback(async (quiet = false) => {
     if (loadingRef.current || document.visibilityState === 'hidden') return
@@ -80,7 +74,6 @@ export default function AdminDashboard() {
   }, [products, sales])
 
   const lowStock = products.filter((product) => product.stockQty <= product.lowStockThreshold)
-  const unpaidCredits = sales.filter((sale) => sale.balanceDue > 0)
   const inventoryInvestment = useMemo(() => products.reduce((sum, product) => {
     const stockCost = product.stockQty * product.costPrice
     return sum + stockCost
@@ -97,37 +90,13 @@ export default function AdminDashboard() {
 
   const monthlyIncomeChart = useMemo(() => {
     const paid = sales.reduce((sum, sale) => sum + sale.paidAmount, 0)
-    const credit = sales.reduce((sum, sale) => sum + sale.balanceDue, 0)
     const profit = sales.filter((sale) => sale.paidAmount > 0).flatMap((sale) => sale.items).reduce((sum, item) => sum + item.profit, 0)
-    const max = Math.max(paid, credit, profit, 1)
+    const max = Math.max(paid, profit, 1)
     return [
       { label: 'Paid', my: 'ရပြီး', amount: paid, className: 'bg-emerald-600' },
-      { label: 'Credit', my: 'အကြွေးကျန်', amount: credit, className: 'bg-amber-500' },
       { label: 'Profit', my: 'အမြတ်', amount: profit, className: 'bg-primary' },
     ].map((item) => ({ ...item, percent: item.amount / max * 100 }))
   }, [sales])
-
-  const markCreditPaid = useCallback((sale: Sale) => {
-    const settledAt = new Date().toISOString()
-    setConfirmCredit(null)
-    setSales((current) => current.map((item) => item.id === sale.id ? {
-      ...item,
-      paidAmount: item.totalAmount,
-      balanceDue: 0,
-      settledAt,
-    } : item))
-    void runWithLoading(async () => {
-      try {
-        const updated = await api.payCredit(sale.id)
-        setSales((current) => current.map((item) => item.id === updated.id ? updated : item))
-        showToast('အကြွေးဆပ်ပြီးပါပြီ။ Daily / Monthly income ထဲ ထည့်တွက်ပြီးပါပြီ။', 'success')
-        await loadDashboard(true)
-      } catch (error) {
-        showToast(error instanceof Error ? error.message : 'အကြွေးပေးချေမှု မအောင်မြင်ပါ။', 'error')
-        await loadDashboard(true)
-      }
-    })
-  }, [loadDashboard, runWithLoading, showToast])
 
   const Card = ({ title, data }: { title: string; data: { revenue: number; profit: number; count: number; units: number } }) => (
     <section className="surface-card p-5">
@@ -143,6 +112,13 @@ export default function AdminDashboard() {
   )
 
   return <div className="min-h-screen bg-slate-50">
+    {welcomeOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true" aria-label="Welcome">
+      <div className="relative w-full max-w-sm rounded-3xl bg-white px-8 py-10 text-center shadow-2xl ring-1 ring-white/70">
+        <button type="button" onClick={() => setWelcomeOpen(false)} className="absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" /></svg></button>
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><svg viewBox="0 0 24 24" className="h-12 w-12" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path strokeLinecap="round" strokeLinejoin="round" d="m8 12 2.5 2.5L16.5 9" /></svg></div>
+        <h2 className="mt-5 text-2xl font-extrabold text-slate-950">Welcome</h2>
+      </div>
+    </div>}
     <AppHeader />
     <main className="max-w-5xl mx-auto p-4 lg:p-6">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -164,20 +140,10 @@ export default function AdminDashboard() {
           <div className="mt-5 rounded-2xl bg-slate-50 p-4"><div className="mb-2 flex items-center justify-between text-sm"><b>{dailyIncome.date}</b><span>{formatCurrency(dailyIncome.amount)}</span></div><div className="h-5 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-gradient-to-r from-primary to-amber-500" style={{ width: `${Math.max(dailyIncome.percent, dailyIncome.amount ? 8 : 0)}%` }} /></div><p className="mt-2 text-xs text-slate-500">Daily target မသတ်မှတ်ထားသေးသဖြင့် ဝင်ငွေရှိပါက bar ကို အပြည့်ပြထားပါသည်။</p></div>
         </div>
         <div className="surface-card p-5">
-          <h2 className="text-lg font-bold">Monthly Income Chart</h2><p className="text-xs text-slate-500">လအတွင်း ငွေရပြီး၊ အကြွေးကျန်၊ အမြတ်</p>
+          <h2 className="text-lg font-bold">Monthly Income Chart</h2><p className="text-xs text-slate-500">လအတွင်း ငွေရပြီး နှင့် အမြတ်</p>
           <div className="mt-5 space-y-4">{monthlyIncomeChart.map((item) => <div key={item.label}><div className="mb-1 flex justify-between text-sm"><b>{item.my}</b><span>{formatCurrency(item.amount)}</span></div><div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className={`h-full ${item.className}`} style={{ width: `${Math.max(item.percent, item.amount ? 4 : 0)}%` }} /></div></div>)}</div>
         </div>
       </section>
-      <section className="mt-5 surface-card p-5"><h2 className="text-lg font-bold text-amber-700">အကြွေးစာရင်း ({unpaidCredits.length})</h2><div className="mt-3 divide-y">{unpaidCredits.length ? unpaidCredits.map((sale) => <div key={sale.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center"><div className="flex-1"><b>{sale.customerName}</b><p className="text-xs text-slate-500">{myanmarDate(sale.createdAt)} · {sale.cashierName} ({sale.cashierEmail})</p></div><b className="text-amber-700">{formatCurrency(sale.balanceDue)}</b><button onClick={() => setConfirmCredit(sale)} className="rounded-lg bg-green-700 px-3 py-2 text-sm font-medium text-white">အကြွေးဆပ်ပြီး</button></div>) : <p className="py-3 text-green-700">ပေးရန်ကျန်သည့်အကြွေး မရှိပါ</p>}</div></section>
-      <section className="mt-5 surface-card p-5"><h2 className="text-lg font-bold">ရောင်းချမှု History · {selectedMonth}</h2><p className="text-xs text-slate-500">Calendar ဖြင့် လအလိုက်ခွဲကြည့်နိုင်ပါသည်။ စာရင်းများကို အလိုအလျောက်မဖျက်ဘဲ audit အတွက်သိမ်းထားပါသည်။</p><div className="mt-3 max-h-96 divide-y overflow-y-auto">{sales.map((sale) => <details key={sale.id} className="py-3"><summary className="flex cursor-pointer list-none flex-wrap justify-between gap-2"><span><b>{new Date(sale.createdAt).toLocaleString('en-GB', { timeZone: MYANMAR_TIME_ZONE })}</b><small className="block text-slate-500">{sale.cashierName} · {sale.cashierEmail}</small></span><span className="text-right"><b>{formatCurrency(sale.totalAmount)}</b><small className={`block ${sale.balanceDue ? 'text-amber-700' : 'text-green-700'}`}>{sale.balanceDue ? `အကြွေးကျန် ${formatCurrency(sale.balanceDue)}` : 'ငွေရပြီး'}</small></span></summary><div className="mt-2 rounded-lg bg-slate-50 p-3 text-sm">{sale.items.map((item) => <div key={item.id} className="flex justify-between"><span>{item.productName} · {item.saleUnit === 'pack' ? 'ပါကင်' : 'တစ်ခု'} × {item.saleQuantity}</span><span>{formatCurrency(item.subtotal)}</span></div>)}</div></details>)}</div></section>
     </main>
-    {confirmCredit && <ConfirmDialog
-      title="အကြွေးဆပ်ပြီး အတည်ပြုမည်"
-      message={`${confirmCredit.customerName} · ${formatCurrency(confirmCredit.balanceDue)} ကို Daily / Monthly income ထဲ ချက်ချင်းပေါင်းထည့်မည်။`}
-      confirmLabel="Confirm"
-      tone="success"
-      onCancel={() => setConfirmCredit(null)}
-      onConfirm={() => markCreditPaid(confirmCredit)}
-    />}
   </div>
 }

@@ -32,7 +32,8 @@ Deno.serve(async (req) => {
     if (error) return response({ error: error.message }, 400)
 
     if (data.user) {
-      await adminClient.from('profiles').upsert({ id: data.user.id, name, email, role: 'employee' }, { onConflict: 'id' })
+      const { error: profileUpsertError } = await adminClient.from('profiles').upsert({ id: data.user.id, name, email, role: 'employee', is_authorized: true }, { onConflict: 'id' })
+      if (profileUpsertError) return response({ error: profileUpsertError.message }, 500)
     }
     return response({ user: { id: data.user?.id || '', name, email, role: 'employee' } })
   } catch (error) {
