@@ -9,8 +9,11 @@ const PRODUCT_CACHE_MS = 15 * 60 * 1000
 const EMPLOYEE_CACHE_MS = 10 * 60 * 1000
 
 const RETRYABLE_ACTIONS = new Set(['getProducts', 'getProductByBarcode', 'searchProducts', 'getCategories', 'getSales', 'getEmployees'])
+const LOGIN_ACTIONS = new Set(['googleLogin'])
 const MAX_READ_RETRIES = 2
+const MAX_LOGIN_RETRIES = 2
 const REQUEST_TIMEOUT_MS = 20000
+const LOGIN_TIMEOUT_MS = 45000
 
 const inFlightReads = new Map<string, Promise<unknown>>()
 
@@ -330,12 +333,14 @@ async function gasFetch(action: string, payload?: Json): Promise<unknown> {
   if (inFlightKey && inFlightReads.has(inFlightKey)) return inFlightReads.get(inFlightKey)!
 
   const run = async () => {
-    const maxAttempts = canDedupe ? MAX_READ_RETRIES + 1 : 1
+    const isLoginAction = LOGIN_ACTIONS.has(action)
+    const maxAttempts = canDedupe ? MAX_READ_RETRIES + 1 : isLoginAction ? MAX_LOGIN_RETRIES + 1 : 1
+    const timeoutMs = isLoginAction ? LOGIN_TIMEOUT_MS : REQUEST_TIMEOUT_MS
     let lastError: unknown
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const controller = new AbortController()
-      const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
 
       try {
         const response = await fetch(url, {
@@ -368,7 +373,7 @@ async function gasFetch(action: string, payload?: Json): Promise<unknown> {
         lastError = error
         const retryable = error instanceof ApiError ? error.retryable : true
         if (!retryable || attempt >= maxAttempts - 1) break
-        await new Promise((resolve) => window.setTimeout(resolve, 600 * (attempt + 1)))
+        await new Promise((resolve) => window.setTimeout(resolve, isLoginAction ? 1200 * (attempt + 1) : 600 * (attempt + 1)))
       } finally {
         window.clearTimeout(timeoutId)
       }
@@ -376,9 +381,13 @@ async function gasFetch(action: string, payload?: Json): Promise<unknown> {
 
     if (lastError instanceof ApiError) throw lastError
     if (lastError instanceof DOMException && lastError.name === 'AbortError') {
-      throw new Error('Network timeout. Server response ကြာနေပါသည်။ Retry ပြန်လုပ်ပါ။')
+      throw new Error(isLoginAction
+        ? 'Login server response ကြာနေပါသည်။ Network မတည်ငြိမ်ပါက Retry ကိုနှိပ်ပါ။'
+        : 'Network timeout. Server response ကြာနေပါသည်။ Retry ပြန်လုပ်ပါ။')
     }
-    throw new Error('Network error. Internet သို့မဟုတ် server connection ကို စစ်ပြီး Retry ပြန်လုပ်ပါ။')
+    throw new Error(isLoginAction
+      ? 'Login network error ဖြစ်နေပါသည်။ Internet connection စစ်ပြီး Retry ပြန်နှိပ်ပါ။'
+      : 'Network error. Internet သို့မဟုတ် server connection ကို စစ်ပြီး Retry ပြန်လုပ်ပါ။')
   }
 
   const promise = run()
