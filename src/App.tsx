@@ -5,6 +5,8 @@ import POS from './pages/POS'
 import AdminProducts from './pages/AdminProducts'
 import AdminEmployees from './pages/AdminEmployees'
 import AdminDashboard from './pages/AdminDashboard'
+import LoadingSpinner from './components/LoadingSpinner'
+import { ToastProvider } from './contexts/ToastContext'
 
 function ProtectedRoute({ children, adminOnly = false }: { children: React.JSX.Element; adminOnly?: boolean }) {
   const { user, isLoading } = useAuth()
@@ -12,7 +14,7 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.JSX.E
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <LoadingSpinner />
       </div>
     )
   }
@@ -30,6 +32,7 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.JSX.E
 
 function App() {
   return (
+    <ToastProvider>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route
@@ -56,8 +59,9 @@ function App() {
           </ProtectedRoute>
         }
       />
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<Navigate to="/pos" replace />} />
     </Routes>
+    </ToastProvider>
   )
 }
 

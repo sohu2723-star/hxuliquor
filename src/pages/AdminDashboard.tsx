@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import { api, type Product, type Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
-import AppToast, { type ToastMessage } from '../components/AppToast'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { useToast } from '../contexts/ToastContext'
 
 const MYANMAR_TIME_ZONE = 'Asia/Yangon'
 
@@ -30,14 +31,10 @@ export default function AdminDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(currentMyanmarMonth)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState<ToastMessage | null>(null)
   const [confirmCredit, setConfirmCredit] = useState<Sale | null>(null)
   const loadingRef = useRef(false)
 
-  const showToast = useCallback((message: string, type: ToastMessage['type']) => {
-    setToast({ message, type })
-    window.setTimeout(() => setToast(null), 4000)
-  }, [])
+  const { showToast } = useToast()
 
   const loadDashboard = useCallback(async (quiet = false) => {
     if (loadingRef.current || document.visibilityState === 'hidden') return
@@ -46,7 +43,10 @@ export default function AdminDashboard() {
     if (!quiet) setLoading(true)
     setError('')
     try {
-      const [saleData, productData] = await Promise.all([api.getSales(start, end, quiet), api.getProducts(quiet)])
+      const [saleData, productData] = await Promise.all([
+        api.getSalesStaleFirst(start, end, setSales).then((result) => result.sales),
+        api.getProductsStaleFirst(setProducts).then((result) => result.products),
+      ])
       setSales(saleData); setProducts(productData)
     } catch (error) { setError(error instanceof Error ? error.message : 'Data ဆွဲမရပါ။') }
     finally { setLoading(false); loadingRef.current = false }
@@ -135,7 +135,6 @@ export default function AdminDashboard() {
 
   return <div className="min-h-screen bg-slate-50">
     <AppHeader />
-    <AppToast toast={toast} />
     <main className="max-w-5xl mx-auto p-4 lg:p-6">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><h1 className="text-2xl font-bold">Income & Stock Dashboard</h1><p className="text-sm text-slate-500">Daily စာရင်းကို မြန်မာစံတော်ချိန် (UTC+6:30) ဖြင့်တွက်ထားပါသည်။</p></div>
@@ -162,13 +161,13 @@ export default function AdminDashboard() {
       <section className="mt-5 surface-card p-5"><h2 className="text-lg font-bold text-amber-700">အကြွေးစာရင်း ({unpaidCredits.length})</h2><div className="mt-3 divide-y">{unpaidCredits.length ? unpaidCredits.map((sale) => <div key={sale.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center"><div className="flex-1"><b>{sale.customerName}</b><p className="text-xs text-slate-500">{myanmarDate(sale.createdAt)} · {sale.cashierName} ({sale.cashierEmail})</p></div><b className="text-amber-700">{formatCurrency(sale.balanceDue)}</b><button onClick={() => setConfirmCredit(sale)} className="rounded-lg bg-green-700 px-3 py-2 text-sm font-medium text-white">အကြွေးဆပ်ပြီး</button></div>) : <p className="py-3 text-green-700">ပေးရန်ကျန်သည့်အကြွေး မရှိပါ</p>}</div></section>
       <section className="mt-5 surface-card p-5"><h2 className="text-lg font-bold">ရောင်းချမှု History · {selectedMonth}</h2><p className="text-xs text-slate-500">Calendar ဖြင့် လအလိုက်ခွဲကြည့်နိုင်ပါသည်။ စာရင်းများကို အလိုအလျောက်မဖျက်ဘဲ audit အတွက်သိမ်းထားပါသည်။</p><div className="mt-3 max-h-96 divide-y overflow-y-auto">{sales.map((sale) => <details key={sale.id} className="py-3"><summary className="flex cursor-pointer list-none flex-wrap justify-between gap-2"><span><b>{new Date(sale.createdAt).toLocaleString('en-GB', { timeZone: MYANMAR_TIME_ZONE })}</b><small className="block text-slate-500">{sale.cashierName} · {sale.cashierEmail}</small></span><span className="text-right"><b>{formatCurrency(sale.totalAmount)}</b><small className={`block ${sale.balanceDue ? 'text-amber-700' : 'text-green-700'}`}>{sale.balanceDue ? `အကြွေးကျန် ${formatCurrency(sale.balanceDue)}` : 'ငွေရပြီး'}</small></span></summary><div className="mt-2 rounded-lg bg-slate-50 p-3 text-sm">{sale.items.map((item) => <div key={item.id} className="flex justify-between"><span>{item.productName} · {item.saleUnit === 'pack' ? 'ပါကင်' : 'တစ်ခု'} × {item.saleQuantity}</span><span>{formatCurrency(item.subtotal)}</span></div>)}</div></details>)}</div></section>
     </main>
-    {confirmCredit && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4">
-      <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></div>
-        <h2 className="mt-4 text-center text-xl font-bold">အကြွေးဆပ်ပြီး အတည်ပြုမည်</h2>
-        <p className="mt-2 text-center text-sm text-slate-500">{confirmCredit.customerName} · {formatCurrency(confirmCredit.balanceDue)} ကို Daily / Monthly income ထဲ ချက်ချင်းပေါင်းထည့်မည်။</p>
-        <div className="mt-5 grid grid-cols-2 gap-2"><button onClick={() => setConfirmCredit(null)} className="rounded-xl border border-slate-200 px-4 py-3 font-semibold">Cancel</button><button onClick={() => markCreditPaid(confirmCredit)} className="rounded-xl bg-green-700 px-4 py-3 font-semibold text-white">Confirm</button></div>
-      </div>
-    </div>}
+    {confirmCredit && <ConfirmDialog
+      title="အကြွေးဆပ်ပြီး အတည်ပြုမည်"
+      message={`${confirmCredit.customerName} · ${formatCurrency(confirmCredit.balanceDue)} ကို Daily / Monthly income ထဲ ချက်ချင်းပေါင်းထည့်မည်။`}
+      confirmLabel="Confirm"
+      tone="success"
+      onCancel={() => setConfirmCredit(null)}
+      onConfirm={() => markCreditPaid(confirmCredit)}
+    />}
   </div>
 }
