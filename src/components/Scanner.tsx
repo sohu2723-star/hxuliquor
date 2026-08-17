@@ -57,17 +57,24 @@ export default function Scanner({ onScan }: ScannerProps) {
       const available = cameras.length ? cameras : await Html5Qrcode.getCameras()
       if (!available.length) throw new Error('Camera မတွေ့ပါ')
       setCameras(available)
-      const rear = available.find((camera) => /back|rear|environment/i.test(camera.label))
-      const selected = requestedCameraId || cameraId || rear?.id || available[0].id
+      const front = available.find((camera) => /front|user|face/i.test(camera.label))
+      const selected = requestedCameraId || cameraId || front?.id || available[0].id
       setCameraId(selected)
 
       const scanner = new Html5Qrcode(readerId, { formatsToSupport: FORMATS, verbose: false })
       scannerRef.current = scanner
       await scanner.start(
         selected,
-        // Scan the complete video instead of a fixed qrbox. This catches large
-        // QR codes and barcodes even when they are not perfectly centered.
-        { fps: 30, aspectRatio: 1.777 },
+        {
+          fps: 45,
+          aspectRatio: 1,
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const width = Math.floor(viewfinderWidth * .86)
+            const height = Math.floor(Math.min(viewfinderHeight * .32, 180))
+            return { width, height }
+          },
+          videoConstraints: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 1280 } },
+        },
         (rawCode) => {
           const code = rawCode.trim()
           const now = Date.now()
@@ -85,11 +92,11 @@ export default function Scanner({ onScan }: ScannerProps) {
       const capabilities = scanner.getRunningTrackCapabilities() as ExtendedCapabilities
       const focusMode = capabilities.focusMode?.includes('continuous') ? 'continuous' : capabilities.focusMode?.includes('single-shot') ? 'single-shot' : undefined
       const zoomCapability = capabilities.zoom
-      const initialZoom = zoomCapability ? Math.min(zoomCapability.max, Math.max(zoomCapability.min, 1)) : undefined
+      const initialZoom = zoomCapability ? Math.min(zoomCapability.max, Math.max(zoomCapability.min, 3)) : undefined
       const advanced = [{ ...(focusMode && { focusMode }), ...(initialZoom !== undefined && { zoom: initialZoom }) }]
       try {
         await scanner.applyVideoConstraints({
-          width: { ideal: 1280 }, height: { ideal: 720 },
+          width: { ideal: 1280 }, height: { ideal: 1280 },
           ...(advanced[0].focusMode || advanced[0].zoom !== undefined ? { advanced } : {}),
         } as ExtendedConstraints)
       } catch { /* Some browsers report capabilities but reject constraints. */ }
@@ -133,7 +140,7 @@ export default function Scanner({ onScan }: ScannerProps) {
         <input aria-label="Camera zoom" type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step} value={zoom} onChange={(event) => { const next = Number(event.target.value); setZoom(next); void applyCameraControl({ zoom: next }) }} className="flex-1" />
       </label>}
     </div>}
-    <div className={`relative overflow-hidden rounded-lg bg-black ${isScanning ? 'min-h-64' : 'hidden'}`}>
+    <div className={`relative mx-auto aspect-square max-h-[360px] w-full max-w-[360px] overflow-hidden rounded-lg bg-black ${isScanning ? '' : 'hidden'}`}>
       <div id={readerId} />
       <div className="pointer-events-none absolute inset-3 rounded-xl border-2 border-green-400/80 scanner-frame" />
     </div>

@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
 import type { Product, Sale } from '../lib/api'
-import { api, barcodeMatches } from '../lib/api'
+import { api, barcodeMatches, PRODUCT_GROUPS, productMatchesGroup, type ProductGroup } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import AppHeader from '../components/AppHeader'
 import Scanner from '../components/Scanner'
@@ -14,6 +14,8 @@ export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<{ product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [productGroup, setProductGroup] = useState<ProductGroup>('all')
+  const [categoryFilter, setCategoryFilter] = useState('')
   const [searchResults, setSearchResults] = useState<Product[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [toast, setToast] = useState<ToastMessage | null>(null)
@@ -64,7 +66,7 @@ export default function POS() {
     document.addEventListener('visibilitychange', refreshWhenReturning)
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') void loadProducts(true, true)
-    }, 30000)
+    }, 5000)
     return () => {
       document.removeEventListener('visibilitychange', refreshWhenReturning)
       window.clearInterval(timer)
@@ -145,6 +147,11 @@ export default function POS() {
     }
   }
 
+  const productCategories = useMemo(() => [...new Set(products.map((product) => product.category).filter(Boolean))].sort(), [products])
+  const matchesCategoryFilter = useCallback((product: Product) => !categoryFilter || product.category === categoryFilter, [categoryFilter])
+  const visibleProducts = products.filter((product) => productMatchesGroup(product, productGroup) && matchesCategoryFilter(product))
+  const filteredSearchResults = searchResults.filter(matchesCategoryFilter)
+
   const requiresAgeCheck = cart.some((item) => item.product.requiresAgeCheck)
 
   const handleCheckoutSuccess = (sale: Sale) => {
@@ -195,11 +202,6 @@ export default function POS() {
 
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
-          <section className="rounded-3xl bg-gradient-to-br from-amber-900 via-primary to-amber-700 p-5 text-white shadow-lg">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-100">Fast Sale</p>
-            <h1 className="mt-2 text-2xl font-extrabold tracking-tight">သန့်ရှင်းလွယ်ကူသော HXU Liquor အရောင်းစာမျက်နှာ</h1>
-            <p className="mt-2 text-sm text-amber-50/90">Scan, search, cart စနစ်များကို အပိုရှုပ်ထွေးမှုမရှိဘဲ တစ်နေရာတည်းတွင်အသုံးပြုနိုင်သည်။</p>
-          </section>
 
           <div className="surface-card p-4 sm:p-5">
             <h2 className="text-lg font-semibold">Scan Product / Barcode ဖတ်ရန်</h2>
@@ -209,19 +211,25 @@ export default function POS() {
 
           <div className="surface-card p-4 sm:p-5">
             <h2 className="text-lg font-semibold mb-3">Search Product</h2>
-            <input
-              type="text"
-              placeholder="Search by name..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-            />
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+              <input
+                type="text"
+                placeholder="Search by name..."
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="min-w-40 rounded-md border border-gray-300 px-3 py-2 font-semibold text-violet-700 focus:outline-none focus:ring-2 focus:ring-primary">
+                <option value="">Category အားလုံး</option>
+                {productCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+            </div>
             {isSearching && (
               <p className="mt-2 text-sm text-gray-500">Searching...</p>
             )}
-            {searchResults.length > 0 && (
+            {filteredSearchResults.length > 0 && (
               <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
-                {searchResults.map((product) => (
+                {filteredSearchResults.map((product) => (
                   <button
                     key={product.id}
                     onClick={() => {
@@ -234,8 +242,8 @@ export default function POS() {
                     <div className="flex items-center gap-3">
                       <ProductImage url={product.imageUrl} name={product.name} />
                       <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-gray-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
+                        <p className="font-bold">{product.name}</p>
+                        <p className="text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
                       </div>
                     </div>
                     <span className="font-semibold text-primary">
@@ -245,18 +253,24 @@ export default function POS() {
                 ))}
               </div>
             )}
-            {searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
+            {searchQuery.length >= 2 && !isSearching && filteredSearchResults.length === 0 && (
               <p className="mt-3 text-sm text-gray-500">No products found</p>
             )}
           </div>
 
           <div className="surface-card p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3 mb-3">
-              <h2 className="text-lg font-semibold">Products ({products.length})</h2>
+              <h2 className="text-lg font-semibold">Products ({visibleProducts.length}/{products.length})</h2>
               <button onClick={() => void loadProducts(true)} disabled={isLoading} className="text-sm border border-gray-300 rounded px-3 py-1 disabled:opacity-50">
                 {isLoading ? 'Loading...' : 'Refresh'}
               </button>
             </div>
+            {!isLoading && products.length > 0 && <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+              {PRODUCT_GROUPS.map((group) => {
+                const count = products.filter((product) => productMatchesGroup(product, group.id)).length
+                return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-3 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{group.label} ({count})</button>
+              })}
+            </div>}
             {isLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {Array.from({ length: 8 }).map((_, i) => (
@@ -280,15 +294,15 @@ export default function POS() {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 max-h-[50vh] overflow-y-auto pr-1">
-                {products.map((product) => (
+                {visibleProducts.map((product) => (
                   <div key={product.id} className={`product-card p-3 text-left flex flex-col shadow-sm ${product.stockQty <= 0 ? 'opacity-40 grayscale' : ''}`}>
                   <div className="text-left flex-1">
                     <div className="flex justify-center mb-2">
                       <ProductImage url={product.imageUrl} name={product.name} />
                     </div>
-                    <p className="font-medium truncate">{product.name}</p>
-                    <p className="text-sm text-gray-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
-                    <p className={`mt-1 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${product.saleType === 'pack' ? 'bg-violet-100 text-violet-800' : 'bg-slate-100 text-slate-700'}`}>Stock: {product.stockQty} {product.saleType === 'pack' ? 'ပါကင်' : 'ခု/ဘူး'}</p>
+                    <p className="truncate font-bold">{product.name}</p>
+                    <p className="text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
+                    <p className={`mt-1 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${product.stockQty <= product.lowStockThreshold ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>Stock: {product.stockQty} {product.saleType === 'pack' ? 'ပါကင်' : 'ခု/ဘူး'}</p>
                   </div>
                   <div className="mt-3 grid gap-2">
                     {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} disabled={product.stockQty <= 0} className="w-full rounded-xl bg-primary disabled:cursor-not-allowed disabled:bg-slate-300 px-3 py-2.5 text-left text-white shadow-sm">

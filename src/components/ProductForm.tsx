@@ -25,6 +25,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     saleType: product?.saleType === 'pack' ? 'pack' : 'unit',
     requiresAgeCheck: product?.requiresAgeCheck || false,
   })
+  const [productKind, setProductKind] = useState<'barcode' | 'noBarcode' | 'pack'>(product?.saleType === 'pack' ? 'pack' : product?.barcode ? 'barcode' : 'noBarcode')
   const [imageFile, setImageFile] = useState<File | undefined>()
   const [imagePreview, setImagePreview] = useState<string | null>(product?.imageUrl || null)
   const [isScanning, setIsScanning] = useState(false)
@@ -33,9 +34,20 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
+    if (name === 'barcode') setProductKind(value.trim() ? 'barcode' : 'noBarcode')
+    if (name === 'saleType' && value === 'pack') setProductKind('pack')
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+    }))
+  }
+
+  const selectProductKind = (kind: 'barcode' | 'noBarcode' | 'pack') => {
+    setProductKind(kind)
+    setFormData((prev) => ({
+      ...prev,
+      saleType: kind === 'pack' ? 'pack' : 'unit',
+      ...(kind === 'noBarcode' ? { barcode: '' } : {}),
     }))
   }
 
@@ -56,7 +68,16 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
   }
 
   const handleScan = (code: string) => {
-    setFormData((prev) => ({ ...prev, barcode: code }))
+    const detected = detectProductDetails(code)
+    setProductKind(detected.barcode || code ? 'barcode' : 'noBarcode')
+    setFormData((prev) => ({
+      ...prev,
+      saleType: 'unit',
+      barcode: detected.barcode || code,
+      name: detected.name || prev.name,
+      productColor: detected.productColor || prev.productColor,
+      productSize: detected.productSize || prev.productSize,
+    }))
     setIsScanning(false)
   }
 
@@ -104,10 +125,12 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
           <form onSubmit={handleSubmit} className="space-y-4">
             <fieldset className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <legend className="px-1 text-sm font-semibold">Product အမျိုးအစား</legend>
-              <div className="grid grid-cols-2 gap-2">
-                <label className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'unit' ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><input className="sr-only" type="radio" name="saleType" value="unit" checked={formData.saleType === 'unit'} onChange={handleChange} /><span className="block font-semibold">တစ်ခုချင်း Product</span><small>Stock ကို ဘူး/ခုဖြင့်ထည့်ပါ</small></label>
-                <label className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><input className="sr-only" type="radio" name="saleType" value="pack" checked={formData.saleType === 'pack'} onChange={handleChange} /><span className="block font-semibold">ပါကင် Product</span><small>Stock ကို ပါကင်ဖြင့်ထည့်ပါ</small></label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <button type="button" onClick={() => selectProductKind('barcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'barcode' ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><span className="block font-semibold">Barcode ရှိ Product</span><small>Barcode ထည့်ပြီး scan ရောင်းရန်</small></button>
+                <button type="button" onClick={() => selectProductKind('noBarcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'noBarcode' ? 'border-slate-500 bg-slate-50 text-slate-800' : 'bg-white'}`}><span className="block font-semibold">Barcode မရှိ Product</span><small>Barcode ကို ကွက်လပ်ထားပါ</small></button>
+                <button type="button" onClick={() => selectProductKind('pack')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><span className="block font-semibold">ပါကင်လိုက် Product</span><small>Stock ကို ပါကင်ဖြင့်ထည့်ပါ</small></button>
               </div>
+              <p className="mt-2 text-xs text-slate-500">Barcode ရှိ/မရှိ အုပ်စုကို Barcode box ဖြည့်ထားခြင်းအလိုက် အလိုအလျောက်ခွဲပါသည်။ ပါကင်လိုက်ကိုရွေးလျှင် သီးသန့်ပါကင်အုပ်စုထဲဝင်ပါမည်။</p>
             </fieldset>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -135,7 +158,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   <Scanner onScan={handleScan} />
                 </div>
               )}
-              <p className="mt-1 text-xs text-gray-500">QR မတူလျှင် code အားလုံးကို comma ခြားထည့်ပါ။ အစပိုင်းတူပြီး အဆုံးသာပြောင်းလျှင် တူသောအစနောက်တွင် * ထည့်နိုင်သည် (ဥပမာ ABC123*)။ Code မရှိလျှင် ကွက်လပ်ထားပြီး POS product ပုံကိုနှိပ်ရောင်းနိုင်သည်။</p>
+              <p className="mt-1 text-xs text-gray-500">QR မတူလျှင် code အားလုံးကို comma ခြားထည့်ပါ။ Scan text ထဲတွင် name/color/size/ml ပါလျှင် Product Name, အရောင်, အရွယ်အစားကို အလိုအလျောက်ဖြည့်ပေးပါမည်။ Code မရှိလျှင် ကွက်လပ်ထားပြီး POS product ပုံကိုနှိပ်ရောင်းနိုင်သည်။</p>
             </div>
 
             <div>
@@ -190,8 +213,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Barcode မရှိသော product များအတွက် camera OCR မဟုတ်ဘဲ QR text ထဲတွင် product name / color / size ပါအောင်ထည့်ပါ။ POS scan သည် ထို text များနှင့် fallback match လုပ်ပါမည်။</p>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="flex flex-col">
+                <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">
                   {formData.saleType === 'pack' ? 'တစ်ပါကင် ရောင်းဈေး (Ks)' : 'တစ်ဘူး / တစ်ခု ရောင်းဈေး (Ks)'}
                 </label>
                 <input
@@ -204,8 +227,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="flex flex-col">
+                <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">
                   Cost Price (Ks)
                 </label>
                 <input
@@ -314,4 +337,63 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       </div>
     </div>
   )
+}
+
+
+type DetectedProductDetails = {
+  barcode: string
+  name: string
+  productColor: string
+  productSize: string
+}
+
+const COLOR_WORDS = [
+  'black', 'white', 'red', 'blue', 'green', 'gold', 'golden', 'silver', 'yellow', 'orange', 'pink', 'purple', 'brown', 'gray', 'grey',
+  'အနက်', 'အဖြူ', 'အနီ', 'အပြာ', 'အစိမ်း', 'ရွှေ', 'ငွေ', 'အဝါ', 'လိမ္မော်', 'ပန်းရောင်', 'ခရမ်း', 'အညို', 'မီးခိုး',
+]
+
+function detectProductDetails(rawCode: string): DetectedProductDetails {
+  const raw = String(rawCode || '').trim()
+  const fields = parseScannedFields(raw)
+  const productSize = fields.size || fields.ml || fields.volume || detectSize(raw)
+  const productColor = fields.color || fields.colour || detectColor(raw)
+  const name = fields.name || fields.product || detectName(raw, productColor, productSize)
+  const barcode = fields.barcode || fields.code || fields.qr || (looksLikePlainBarcode(raw) ? raw : '')
+  return { barcode, name, productColor, productSize }
+}
+
+function parseScannedFields(raw: string): Record<string, string> {
+  return raw.split(/[\n|;,]+/).reduce<Record<string, string>>((fields, part) => {
+    const match = part.match(/^\s*([a-zA-Z ]{2,16})\s*[:=\-]\s*(.+?)\s*$/)
+    if (!match) return fields
+    const key = match[1].trim().toLowerCase().replace(/\s+/g, '')
+    fields[key] = match[2].trim()
+    return fields
+  }, {})
+}
+
+function detectSize(raw: string): string {
+  return raw.match(/\b\d+(?:\.\d+)?\s*(?:ml|l|liter|litre|cl)\b/i)?.[0]?.replace(/\s+/g, '') || ''
+}
+
+function detectColor(raw: string): string {
+  const normalized = raw.toLowerCase()
+  return COLOR_WORDS.find((color) => normalized.includes(color.toLowerCase())) || ''
+}
+
+function detectName(raw: string, productColor: string, productSize: string): string {
+  if (looksLikePlainBarcode(raw)) return ''
+  const cleaned = raw
+    .split(/[\n|;,]+/)
+    .filter((part) => !/^\s*(?:barcode|code|qr|color|colour|size|ml|volume)\s*[:=\-]/i.test(part))
+    .join(' ')
+    .replace(productColor, '')
+    .replace(productSize, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return cleaned.length >= 2 ? cleaned.slice(0, 80) : ''
+}
+
+function looksLikePlainBarcode(raw: string): boolean {
+  return /^[0-9A-Z\-\s]{6,}$/i.test(raw) && !/[\n|;,]/.test(raw)
 }
