@@ -104,10 +104,12 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
           <form onSubmit={handleSubmit} className="space-y-4">
             <fieldset className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <legend className="px-1 text-sm font-semibold">Product အမျိုးအစား</legend>
-              <div className="grid grid-cols-2 gap-2">
-                <label className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'unit' ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><input className="sr-only" type="radio" name="saleType" value="unit" checked={formData.saleType === 'unit'} onChange={handleChange} /><span className="block font-semibold">တစ်ခုချင်း Product</span><small>Stock ကို ဘူး/ခုဖြင့်ထည့်ပါ</small></label>
-                <label className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><input className="sr-only" type="radio" name="saleType" value="pack" checked={formData.saleType === 'pack'} onChange={handleChange} /><span className="block font-semibold">ပါကင် Product</span><small>Stock ကို ပါကင်ဖြင့်ထည့်ပါ</small></label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <button type="button" onClick={() => setFormData((prev) => ({ ...prev, saleType: 'unit' }))} className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'unit' && formData.barcode.trim() ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><span className="block font-semibold">Barcode ရှိ Product</span><small>Barcode ထည့်ပြီး scan ရောင်းရန်</small></button>
+                <button type="button" onClick={() => setFormData((prev) => ({ ...prev, saleType: 'unit', barcode: '' }))} className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'unit' && !formData.barcode.trim() ? 'border-slate-500 bg-slate-50 text-slate-800' : 'bg-white'}`}><span className="block font-semibold">Barcode မရှိ Product</span><small>Barcode ကို ကွက်လပ်ထားပါ</small></button>
+                <label className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><input className="sr-only" type="radio" name="saleType" value="pack" checked={formData.saleType === 'pack'} onChange={handleChange} /><span className="block font-semibold">ပါကင်လိုက် Product</span><small>Stock ကို ပါကင်ဖြင့်ထည့်ပါ</small></label>
               </div>
+              <p className="mt-2 text-xs text-slate-500">Barcode ရှိ/မရှိ အုပ်စုကို Barcode box ဖြည့်ထားခြင်းအလိုက် အလိုအလျောက်ခွဲပါသည်။ ပါကင်လိုက်ကိုရွေးလျှင် သီးသန့်ပါကင်အုပ်စုထဲဝင်ပါမည်။</p>
             </fieldset>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -190,8 +192,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Barcode မရှိသော product များအတွက် camera OCR မဟုတ်ဘဲ QR text ထဲတွင် product name / color / size ပါအောင်ထည့်ပါ။ POS scan သည် ထို text များနှင့် fallback match လုပ်ပါမည်။</p>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="flex flex-col">
+                <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">
                   {formData.saleType === 'pack' ? 'တစ်ပါကင် ရောင်းဈေး (Ks)' : 'တစ်ဘူး / တစ်ခု ရောင်းဈေး (Ks)'}
                 </label>
                 <input
@@ -204,8 +206,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="flex flex-col">
+                <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">
                   Cost Price (Ks)
                 </label>
                 <input

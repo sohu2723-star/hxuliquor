@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
 import type { Product, Sale } from '../lib/api'
-import { api, barcodeMatches } from '../lib/api'
+import { api, barcodeMatches, PRODUCT_GROUPS, productMatchesGroup, type ProductGroup } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import AppHeader from '../components/AppHeader'
 import Scanner from '../components/Scanner'
@@ -14,6 +14,7 @@ export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<{ product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [productGroup, setProductGroup] = useState<ProductGroup>('all')
   const [searchResults, setSearchResults] = useState<Product[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [toast, setToast] = useState<ToastMessage | null>(null)
@@ -145,6 +146,8 @@ export default function POS() {
     }
   }
 
+  const visibleProducts = products.filter((product) => productMatchesGroup(product, productGroup))
+
   const requiresAgeCheck = cart.some((item) => item.product.requiresAgeCheck)
 
   const handleCheckoutSuccess = (sale: Sale) => {
@@ -195,11 +198,6 @@ export default function POS() {
 
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
-          <section className="rounded-3xl bg-gradient-to-br from-amber-900 via-primary to-amber-700 p-5 text-white shadow-lg">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-amber-100">Fast Sale</p>
-            <h1 className="mt-2 text-2xl font-extrabold tracking-tight">သန့်ရှင်းလွယ်ကူသော HXU Liquor အရောင်းစာမျက်နှာ</h1>
-            <p className="mt-2 text-sm text-amber-50/90">Scan, search, cart စနစ်များကို အပိုရှုပ်ထွေးမှုမရှိဘဲ တစ်နေရာတည်းတွင်အသုံးပြုနိုင်သည်။</p>
-          </section>
 
           <div className="surface-card p-4 sm:p-5">
             <h2 className="text-lg font-semibold">Scan Product / Barcode ဖတ်ရန်</h2>
@@ -252,11 +250,17 @@ export default function POS() {
 
           <div className="surface-card p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3 mb-3">
-              <h2 className="text-lg font-semibold">Products ({products.length})</h2>
+              <h2 className="text-lg font-semibold">Products ({visibleProducts.length}/{products.length})</h2>
               <button onClick={() => void loadProducts(true)} disabled={isLoading} className="text-sm border border-gray-300 rounded px-3 py-1 disabled:opacity-50">
                 {isLoading ? 'Loading...' : 'Refresh'}
               </button>
             </div>
+            {!isLoading && products.length > 0 && <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+              {PRODUCT_GROUPS.map((group) => {
+                const count = products.filter((product) => productMatchesGroup(product, group.id)).length
+                return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-3 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{group.label} ({count})</button>
+              })}
+            </div>}
             {isLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {Array.from({ length: 8 }).map((_, i) => (
@@ -280,7 +284,7 @@ export default function POS() {
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 max-h-[50vh] overflow-y-auto pr-1">
-                {products.map((product) => (
+                {visibleProducts.map((product) => (
                   <div key={product.id} className={`product-card p-3 text-left flex flex-col shadow-sm ${product.stockQty <= 0 ? 'opacity-40 grayscale' : ''}`}>
                   <div className="text-left flex-1">
                     <div className="flex justify-center mb-2">
