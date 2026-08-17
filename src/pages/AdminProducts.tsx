@@ -91,7 +91,7 @@ export default function AdminProducts() {
       setEditingProduct(null)
       void loadCategories()
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to save product', 'error')
+      showToast(getErrorMessage(error, 'Product သိမ်းမရပါ။ နာမည်၊ category၊ ဈေး၊ ပုံဖိုင်အရွယ်အစားနှင့် internet connection ကို စစ်ပြီး ထပ်ကြိုးစားပါ။'), 'error')
     }
   }
 
