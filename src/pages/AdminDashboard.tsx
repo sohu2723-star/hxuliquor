@@ -4,6 +4,7 @@ import { api, type Product, type Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../contexts/ToastContext'
+import { useActionLoading } from '../contexts/ActionLoadingContext'
 
 const MYANMAR_TIME_ZONE = 'Asia/Yangon'
 
@@ -35,6 +36,7 @@ export default function AdminDashboard() {
   const loadingRef = useRef(false)
 
   const { showToast } = useToast()
+  const { runWithLoading } = useActionLoading()
 
   const loadDashboard = useCallback(async (quiet = false) => {
     if (loadingRef.current || document.visibilityState === 'hidden') return
@@ -114,15 +116,18 @@ export default function AdminDashboard() {
       balanceDue: 0,
       settledAt,
     } : item))
-    showToast('အကြွေးဆပ်ပြီးပါပြီ။ Daily / Monthly income ထဲ ထည့်တွက်ပြီးပါပြီ။', 'success')
-    void api.payCredit(sale.id)
-      .then((updated) => setSales((current) => current.map((item) => item.id === updated.id ? updated : item)))
-      .then(() => loadDashboard(true))
-      .catch((error) => {
+    void runWithLoading(async () => {
+      try {
+        const updated = await api.payCredit(sale.id)
+        setSales((current) => current.map((item) => item.id === updated.id ? updated : item))
+        showToast('အကြွေးဆပ်ပြီးပါပြီ။ Daily / Monthly income ထဲ ထည့်တွက်ပြီးပါပြီ။', 'success')
+        await loadDashboard(true)
+      } catch (error) {
         showToast(error instanceof Error ? error.message : 'အကြွေးပေးချေမှု မအောင်မြင်ပါ။', 'error')
-        void loadDashboard(true)
-      })
-  }, [loadDashboard, showToast])
+        await loadDashboard(true)
+      }
+    })
+  }, [loadDashboard, runWithLoading, showToast])
 
   const Card = ({ title, data }: { title: string; data: { revenue: number; profit: number; count: number; units: number } }) => (
     <section className="surface-card p-5">

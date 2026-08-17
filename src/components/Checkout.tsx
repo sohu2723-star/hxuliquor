@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../lib/api'
 import type { Product, Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
+import { useActionLoading } from '../contexts/ActionLoadingContext'
 
 interface CheckoutProps {
   cart: { product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]
@@ -11,8 +12,6 @@ interface CheckoutProps {
   onError?: (message: string) => void
 }
 
-type CartItem = { product: Product; quantity: number; saleUnit: 'unit' | 'pack' }
-
 type PaymentMethod = 'Cash' | 'Card' | 'Mobile Wallet' | 'Credit'
 
 export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, onError }: CheckoutProps) {
@@ -21,13 +20,14 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [customerName, setCustomerName] = useState('')
+  const { runWithLoading } = useActionLoading()
 
   const total = cart.reduce(
     (sum, item) => sum + (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity,
     0
   )
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (requiresAgeCheck && !ageVerified) {
       setError('Age verification is required')
       return
@@ -57,12 +57,17 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
       customerName: customerName.trim(),
     }
 
-    onSuccess(createInstantSale(cart, payload.cashierId, payload.cashierName, paymentMethod, payload.customerName, payload.isCredit))
-    onClose()
-
-    void api.createSale(payload)
-      .then(onSuccess)
-      .catch((err) => onError?.(err instanceof Error ? err.message : 'Checkout failed'))
+    try {
+      const sale = await runWithLoading(() => api.createSale(payload))
+      onSuccess(sale)
+      onClose()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Checkout failed'
+      setError(message)
+      onError?.(message)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -166,47 +171,3 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
   )
 }
 
-
-function createInstantSale(
-  cart: CartItem[],
-  cashierId: string,
-  cashierName: string,
-  paymentMethod: PaymentMethod,
-  customerName: string,
-  isCredit: boolean
-): Sale {
-  const createdAt = new Date().toISOString()
-  const totalAmount = cart.reduce((sum, item) => sum + (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity, 0)
-  return {
-    id: `local-${Date.now()}`,
-    cashierId,
-    cashierName,
-    cashierEmail: '',
-    totalAmount,
-    paidAmount: isCredit ? 0 : totalAmount,
-    balanceDue: isCredit ? totalAmount : 0,
-    customerName,
-    isCredit,
-    settledAt: '',
-    paymentMethod,
-    ageVerified: true,
-    createdAt,
-    items: cart.map((item) => {
-      const linePrice = (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity
-      const stockQuantity = item.quantity * (item.saleUnit === 'pack' && item.product.saleType !== 'pack' ? item.product.unitsPerPack : 1)
-      return {
-        id: `${item.product.id}-${item.saleUnit}`,
-        saleId: '',
-        productId: item.product.id,
-        productName: item.product.name + (item.saleUnit === 'pack' ? ` (Pack x${item.product.unitsPerPack})` : ''),
-        quantity: stockQuantity,
-        unitPrice: linePrice / stockQuantity,
-        subtotal: linePrice,
-        unitCost: item.product.costPrice,
-        profit: linePrice - (item.product.costPrice * stockQuantity),
-        saleUnit: item.saleUnit,
-        saleQuantity: item.quantity,
-      }
-    }),
-  }
-}

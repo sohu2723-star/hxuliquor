@@ -265,7 +265,7 @@ async function uploadProductImage(productId: string, imageBase64: string, fileNa
 }
 
 async function fetchProducts(): Promise<Product[]> {
-  const { data, error } = await supabase.from('products').select('*').order('name', { ascending: true })
+  const { data, error } = await supabase.from('products').select('*').eq('is_active', true).order('name', { ascending: true })
   if (error) throwDatabaseError(error)
   return (data || []).map(normalizeProduct).filter((product): product is Product => product !== null)
 }
@@ -427,7 +427,7 @@ export const api = {
   },
 
   async deleteProduct(id: string): Promise<void> {
-    const { error } = await supabase.from('products').delete().eq('id', id)
+    const { error } = await supabase.from('products').update({ is_active: false }).eq('id', id)
     if (error) throwDatabaseError(error)
     clearProductCache()
   },

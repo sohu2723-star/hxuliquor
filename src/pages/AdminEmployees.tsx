@@ -3,6 +3,7 @@ import AppHeader from '../components/AppHeader'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { api, type User } from '../lib/api'
 import { useToast } from '../contexts/ToastContext'
+import { useActionLoading } from '../contexts/ActionLoadingContext'
 
 export default function AdminEmployees() {
   const [employees, setEmployees] = useState<User[]>([])
@@ -12,6 +13,7 @@ export default function AdminEmployees() {
   const [removeEmployee, setRemoveEmployee] = useState<User | null>(null)
 
   const { showToast } = useToast()
+  const { runWithLoading } = useActionLoading()
   const load = useCallback((force = false) => api.getEmployees(force).then((fresh) => setEmployees((current) => JSON.stringify(current) === JSON.stringify(fresh) ? current : fresh)).catch((e: unknown) => { if (!force) showToast(e instanceof Error ? e.message : 'Employee data ဆွဲမရပါ။', 'error') }), [showToast])
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export default function AdminEmployees() {
     event.preventDefault()
     setIsSaving(true)
     try {
-      const added = await api.addEmployee({ name, email })
+      const added = await runWithLoading(() => api.addEmployee({ name, email }))
       setEmployees((current) => [...current.filter((item) => item.id !== added.id), added])
       setName('')
       setEmail('')
@@ -41,10 +43,16 @@ export default function AdminEmployees() {
     setRemoveEmployee(null)
     const previous = employees
     setEmployees((current) => current.filter((item) => item.id !== employee.id))
-    showToast('Employee remove ကို နောက်ကွယ်မှာ လုပ်နေပါသည်…', 'info')
-    void api.deleteEmployee(employee.id)
-      .then(() => { showToast('Employee ဖယ်ရှားပြီးပါပြီ။', 'success'); void load(true) })
-      .catch((error) => { setEmployees(previous); showToast(error instanceof Error ? error.message : 'Remove failed', 'error') })
+    void runWithLoading(async () => {
+      try {
+        await api.deleteEmployee(employee.id)
+        showToast('Employee ဖယ်ရှားပြီးပါပြီ။', 'success')
+        await load(true)
+      } catch (error) {
+        setEmployees(previous)
+        showToast(error instanceof Error ? error.message : 'Remove failed', 'error')
+      }
+    })
   }
 
   return <div className="min-h-screen bg-gray-100"><AppHeader /><main className="max-w-3xl mx-auto p-4 lg:p-6">

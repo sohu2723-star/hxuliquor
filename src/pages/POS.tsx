@@ -155,8 +155,8 @@ export default function POS() {
     setShowCheckout(false)
     setCompletedSale(sale)
     if (sale.id.startsWith('local-')) setProducts((current) => reduceSoldStock(current, sale))
-    showToast(sale.id.startsWith('local-') ? 'Slip ချက်ချင်းထုတ်ပြီးပါပြီ။ Backend ကို နောက်ကွယ်မှာ သိမ်းနေပါသည်။' : 'Backend သိမ်းပြီးပါပြီ။ Stock စာရင်း update ဖြစ်ပါပြီ။', 'success')
-    if (!sale.id.startsWith('local-')) loadProducts(true, true)
+    showToast('Checkout အောင်မြင်ပါသည်။ Slip ထုတ်နိုင်ပါပြီ။', 'success')
+    void loadProducts(true, true)
   }
 
   const ProductImage = ({ url, name }: { url: string; name: string }) => {

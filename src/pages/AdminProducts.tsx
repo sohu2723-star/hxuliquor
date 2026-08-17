@@ -6,6 +6,7 @@ import ProductForm from '../components/ProductForm'
 import AppHeader from '../components/AppHeader'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../contexts/ToastContext'
+import { useActionLoading } from '../contexts/ActionLoadingContext'
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([])
@@ -19,6 +20,7 @@ export default function AdminProducts() {
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
 
   const { showToast } = useToast()
+  const { runWithLoading } = useActionLoading()
 
   const refreshProducts = useCallback(async (force = false) => {
     if (!force) setIsLoading(true)
@@ -52,8 +54,8 @@ export default function AdminProducts() {
     const savingProduct = editingProduct
     setShowForm(false)
     setEditingProduct(null)
-    showToast(savingProduct ? 'Product update ကို နောက်ကွယ်မှာ သိမ်းနေပါသည်…' : 'Product add ကို နောက်ကွယ်မှာ သိမ်းနေပါသည်…', 'info')
     try {
+      await runWithLoading(async () => {
       let imageBase64: string | undefined
       let imageFileName: string | undefined
 
@@ -89,7 +91,8 @@ export default function AdminProducts() {
         showToast('Product added အောင်မြင်ပါသည်', 'success')
       }
 
-      void loadCategories()
+        void loadCategories()
+      })
     } catch (error) {
       showToast(getErrorMessage(error, 'Product သိမ်းမရပါ။ နာမည်၊ category၊ ဈေး၊ ပုံဖိုင်အရွယ်အစားနှင့် internet connection ကို စစ်ပြီး ထပ်ကြိုးစားပါ။'), 'error')
     }
@@ -105,13 +108,16 @@ export default function AdminProducts() {
     setDeleteProductId(null)
     const previous = products
     setProducts((current) => current.filter((product) => product.id !== id))
-    showToast('Product delete ကို နောက်ကွယ်မှာ လုပ်နေပါသည်…', 'info')
-    void api.deleteProduct(id)
-      .then(() => { showToast('Product deleted', 'success'); void refreshProducts(true) })
-      .catch((error) => {
+    void runWithLoading(async () => {
+      try {
+        await api.deleteProduct(id)
+        showToast('Product deleted', 'success')
+        await refreshProducts(true)
+      } catch (error) {
         setProducts(previous)
         showToast(error instanceof Error ? error.message : 'Failed to delete product', 'error')
-      })
+      }
+    })
   }
 
   const handleEdit = (product: Product) => {
