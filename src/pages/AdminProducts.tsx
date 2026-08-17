@@ -44,7 +44,7 @@ export default function AdminProducts() {
   useEffect(() => {
     void refreshProducts()
     void loadCategories()
-    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshProducts(true) }, 5000)
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshProducts(true) }, 30000)
     return () => window.clearInterval(timer)
   }, [refreshProducts, loadCategories])
 

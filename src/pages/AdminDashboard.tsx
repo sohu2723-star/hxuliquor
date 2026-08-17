@@ -80,8 +80,8 @@ export default function AdminDashboard() {
   const lowStock = products.filter((product) => product.stockQty <= product.lowStockThreshold)
   const unpaidCredits = sales.filter((sale) => sale.balanceDue > 0)
   const inventoryInvestment = useMemo(() => products.reduce((sum, product) => {
-    const stockUnits = product.saleType === 'pack' ? product.stockQty * Math.max(1, product.unitsPerPack) : product.stockQty
-    return sum + (stockUnits * product.costPrice)
+    const stockCost = product.stockQty * product.costPrice
+    return sum + stockCost
   }, 0), [products])
   const dailyIncome = useMemo(() => {
     const today = myanmarDate(new Date())
@@ -150,7 +150,7 @@ export default function AdminDashboard() {
       {loading ? <div className="surface-card p-8 text-center text-slate-500">စာရင်းတွက်နေပါသည်…</div> : <div className="grid md:grid-cols-3 gap-4">
         <Card title="ယနေ့ Daily (မြန်မာစံတော်ချိန်)" data={report.today} />
         <Card title={`${selectedMonth} Monthly`} data={report.month} />
-        <section className="surface-card p-5"><h2 className="font-bold text-lg">ဆိုင်ထဲ Product ရင်းနှီးမှု</h2><p className="mt-3 text-sm text-gray-500">လက်ကျန် stock × cost price</p><p className="text-2xl font-bold text-violet-700">{formatCurrency(inventoryInvestment)}</p><p className="mt-3 border-t pt-3 text-sm text-slate-500">ပါကင်သီးသန့် stock ကို တစ်ခုချင်းအရေအတွက်သို့ပြောင်းတွက်ထားပါသည်။</p></section>
+        <section className="surface-card p-5"><h2 className="font-bold text-lg">ဆိုင်ထဲ Product ရင်းနှီးမှု</h2><p className="mt-3 text-sm text-gray-500">လက်ကျန် stock × cost price (ပါကင်သီးသန့်ဆို cost ကို ပါကင်တန်ဖိုးဖြင့်၊ ပါကင် + တစ်ခုချင်းဆို cost ကို smallest unit တစ်ခုတန်ဖိုးဖြင့် တွက်ပါသည်)</p><p className="text-2xl font-bold text-violet-700">{formatCurrency(inventoryInvestment)}</p><p className="mt-3 border-t pt-3 text-sm text-slate-500">ရောင်းပြီးသည်နှင့် stock လျော့သွားသောကြောင့် ရင်းနှီးမှု amount လည်း လိုက်လျော့ပါမည်။ Product ထပ် add လုပ်လျှင် stock နှင့်အတူ ပြန်ပေါင်းတွက်ပါမည်။</p></section>
       </div>}
       <section className="mt-5 surface-card p-5"><h2 className="font-bold text-lg text-red-700">ကုန်တော့မည့်ပစ္စည်း Warning ({lowStock.length})</h2><div className="mt-3 divide-y">{lowStock.length ? lowStock.map((product) => <div key={product.id} className="py-2 flex justify-between"><span>{product.name} <small className="text-slate-500">({product.saleType === 'pack' ? 'ပါကင် Product' : 'တစ်ခုချင်း Product'})</small></span><b className="text-red-600">Stock {product.stockQty} {product.saleType === 'pack' ? 'ပါကင်' : 'ခု/ဘူး'}</b></div>) : <p className="text-green-700">Stock အားလုံးလုံလောက်ပါသည်</p>}</div></section>
       <section className="mt-5 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
