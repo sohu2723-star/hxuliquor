@@ -426,11 +426,12 @@ function login(email, password) {
 
 function googleLogin(idToken) {
   try {
-    const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken));
-    const data = JSON.parse(response.getContentText());
-
-    if (data.error_description) {
-      return { success: false, message: 'Invalid Google token' };
+    // getGoogleTokenData() uses muteHttpExceptions + validates aud
+    let data;
+    try {
+      data = getGoogleTokenData(idToken);
+    } catch (tokenErr) {
+      return { success: false, message: 'Google token မမှန်ပါ: ' + tokenErr.message };
     }
 
     const email = String(data.email || '').trim().toLowerCase();
