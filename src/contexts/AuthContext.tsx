@@ -8,12 +8,24 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>
   logout: () => Promise<void>
   isLoading: boolean
+  authError: string
 }
 
 const USER_KEY = 'minimart-pos-user'
+const AUTH_LOAD_TIMEOUT_MS = 15000
 
 function clearStoredUser() {
   try { localStorage.removeItem(USER_KEY) } catch { /* storage unavailable */ }
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error('Login is taking too long. Please try again.')), timeoutMs)
+    promise.then(
+      (value) => { window.clearTimeout(timer); resolve(value) },
+      (error) => { window.clearTimeout(timer); reject(error) },
+    )
+  })
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -21,29 +33,46 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [authError, setAuthError] = useState('')
 
   useEffect(() => {
     let mounted = true
+    let loadRequest = 0
 
     const loadUser = async () => {
+      const requestId = ++loadRequest
       try {
-        const currentUser = await api.getCurrentUser()
-        if (!mounted) return
+        const currentUser = await withTimeout(api.getCurrentUser(), AUTH_LOAD_TIMEOUT_MS)
+        if (!mounted || requestId !== loadRequest) return
         setUser(currentUser)
+        setAuthError('')
         if (currentUser) localStorage.setItem(USER_KEY, JSON.stringify(currentUser))
         else clearStoredUser()
-      } catch {
-        if (mounted) {
-          setUser(null)
-          clearStoredUser()
-        }
+      } catch (error) {
+        if (!mounted || requestId !== loadRequest) return
+        setUser(null)
+        clearStoredUser()
+        setAuthError(error instanceof Error ? error.message : 'Unable to finish login. Please try again.')
       } finally {
-        if (mounted) setIsLoading(false)
+        if (mounted && requestId === loadRequest) setIsLoading(false)
       }
     }
 
     void loadUser()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => { void loadUser() })
+    // Defer database/profile work until Supabase has released its auth lock.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return
+      if (event === 'SIGNED_OUT' || !session) {
+        loadRequest += 1
+        setUser(null)
+        setAuthError('')
+        clearStoredUser()
+        setIsLoading(false)
+        return
+      }
+      setIsLoading(true)
+      window.setTimeout(() => { if (mounted) void loadUser() }, 0)
+    })
     return () => {
       mounted = false
       subscription.unsubscribe()
@@ -66,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const signInWithGoogle = async () => {
+    setAuthError('')
     await api.signInWithGoogle()
   }
 
@@ -75,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearStoredUser()
   }
 
-  return <AuthContext.Provider value={{ user, signInWithGoogle, logout, isLoading }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, signInWithGoogle, logout, isLoading, authError }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {

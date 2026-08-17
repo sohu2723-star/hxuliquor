@@ -1,15 +1,31 @@
-import { useState } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ReceiptLogo from '../components/ReceiptLogo'
+import { useToast } from '../contexts/ToastContext'
 
 export default function Login() {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { signInWithGoogle, isLoading, user } = useAuth()
+  const { signInWithGoogle, isLoading, user, authError } = useAuth()
+  const { showToast } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
+
+  useEffect(() => {
+    if (!authError) return
+    setError(authError)
+    setIsSubmitting(false)
+  }, [authError])
+
+  useEffect(() => {
+    if (!user) return
+    const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/pos'
+    showToast('Login အောင်မြင်ပါပြီ။ Dashboard ကိုဖွင့်နေပါတယ်။', 'success')
+    const timer = window.setTimeout(() => navigate(destination, { replace: true }), 700)
+    return () => window.clearTimeout(timer)
+  }, [location.state, navigate, showToast, user])
 
   const handleGoogleLogin = async () => {
     setError('')
@@ -28,7 +44,7 @@ export default function Login() {
     return <div className="flex min-h-screen items-center justify-center bg-slate-50"><LoadingSpinner /></div>
   }
 
-  if (user) return <Navigate to="/pos" replace />
+  if (user) return <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-50"><LoadingSpinner /><p className="text-sm font-semibold text-slate-600">Login အောင်မြင်ပါပြီ။ Dashboard ကိုဖွင့်နေပါတယ်...</p></div>
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#fef3c7,transparent_34%),linear-gradient(135deg,#f8fafc,#eef2ff)] px-4">
