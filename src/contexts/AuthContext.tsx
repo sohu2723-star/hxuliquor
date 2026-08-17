@@ -10,6 +10,24 @@ interface AuthContextType {
 }
 
 const USER_KEY = 'minimart-pos-user'
+const AUTH_META_KEY = 'minimart-pos-auth-meta'
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+type AuthMeta = { expiresAt: number }
+
+function clearStoredAuth() {
+  localStorage.removeItem(USER_KEY)
+  localStorage.removeItem(AUTH_TOKEN_KEY)
+  localStorage.removeItem(AUTH_META_KEY)
+}
+
+function readAuthMeta(): AuthMeta | null {
+  const stored = localStorage.getItem(AUTH_META_KEY)
+  if (!stored) return null
+  const parsed = JSON.parse(stored) as Partial<AuthMeta>
+  return typeof parsed.expiresAt === 'number' ? { expiresAt: parsed.expiresAt } : null
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -20,15 +38,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const storedUser = localStorage.getItem(USER_KEY)
       const storedToken = localStorage.getItem(AUTH_TOKEN_KEY)
-      if (storedUser && storedToken) {
+      const storedMeta = readAuthMeta()
+      if (storedUser && storedToken && (!storedMeta || storedMeta.expiresAt > Date.now())) {
+        if (!storedMeta) localStorage.setItem(AUTH_META_KEY, JSON.stringify({ expiresAt: Date.now() + SESSION_TTL_MS } satisfies AuthMeta))
         setUser(JSON.parse(storedUser) as User)
       } else {
-        localStorage.removeItem(USER_KEY)
-        localStorage.removeItem(AUTH_TOKEN_KEY)
+        clearStoredAuth()
       }
     } catch {
-      localStorage.removeItem(USER_KEY)
-      localStorage.removeItem(AUTH_TOKEN_KEY)
+      clearStoredAuth()
     } finally {
       setIsLoading(false)
     }
@@ -53,12 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData)
     localStorage.setItem(USER_KEY, JSON.stringify(userData))
     localStorage.setItem(AUTH_TOKEN_KEY, userData.sessionToken || idToken)
+    localStorage.setItem(AUTH_META_KEY, JSON.stringify({ expiresAt: Date.now() + SESSION_TTL_MS } satisfies AuthMeta))
   }
 
   const logout = () => {
     setUser(null)
-    localStorage.removeItem(USER_KEY)
-    localStorage.removeItem(AUTH_TOKEN_KEY)
+    clearStoredAuth()
   }
 
   return (
