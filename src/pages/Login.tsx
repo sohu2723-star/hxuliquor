@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -8,7 +8,7 @@ import ReceiptLogo from '../components/ReceiptLogo'
 export default function Login() {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { googleLogin } = useAuth()
+  const { googleLogin, isLoading, user } = useAuth()
   const navigate = useNavigate()
 
   const handleGoogleSuccess = async (idToken: string) => {
@@ -31,6 +31,16 @@ export default function Login() {
   }
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (user) return <Navigate to="/pos" replace />
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#fef3c7,transparent_34%),linear-gradient(135deg,#f8fafc,#eef2ff)] px-4">
