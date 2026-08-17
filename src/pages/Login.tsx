@@ -1,51 +1,31 @@
-import { useRef, useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import GoogleSignInButton from '../components/GoogleSignInButton'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ReceiptLogo from '../components/ReceiptLogo'
 
 export default function Login() {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const lastIdTokenRef = useRef('')
-  const { googleLogin, isLoading, user } = useAuth()
+  const { signInWithGoogle, isLoading, user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
-  const handleGoogleSuccess = async (idToken: string) => {
-    lastIdTokenRef.current = idToken
-    setIsSubmitting(true)
+  const handleGoogleLogin = async () => {
     setError('')
-
+    setIsSubmitting(true)
     try {
-      await googleLogin(idToken)
-      navigate('/pos')
+      await signInWithGoogle()
+      const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/pos'
+      navigate(destination)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Google login failed')
-    } finally {
       setIsSubmitting(false)
     }
   }
 
-  const handleGoogleError = (errorMessage: string) => {
-    setError(errorMessage)
-    setIsSubmitting(false)
-  }
-
-    const handleRetryLogin = () => {
-    // Clear stale token — user gets fresh Google credential
-    lastIdTokenRef.current = ''
-    setError('')
-  }
-
-  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
-
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <LoadingSpinner />
-      </div>
-    )
+    return <div className="flex min-h-screen items-center justify-center bg-slate-50"><LoadingSpinner /></div>
   }
 
   if (user) return <Navigate to="/pos" replace />
@@ -53,48 +33,16 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#fef3c7,transparent_34%),linear-gradient(135deg,#f8fafc,#eef2ff)] px-4">
       <div className="w-full max-w-md rounded-[2rem] bg-white/95 p-8 shadow-2xl ring-1 ring-slate-200 backdrop-blur">
-        <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-3xl bg-primary/10 p-3 shadow-inner">
-          <ReceiptLogo className="h-20 w-20" />
-        </div>
+        <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-3xl bg-primary/10 p-3 shadow-inner"><ReceiptLogo className="h-20 w-20" /></div>
         <h1 className="text-center font-serif text-4xl font-black tracking-tight text-slate-950 drop-shadow-sm">HXU Liquor POS</h1>
         <p className="mb-8 mt-2 text-center text-sm font-medium text-slate-500">Sign in securely with Google to continue</p>
 
-        {error && (
-          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-            <p>{error}</p>
-            <p className="mt-1 text-xs font-semibold text-red-600">Internet မတည်ငြိမ်တာ၊ Google Apps Script ခဏနိုးနေတာကြောင့် တခါတလေဖြစ်နိုင်ပါတယ်။ ခဏစောင့်ပြီး Retry လုပ်ပါ။</p>
-            {lastIdTokenRef.current && (
-              <button
-                type="button"
-                onClick={handleRetryLogin}
-                disabled={isSubmitting}
-                className="mt-3 rounded-full bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Retry login
-              </button>
-            )}
-          </div>
-        )}
+        {error && <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"><p>{error}</p><p className="mt-1 text-xs font-semibold text-red-600">Supabase Google OAuth configuration နှင့် Internet connection ကို စစ်ပြီး Retry ပြန်လုပ်ပါ။</p></div>}
 
-        {googleClientId ? (
-          <div className="relative">
-            <GoogleSignInButton
-              clientId={googleClientId}
-              onSuccess={handleGoogleSuccess}
-              onError={handleGoogleError}
-            />
-            {isSubmitting && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-white/85 backdrop-blur-sm">
-                <LoadingSpinner className="h-10 w-10" />
-                <p className="mt-2 text-center text-sm font-semibold text-slate-500">Signing in...</p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <p className="text-center text-sm text-gray-500">
-            Google Sign-In is not configured. Please contact the administrator.
-          </p>
-        )}
+        <button type="button" onClick={() => void handleGoogleLogin()} disabled={isSubmitting} className="flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+          {isSubmitting ? <LoadingSpinner className="h-5 w-5" /> : <span className="text-lg font-black text-blue-600">G</span>}
+          {isSubmitting ? 'Signing in...' : 'Continue with Google'}
+        </button>
       </div>
     </div>
   )

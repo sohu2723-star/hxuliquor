@@ -1,27 +1,12 @@
-const API_URL = '/api/gas'
+import { supabase } from './supabase'
 
-export const AUTH_TOKEN_KEY = 'minimart-pos-token'
+export const AUTH_TOKEN_KEY = 'supabase-auth-session'
 
 const PRODUCT_CACHE_KEY = 'hxu-products-v3'
 const EMPLOYEE_CACHE_KEY = 'hxu-employees-v1'
 const SALES_CACHE_PREFIX = 'hxu-sales-v1:'
 const PRODUCT_CACHE_MS = 15 * 60 * 1000
 const EMPLOYEE_CACHE_MS = 10 * 60 * 1000
-
-const RETRYABLE_ACTIONS = new Set(['getProducts', 'getProductByBarcode', 'searchProducts', 'getCategories', 'getSales', 'getEmployees'])
-const LOGIN_ACTIONS = new Set(['googleLogin'])
-const MAX_READ_RETRIES = 3
-const MAX_LOGIN_RETRIES = 2
-const REQUEST_TIMEOUT_MS = 35000
-const LOGIN_TIMEOUT_MS = 60000
-
-const inFlightReads = new Map<string, Promise<unknown>>()
-
-let productCache: { products: Product[]; savedAt: number } | null = null
-let employeeCache: { users: User[]; savedAt: number } | null = null
-const salesCache = new Map<string, Sale[]>()
-
-type Json = Record<string, unknown>
 
 export type Product = {
   id: string
@@ -81,7 +66,6 @@ export type User = {
   sessionToken?: string
 }
 
-
 export type ProductGroup = 'all' | 'barcode' | 'noBarcode' | 'pack' | 'both'
 
 export const PRODUCT_GROUPS: { id: ProductGroup; label: string; description: string }[] = [
@@ -105,9 +89,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function asString(value: unknown, fallback = ''): string {
-  return typeof value === 'string' ? value
-    : typeof value === 'number' || typeof value === 'boolean' ? String(value)
-    : fallback
+  return typeof value === 'string' ? value : typeof value === 'number' || typeof value === 'boolean' ? String(value) : fallback
 }
 
 function asNumber(value: unknown): number {
@@ -132,18 +114,37 @@ function normalizeProduct(value: unknown): Product | null {
     barcode: asString(value.barcode),
     name: asString(value.name, 'Unnamed product'),
     category: asString(value.category),
-    productColor: asString(value.productColor),
-    productSize: asString(value.productSize),
+    productColor: asString(value.productColor ?? value.product_color),
+    productSize: asString(value.productSize ?? value.product_size),
     price: asNumber(value.price),
-    costPrice: asNumber(value.costPrice),
-    stockQty: asInteger(value.stockQty),
-    lowStockThreshold: asInteger(value.lowStockThreshold),
-    unitsPerPack: Math.max(1, asInteger(value.unitsPerPack) || 1),
-    packPrice: asNumber(value.packPrice),
-    saleType: value.saleType === 'pack' || value.saleType === 'unit' ? value.saleType : 'both',
-    requiresAgeCheck: asBoolean(value.requiresAgeCheck),
-    imageUrl: asString(value.imageUrl),
-    createdAt: asString(value.createdAt),
+    costPrice: asNumber(value.costPrice ?? value.cost_price),
+    stockQty: asInteger(value.stockQty ?? value.stock_qty),
+    lowStockThreshold: asInteger(value.lowStockThreshold ?? value.low_stock_threshold),
+    unitsPerPack: Math.max(1, asInteger(value.unitsPerPack ?? value.units_per_pack) || 1),
+    packPrice: asNumber(value.packPrice ?? value.pack_price),
+    saleType: (() => { const saleType = asString(value.saleType ?? value.sale_type, 'both'); return saleType === 'pack' || saleType === 'unit' ? saleType : 'both' })(),
+    requiresAgeCheck: asBoolean(value.requiresAgeCheck ?? value.requires_age_check),
+    imageUrl: asString(value.imageUrl ?? value.image_url),
+    createdAt: asString(value.createdAt ?? value.created_at),
+  }
+}
+
+function normalizeSaleItem(value: unknown): SaleItem | null {
+  if (!isRecord(value)) return null
+  const id = asString(value.id) || asString(value.productId ?? value.product_id)
+  if (!id) return null
+  return {
+    id,
+    saleId: asString(value.saleId ?? value.sale_id),
+    productId: asString(value.productId ?? value.product_id),
+    productName: asString(value.productName ?? value.product_name ?? value.name, 'Unknown product'),
+    quantity: asInteger(value.quantity),
+    unitPrice: asNumber(value.unitPrice ?? value.unit_price),
+    subtotal: asNumber(value.subtotal),
+    unitCost: asNumber(value.unitCost ?? value.unit_cost),
+    profit: asNumber(value.profit),
+    saleUnit: asString(value.saleUnit ?? value.sale_unit) === 'pack' ? 'pack' : 'unit',
+    saleQuantity: asInteger(value.saleQuantity ?? value.sale_quantity) || asInteger(value.quantity),
   }
 }
 
@@ -151,41 +152,22 @@ function normalizeSale(value: unknown): Sale | null {
   if (!isRecord(value)) return null
   const id = asString(value.id)
   if (!id) return null
-  const items = Array.isArray(value.items) ? value.items.map(normalizeSaleItem).filter((item): item is SaleItem => item !== null) : []
+  const rawItems = Array.isArray(value.items) ? value.items : Array.isArray(value.sale_items) ? value.sale_items : []
   return {
     id,
-    cashierId: asString(value.cashierId),
-    cashierName: asString(value.cashierName),
-    cashierEmail: asString(value.cashierEmail),
-    totalAmount: asNumber(value.totalAmount),
-    paidAmount: value.paidAmount === undefined ? asNumber(value.totalAmount) : asNumber(value.paidAmount),
-    balanceDue: asNumber(value.balanceDue),
-    customerName: asString(value.customerName),
-    isCredit: asBoolean(value.isCredit),
-    settledAt: asString(value.settledAt),
-    paymentMethod: asString(value.paymentMethod, 'Cash'),
-    ageVerified: asBoolean(value.ageVerified),
-    createdAt: asString(value.createdAt),
-    items,
-  }
-}
-
-function normalizeSaleItem(value: unknown): SaleItem | null {
-  if (!isRecord(value)) return null
-  const id = asString(value.id) || asString(value.productId)
-  if (!id) return null
-  return {
-    id,
-    saleId: asString(value.saleId),
-    productId: asString(value.productId),
-    productName: asString(value.productName, asString(value.name, 'Unknown product')),
-    quantity: asInteger(value.quantity),
-    unitPrice: asNumber(value.unitPrice),
-    subtotal: asNumber(value.subtotal),
-    unitCost: asNumber(value.unitCost),
-    profit: asNumber(value.profit),
-    saleUnit: asString(value.saleUnit) === 'pack' ? 'pack' : 'unit',
-    saleQuantity: asInteger(value.saleQuantity) || asInteger(value.quantity),
+    cashierId: asString(value.cashierId ?? value.cashier_id ?? value.cashierLegacyId ?? value.cashier_legacy_id),
+    cashierName: asString(value.cashierName ?? value.cashier_name),
+    cashierEmail: asString(value.cashierEmail ?? value.cashier_email),
+    totalAmount: asNumber(value.totalAmount ?? value.total_amount),
+    paidAmount: value.paidAmount === undefined && value.paid_amount === undefined ? asNumber(value.totalAmount ?? value.total_amount) : asNumber(value.paidAmount ?? value.paid_amount),
+    balanceDue: asNumber(value.balanceDue ?? value.balance_due),
+    customerName: asString(value.customerName ?? value.customer_name),
+    isCredit: asBoolean(value.isCredit ?? value.is_credit),
+    settledAt: asString(value.settledAt ?? value.settled_at),
+    paymentMethod: asString(value.paymentMethod ?? value.payment_method, 'Cash'),
+    ageVerified: asBoolean(value.ageVerified ?? value.age_verified),
+    createdAt: asString(value.createdAt ?? value.created_at),
+    items: rawItems.map(normalizeSaleItem).filter((item): item is SaleItem => item !== null),
   }
 }
 
@@ -194,106 +176,55 @@ function normalizeUser(value: unknown): User | null {
   const id = asString(value.id)
   const email = asString(value.email).toLowerCase()
   if (!id || !email) return null
-  return {
-    id,
-    name: asString(value.name, email.split('@')[0]),
-    email,
-    role: asString(value.role, 'employee').toLowerCase(),
-    sessionToken: asString(value.sessionToken) || undefined,
-  }
-}
-
-function unwrapArray(value: unknown, label: string): unknown[] {
-  if (Array.isArray(value)) return value
-  if (isRecord(value) && Array.isArray(value.data)) return value.data
-  if (isRecord(value) && Array.isArray(value[label])) return value[label]
-  return []
-}
-
-function unwrapObject(value: unknown, label: string): unknown {
-  if (isRecord(value)) {
-    if (isRecord(value.data)) return value.data
-    if (isRecord(value[label])) return value[label]
-    return value
-  }
-  return {}
+  return { id, name: asString(value.name, email.split('@')[0]), email, role: asString(value.role, 'employee').toLowerCase() }
 }
 
 function readProductCache(): Product[] | null {
-  if (productCache && Date.now() - productCache.savedAt < PRODUCT_CACHE_MS) return productCache.products
   try {
-    const stored: unknown = JSON.parse(localStorage.getItem(PRODUCT_CACHE_KEY) || 'null')
-    if (isRecord(stored) && Array.isArray(stored.products) && Number.isFinite(Number(stored.savedAt))) {
-      const products = stored.products.map(normalizeProduct).filter((product): product is Product => product !== null)
-      if (products.length === stored.products.length && Date.now() - Number(stored.savedAt) < PRODUCT_CACHE_MS) {
-        productCache = { products, savedAt: Number(stored.savedAt) }
-        return products
-      }
-    }
-  } catch {
-    try { localStorage.removeItem(PRODUCT_CACHE_KEY) } catch { /* storage unavailable */ }
-  }
-  return null
+    const stored = JSON.parse(localStorage.getItem(PRODUCT_CACHE_KEY) || 'null') as { products?: unknown; savedAt?: number } | null
+    if (!stored || !Array.isArray(stored.products) || !stored.savedAt || Date.now() - stored.savedAt >= PRODUCT_CACHE_MS) return null
+    return stored.products.map(normalizeProduct).filter((product): product is Product => product !== null)
+  } catch { return null }
 }
 
 function saveProductCache(products: Product[]) {
-  productCache = { products, savedAt: Date.now() }
-  try { localStorage.setItem(PRODUCT_CACHE_KEY, JSON.stringify(productCache)) } catch { /* storage may be full */ }
+  try { localStorage.setItem(PRODUCT_CACHE_KEY, JSON.stringify({ products, savedAt: Date.now() })) } catch { /* storage unavailable */ }
 }
 
 function clearProductCache() {
-  productCache = null
   try { localStorage.removeItem(PRODUCT_CACHE_KEY) } catch { /* storage unavailable */ }
 }
 
 function readEmployeeCache(): User[] | null {
-  if (employeeCache && Date.now() - employeeCache.savedAt < EMPLOYEE_CACHE_MS) return employeeCache.users
   try {
-    const stored: unknown = JSON.parse(localStorage.getItem(EMPLOYEE_CACHE_KEY) || 'null')
-    const storedUsers = Array.isArray(stored) ? stored : isRecord(stored) && Array.isArray(stored.users) ? stored.users : null
-    const savedAt = isRecord(stored) && Number.isFinite(Number(stored.savedAt)) ? Number(stored.savedAt) : Date.now()
-    if (!storedUsers || Date.now() - savedAt >= EMPLOYEE_CACHE_MS) return null
-    const users = storedUsers.map(normalizeUser).filter((user): user is User => user !== null)
-    employeeCache = { users, savedAt }
-    return users
+    const stored = JSON.parse(localStorage.getItem(EMPLOYEE_CACHE_KEY) || 'null') as { users?: unknown; savedAt?: number } | null
+    if (!stored || !Array.isArray(stored.users) || !stored.savedAt || Date.now() - stored.savedAt >= EMPLOYEE_CACHE_MS) return null
+    return stored.users.map(normalizeUser).filter((user): user is User => user !== null)
   } catch { return null }
 }
 
 function saveEmployeeCache(users: User[]) {
-  employeeCache = { users, savedAt: Date.now() }
-  try { localStorage.setItem(EMPLOYEE_CACHE_KEY, JSON.stringify(employeeCache)) } catch { /* storage unavailable */ }
+  try { localStorage.setItem(EMPLOYEE_CACHE_KEY, JSON.stringify({ users, savedAt: Date.now() })) } catch { /* storage unavailable */ }
 }
 
-function salesCacheKey(startDate?: string, endDate?: string) {
-  return `${SALES_CACHE_PREFIX}${startDate || ''}:${endDate || ''}`
-}
+function salesCacheKey(startDate?: string, endDate?: string) { return `${SALES_CACHE_PREFIX}${startDate || ''}:${endDate || ''}` }
 
 function readSalesCache(key: string): Sale[] | null {
-  if (salesCache.has(key)) return salesCache.get(key) || null
   try {
-    const stored: unknown = JSON.parse(localStorage.getItem(key) || 'null')
-    if (!Array.isArray(stored)) return null
-    const sales = stored.map(normalizeSale).filter((sale): sale is Sale => sale !== null)
-    salesCache.set(key, sales)
-    return sales
+    const stored = JSON.parse(localStorage.getItem(key) || 'null')
+    return Array.isArray(stored) ? stored.map(normalizeSale).filter((sale): sale is Sale => sale !== null) : null
   } catch { return null }
 }
 
 function saveSalesCache(key: string, sales: Sale[]) {
-  salesCache.set(key, sales)
   try { localStorage.setItem(key, JSON.stringify(sales)) } catch { /* storage unavailable */ }
 }
 
 function clearSalesCache() {
-  salesCache.clear()
-  try {
-    Object.keys(localStorage).filter((key) => key.startsWith(SALES_CACHE_PREFIX)).forEach((key) => localStorage.removeItem(key))
-  } catch { /* storage unavailable */ }
+  try { Object.keys(localStorage).filter((key) => key.startsWith(SALES_CACHE_PREFIX)).forEach((key) => localStorage.removeItem(key)) } catch { /* storage unavailable */ }
 }
 
-export function normalizeBarcode(value: string): string {
-  return String(value || '').trim().replace(/[\s-]+/g, '').toUpperCase()
-}
+export function normalizeBarcode(value: string): string { return String(value || '').trim().replace(/[\s-]+/g, '').toUpperCase() }
 
 export function barcodeMatches(savedValue: string, scannedValue: string): boolean {
   const scanned = normalizeBarcode(scannedValue)
@@ -306,100 +237,46 @@ export function barcodeMatches(savedValue: string, scannedValue: string): boolea
   })
 }
 
-function upsertProductCache(product: Product) {
-  const cached = readProductCache() || []
-  saveProductCache([product, ...cached.filter((item) => item.id !== product.id)])
+function throwDatabaseError(error: { message?: string } | null): never {
+  throw new Error(error?.message || 'Supabase request failed. Please try again.')
 }
 
-class ApiError extends Error {
-  readonly retryable: boolean
-
-  constructor(message: string, retryable = false) {
-    super(message)
-    this.name = 'ApiError'
-    this.retryable = retryable
-  }
+function productPayload(payload: Record<string, unknown>) {
+  const output: Record<string, unknown> = {}
+  const textFields: [string, string][] = [['barcode', 'barcode'], ['name', 'name'], ['category', 'category'], ['productColor', 'product_color'], ['productSize', 'product_size']]
+  textFields.forEach(([source, target]) => { if (payload[source] !== undefined) output[target] = asString(payload[source]) })
+  const numberFields: [string, string][] = [['price', 'price'], ['costPrice', 'cost_price'], ['stockQty', 'stock_qty'], ['lowStockThreshold', 'low_stock_threshold'], ['packPrice', 'pack_price']]
+  numberFields.forEach(([source, target]) => { if (payload[source] !== undefined) output[target] = source === 'stockQty' || source === 'lowStockThreshold' ? asInteger(payload[source]) : asNumber(payload[source]) })
+  if (payload.unitsPerPack !== undefined) output.units_per_pack = Math.max(1, asInteger(payload.unitsPerPack) || 1)
+  if (payload.saleType !== undefined) output.sale_type = asString(payload.saleType, 'both')
+  if (payload.requiresAgeCheck !== undefined) output.requires_age_check = asBoolean(payload.requiresAgeCheck)
+  return output
 }
 
-async function gasFetch(action: string, payload?: Json): Promise<unknown> {
-  const url = `${API_URL}?action=${encodeURIComponent(action)}`
-  const token = action === 'googleLogin' ? '' : (() => {
-    try { return localStorage.getItem(AUTH_TOKEN_KEY) || '' } catch { return '' }
-  })()
-  const requestPayload = token ? { ...(payload ?? {}), accessToken: token } : (payload ?? {})
-  const body = JSON.stringify(requestPayload)
-  const canDedupe = RETRYABLE_ACTIONS.has(action)
-  const inFlightKey = canDedupe ? `${action}:${body}` : ''
-  if (inFlightKey && inFlightReads.has(inFlightKey)) return inFlightReads.get(inFlightKey)!
-
-  const run = async () => {
-    const isLoginAction = LOGIN_ACTIONS.has(action)
-    const maxAttempts = canDedupe ? MAX_READ_RETRIES + 1 : isLoginAction ? MAX_LOGIN_RETRIES + 1 : 1
-    const timeoutMs = isLoginAction ? LOGIN_TIMEOUT_MS : REQUEST_TIMEOUT_MS
-    let lastError: unknown
-
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      const controller = new AbortController()
-      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
-
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body,
-          signal: controller.signal,
-        })
-        const text = await response.text()
-        let data: unknown = null
-        try {
-          data = text ? JSON.parse(text) : null
-        } catch {
-          throw new ApiError('Server returned an invalid response. Please reload and try again.', response.status >= 500)
-        }
-
-        if (!response.ok) {
-          const message = isRecord(data) && typeof data.message === 'string'
-            ? data.message
-            : `Server error (${response.status})`
-          throw new ApiError(message, response.status >= 500 || response.status === 429)
-        }
-
-        if (isRecord(data) && data.success === false) {
-          throw new ApiError(asString(data.message, 'Request failed'))
-        }
-
-        return data
-      } catch (error) {
-        lastError = error
-        const retryable = error instanceof ApiError ? error.retryable : true
-        if (!retryable || attempt >= maxAttempts - 1) break
-        await new Promise((resolve) => window.setTimeout(resolve, isLoginAction ? 1200 * (attempt + 1) : 600 * (attempt + 1)))
-      } finally {
-        window.clearTimeout(timeoutId)
-      }
-    }
-
-    if (lastError instanceof ApiError) throw lastError
-    if (lastError instanceof DOMException && lastError.name === 'AbortError') {
-      throw new Error(isLoginAction
-        ? 'Login server response ကြာနေပါသည်။ Internet မတည်ငြိမ်ပါက ခဏစောင့်ပြီး Retry နှိပ်ပါ။'
-        : 'Server response ကြာနေပါသည်။ App က အလိုအလျောက် retry လုပ်ပြီးပါပြီ။ Internet စစ်ပြီး Retry ပြန်လုပ်ပါ။')
-    }
-    throw new Error(isLoginAction
-      ? 'Login network error ဖြစ်နေပါသည်။ Internet connection စစ်ပြီး Retry ပြန်နှိပ်ပါ။'
-      : 'Network error. Internet သို့မဟုတ် server connection ကို စစ်ပြီး Retry ပြန်လုပ်ပါ။')
-  }
-
-  const promise = run()
-  if (inFlightKey) {
-    inFlightReads.set(inFlightKey, promise)
-    promise.finally(() => inFlightReads.delete(inFlightKey)).catch(() => {})
-  }
-  return promise
+async function uploadProductImage(productId: string, imageBase64: string, fileName: string): Promise<string> {
+  const raw = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64
+  const binary = atob(raw)
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+  const extension = (fileName.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
+  const path = `${productId}/${Date.now()}.${extension}`
+  const { error } = await supabase.storage.from('product-images').upload(path, new Blob([bytes], { type: `image/${extension === 'jpg' ? 'jpeg' : extension}` }), { upsert: true, contentType: `image/${extension === 'jpg' ? 'jpeg' : extension}` })
+  if (error) throwDatabaseError(error)
+  return supabase.storage.from('product-images').getPublicUrl(path).data.publicUrl
 }
 
-function normalizeSalesResponse(data: unknown): Sale[] {
-  return unwrapArray(data, 'sales').map(normalizeSale).filter((sale): sale is Sale => sale !== null)
+async function fetchProducts(): Promise<Product[]> {
+  const { data, error } = await supabase.from('products').select('*').order('name', { ascending: true })
+  if (error) throwDatabaseError(error)
+  return (data || []).map(normalizeProduct).filter((product): product is Product => product !== null)
+}
+
+async function fetchSales(startDate?: string, endDate?: string): Promise<Sale[]> {
+  let query = supabase.from('sales').select('*, sale_items(*)').order('created_at', { ascending: false })
+  if (startDate) query = query.gte('created_at', `${startDate}T00:00:00+06:30`)
+  if (endDate) query = query.lte('created_at', `${endDate}T23:59:59+06:30`)
+  const { data, error } = await query
+  if (error) throwDatabaseError(error)
+  return (data || []).map(normalizeSale).filter((sale): sale is Sale => sale !== null)
 }
 
 export const api = {
@@ -408,8 +285,7 @@ export const api = {
       const cached = readProductCache()
       if (cached) return cached
     }
-    const data = await gasFetch('getProducts')
-    const products = unwrapArray(data, 'products').map(normalizeProduct).filter((product): product is Product => product !== null)
+    const products = await fetchProducts()
     saveProductCache(products)
     return products
   },
@@ -417,45 +293,26 @@ export const api = {
   async getProductsStaleFirst(onFresh?: (products: Product[]) => void): Promise<{ products: Product[]; fromCache: boolean }> {
     const cached = readProductCache()
     if (cached) {
-      void gasFetch('getProducts')
-        .then((data) => {
-          const fresh = unwrapArray(data, 'products').map(normalizeProduct).filter((p): p is Product => p !== null)
-          if (fresh.length > 0) { saveProductCache(fresh); onFresh?.(fresh) }
-        })
-        .catch(() => {})
+      void fetchProducts().then((fresh) => { saveProductCache(fresh); onFresh?.(fresh) }).catch(() => {})
       return { products: cached, fromCache: true }
     }
-    const data = await gasFetch('getProducts')
-    const products = unwrapArray(data, 'products').map(normalizeProduct).filter((product): product is Product => product !== null)
+    const products = await fetchProducts()
     saveProductCache(products)
     return { products, fromCache: false }
   },
 
   async getProductByBarcode(barcode: string): Promise<Product | null> {
-    const localProduct = readProductCache()?.find((product) => barcodeMatches(product.barcode, barcode))
-    if (localProduct) return localProduct
-    const data = await gasFetch('getProductByBarcode', { barcode })
-    return normalizeProduct(unwrapObject(data, 'product'))
+    return (await this.getProducts()).find((product) => barcodeMatches(product.barcode, barcode)) || null
   },
 
   async searchProducts(query: string): Promise<Product[]> {
-    const cached = readProductCache()
-    if (cached) {
-      const normalized = query.trim().toLowerCase()
-      return cached.filter((product) =>
-        product.name.toLowerCase().includes(normalized) ||
-        product.category.toLowerCase().includes(normalized) ||
-        product.barcode.includes(normalized))
-    }
-    const data = await gasFetch('searchProducts', { query })
-    return unwrapArray(data, 'products').map(normalizeProduct).filter((product): product is Product => product !== null)
+    const products = await this.getProducts()
+    const normalized = query.trim().toLowerCase()
+    return products.filter((product) => product.name.toLowerCase().includes(normalized) || product.category.toLowerCase().includes(normalized) || product.barcode.toLowerCase().includes(normalized))
   },
 
   async getCategories(): Promise<string[]> {
-    const cached = readProductCache()
-    if (cached) return [...new Set(cached.map((product) => product.category).filter(Boolean))].sort()
-    const data = unwrapArray(await gasFetch('getCategories'), 'categories')
-    return data.map((category) => asString(category)).filter(Boolean)
+    return [...new Set((await this.getProducts()).map((product) => product.category).filter(Boolean))].sort()
   },
 
   async getSales(startDate?: string, endDate?: string, forceRefresh = false): Promise<Sale[]> {
@@ -464,40 +321,42 @@ export const api = {
       const cached = readSalesCache(cacheKey)
       if (cached) return cached
     }
-    const params: Json = {}
-    if (startDate) params.startDate = startDate
-    if (endDate) params.endDate = endDate
-    const sales = normalizeSalesResponse(await gasFetch('getSales', params))
+    const sales = await fetchSales(startDate, endDate)
     saveSalesCache(cacheKey, sales)
     return sales
   },
 
   async getSalesStaleFirst(startDate?: string, endDate?: string, onFresh?: (sales: Sale[]) => void): Promise<{ sales: Sale[]; fromCache: boolean }> {
     const cacheKey = salesCacheKey(startDate, endDate)
-    const params: Json = {}
-    if (startDate) params.startDate = startDate
-    if (endDate) params.endDate = endDate
     const cached = readSalesCache(cacheKey)
     if (cached) {
-      void gasFetch('getSales', params)
-        .then((data) => {
-          const fresh = normalizeSalesResponse(data)
-          saveSalesCache(cacheKey, fresh)
-          onFresh?.(fresh)
-        })
-        .catch(() => {})
+      void fetchSales(startDate, endDate).then((fresh) => { saveSalesCache(cacheKey, fresh); onFresh?.(fresh) }).catch(() => {})
       return { sales: cached, fromCache: true }
     }
-    const sales = normalizeSalesResponse(await gasFetch('getSales', params))
+    const sales = await fetchSales(startDate, endDate)
     saveSalesCache(cacheKey, sales)
     return { sales, fromCache: false }
   },
 
-  async googleLogin(idToken: string): Promise<User> {
-    const data = unwrapObject(await gasFetch('googleLogin', { idToken }), 'user')
-    const user = normalizeUser(data)
-    if (!user?.sessionToken) throw new Error('Login response မမှန်ပါ။ Google login ပြန်လုပ်ပါ။')
-    return user
+  async getCurrentUser(): Promise<User | null> {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError) throwDatabaseError(sessionError)
+    if (!session?.user) return null
+    const metadata = session.user.user_metadata || {}
+    const fallback = { id: session.user.id, name: metadata.full_name || metadata.name || session.user.email?.split('@')[0] || '', email: session.user.email || '', role: 'employee' }
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
+    if (error) throwDatabaseError(error)
+    if (!data) {
+      const { data: created, error: createError } = await supabase.from('profiles').upsert({ id: session.user.id, name: fallback.name, email: fallback.email }, { onConflict: 'id' }).select().single()
+      if (createError) throwDatabaseError(createError)
+      return normalizeUser(created)
+    }
+    return normalizeUser(data)
+  },
+
+  async signInWithGoogle(): Promise<void> {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/login` } })
+    if (error) throwDatabaseError(error)
   },
 
   async getEmployees(forceRefresh = false): Promise<User[]> {
@@ -505,101 +364,71 @@ export const api = {
       const cached = readEmployeeCache()
       if (cached) return cached
     }
-    const data = unwrapArray(await gasFetch('getEmployees'), 'employees')
-    const users = data.map(normalizeUser).filter((user): user is User => user !== null)
+    const { data, error } = await supabase.from('profiles').select('*').order('name', { ascending: true })
+    if (error) throwDatabaseError(error)
+    const users = (data || []).map(normalizeUser).filter((user): user is User => user !== null)
     saveEmployeeCache(users)
     return users
   },
 
   async addEmployee(payload: { name: string; email: string }): Promise<User> {
-    const data = unwrapObject(await gasFetch('addEmployee', payload), 'user')
-    const user = normalizeUser(data)
-    if (!user) throw new Error('Employee response မမှန်ပါ။ Backend deployment ကို စစ်ပါ။')
+    const { data, error } = await supabase.functions.invoke('invite-employee', { body: { name: payload.name, email: payload.email } })
+    if (error) throwDatabaseError(error)
+    const user = normalizeUser(data?.user || data)
+    if (!user) throw new Error('Employee invitation response မမှန်ပါ။')
     saveEmployeeCache([...(readEmployeeCache() || []).filter((item) => item.id !== user.id), user])
     return user
   },
 
   async deleteEmployee(id: string): Promise<void> {
-    await gasFetch('deleteEmployee', { id })
+    const { error } = await supabase.functions.invoke('delete-employee', { body: { id } })
+    if (error) throwDatabaseError(error)
     saveEmployeeCache((readEmployeeCache() || []).filter((user) => user.id !== id))
   },
 
-  async createSale(payload: {
-    cashierId: string
-    cashierName: string
-    items: { productId: string; quantity: number; saleUnit: 'unit' | 'pack' }[]
-    ageVerified: boolean
-    paymentMethod: string
-    customerName?: string
-    isCredit?: boolean
-  }): Promise<Sale> {
-    const data = await gasFetch('createSale', payload)
-    clearProductCache()
-    clearSalesCache()
-    const sale = normalizeSale(unwrapObject(data, 'sale'))
+  async createSale(payload: { cashierId: string; cashierName: string; items: { productId: string; quantity: number; saleUnit: 'unit' | 'pack' }[]; ageVerified: boolean; paymentMethod: string; customerName?: string; isCredit?: boolean }): Promise<Sale> {
+    const { data, error } = await supabase.rpc('create_sale', { p_items: payload.items, p_age_verified: payload.ageVerified, p_payment_method: payload.paymentMethod, p_customer_name: payload.customerName || '', p_is_credit: payload.isCredit || false })
+    if (error) throwDatabaseError(error)
+    clearProductCache(); clearSalesCache()
+    const sale = normalizeSale((data as Record<string, unknown> | null)?.sale || data)
     if (!sale) throw new Error('Sale response မမှန်ပါ။')
     return sale
   },
 
   async payCredit(saleId: string): Promise<Sale> {
-    const data = await gasFetch('payCredit', { saleId })
-    const sale = normalizeSale(unwrapObject(data, 'sale'))
-    if (!sale) throw new Error('အကြွေးငွေပေးချေမှု response မမှန်ပါ။')
+    const { data, error } = await supabase.rpc('pay_credit', { p_sale_id: saleId })
+    if (error) throwDatabaseError(error)
     clearSalesCache()
+    const sale = normalizeSale((data as Record<string, unknown> | null)?.sale || data)
+    if (!sale) throw new Error('အကြွေးငွေပေးချေမှု response မမှန်ပါ။')
     return sale
   },
 
-  async addProduct(payload: {
-    barcode: string
-    name: string
-    category: string
-    productColor?: string
-    productSize?: string
-    price: number
-    costPrice: number
-    stockQty: number
-    lowStockThreshold: number
-    unitsPerPack: number
-    packPrice: number
-    saleType: 'unit' | 'pack' | 'both'
-    requiresAgeCheck: boolean
-    imageBase64?: string
-    imageFileName?: string
-  }): Promise<Product> {
-    const data = await gasFetch('addProduct', payload)
-    const product = normalizeProduct(unwrapObject(data, 'product'))
+  async addProduct(payload: { barcode: string; name: string; category: string; productColor?: string; productSize?: string; price: number; costPrice: number; stockQty: number; lowStockThreshold: number; unitsPerPack: number; packPrice: number; saleType: 'unit' | 'pack' | 'both'; requiresAgeCheck: boolean; imageBase64?: string; imageFileName?: string }): Promise<Product> {
+    const id = crypto.randomUUID()
+    const imageUrl = payload.imageBase64 ? await uploadProductImage(id, payload.imageBase64, payload.imageFileName || 'product.jpg') : ''
+    const { data, error } = await supabase.from('products').insert({ id, ...productPayload(payload), image_url: imageUrl }).select().single()
+    if (error) throwDatabaseError(error)
+    const product = normalizeProduct(data)
     if (!product) throw new Error('Product response မမှန်ပါ။')
-    upsertProductCache(product)
+    clearProductCache()
     return product
   },
 
-  async updateProduct(payload: {
-    id: string
-    barcode?: string
-    name?: string
-    category?: string
-    productColor?: string
-    productSize?: string
-    price?: number
-    costPrice?: number
-    stockQty?: number
-    lowStockThreshold?: number
-    unitsPerPack?: number
-    packPrice?: number
-    saleType?: 'unit' | 'pack' | 'both'
-    requiresAgeCheck?: boolean
-    imageBase64?: string
-    imageFileName?: string
-  }): Promise<Product> {
-    const data = await gasFetch('updateProduct', payload)
-    const product = normalizeProduct(unwrapObject(data, 'product'))
+  async updateProduct(payload: { id: string; barcode?: string; name?: string; category?: string; productColor?: string; productSize?: string; price?: number; costPrice?: number; stockQty?: number; lowStockThreshold?: number; unitsPerPack?: number; packPrice?: number; saleType?: 'unit' | 'pack' | 'both'; requiresAgeCheck?: boolean; imageBase64?: string; imageFileName?: string }): Promise<Product> {
+    const updates: Record<string, unknown> = productPayload(payload)
+    if (payload.imageBase64) updates.image_url = await uploadProductImage(payload.id, payload.imageBase64, payload.imageFileName || 'product.jpg')
+    const { data, error } = await supabase.from('products').update(updates).eq('id', payload.id).select().single()
+    if (error) throwDatabaseError(error)
+    const product = normalizeProduct(data)
     if (!product) throw new Error('Product response မမှန်ပါ။')
-    upsertProductCache(product)
+    clearProductCache()
     return product
   },
 
   async deleteProduct(id: string): Promise<void> {
-    await gasFetch('deleteProduct', { id })
+    const { error } = await supabase.from('products').delete().eq('id', id)
+    if (error) throwDatabaseError(error)
     clearProductCache()
   },
 }

@@ -391,7 +391,7 @@ function detectProductDetails(rawCode: string): DetectedProductDetails {
 
 function parseScannedFields(raw: string): Record<string, string> {
   return raw.split(/[\n|;,]+/).reduce<Record<string, string>>((fields, part) => {
-    const match = part.match(/^\s*([a-zA-Z ]{2,16})\s*[:=\-]\s*(.+?)\s*$/)
+    const match = part.match(/^\s*([a-zA-Z ]{2,16})\s*[:-=]\s*(.+?)\s*$/)
     if (!match) return fields
     const key = match[1].trim().toLowerCase().replace(/\s+/g, '')
     fields[key] = match[2].trim()
@@ -412,7 +412,7 @@ function detectName(raw: string, productColor: string, productSize: string): str
   if (looksLikePlainBarcode(raw)) return ''
   const cleaned = raw
     .split(/[\n|;,]+/)
-    .filter((part) => !/^\s*(?:barcode|code|qr|color|colour|size|ml|volume)\s*[:=\-]/i.test(part))
+    .filter((part) => !/^\s*(?:barcode|code|qr|color|colour|size|ml|volume)\s*[:-=]/i.test(part))
     .join(' ')
     .replace(productColor, '')
     .replace(productSize, '')
