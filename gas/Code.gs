@@ -259,10 +259,8 @@ function requireAuth(params) {
     return sessionActor;
   }
 
-  const data = getGoogleTokenData(token);
-  const actor = getUserActorByEmail(text(data.email).toLowerCase());
-  cache.put(key, JSON.stringify(actor), 300);
-  return actor;
+    // Session expired — throw clear error; do NOT treat UUID as Google ID token
+  throw new Error('Login session ကုန်သွားပါပြီ။ Login ပြန်လုပ်ပါ။');
 }
 
 function getSessionActor(token) {
