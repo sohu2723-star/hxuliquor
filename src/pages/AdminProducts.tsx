@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api } from '../lib/api'
+import { api, PRODUCT_GROUPS, productMatchesGroup, type ProductGroup } from '../lib/api'
 import type { Product } from '../lib/api'
 import ProductList from '../components/ProductList'
 import ProductForm from '../components/ProductForm'
@@ -12,6 +12,7 @@ export default function AdminProducts() {
   const [showForm, setShowForm] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [productGroup, setProductGroup] = useState<ProductGroup>('all')
   const [categories, setCategories] = useState<string[]>([])
   const [toast, setToast] = useState<ToastMessage | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -115,7 +116,7 @@ export default function AdminProducts() {
     const matchesSearch = String(p.name).toLowerCase().includes(searchQuery.toLowerCase()) ||
       String(p.barcode).toLowerCase().includes(searchQuery.toLowerCase())
     const matchesCategory = !categoryFilter || p.category === categoryFilter
-    return matchesSearch && matchesCategory
+    return matchesSearch && matchesCategory && productMatchesGroup(p, productGroup)
   })
 
   return (
@@ -135,6 +136,13 @@ export default function AdminProducts() {
               Add Product
             </button>
           </div>
+        </div>
+
+        <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+          {PRODUCT_GROUPS.map((group) => {
+            const count = products.filter((product) => productMatchesGroup(product, group.id)).length
+            return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{group.label} ({count})</button>
+          })}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 mb-4">

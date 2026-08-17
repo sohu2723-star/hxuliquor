@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const storedUser = localStorage.getItem(USER_KEY)
       const storedToken = localStorage.getItem(AUTH_TOKEN_KEY)
-      if (storedUser && storedToken && !isExpiredGoogleToken(storedToken)) {
+      if (storedUser && storedToken) {
         setUser(JSON.parse(storedUser) as User)
       } else {
         localStorage.removeItem(USER_KEY)
@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userData = await api.googleLogin(idToken)
     setUser(userData)
     localStorage.setItem(USER_KEY, JSON.stringify(userData))
-    localStorage.setItem(AUTH_TOKEN_KEY, idToken)
+    localStorage.setItem(AUTH_TOKEN_KEY, userData.sessionToken || idToken)
   }
 
   const logout = () => {
@@ -68,16 +68,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
-function isExpiredGoogleToken(token: string): boolean {
-  try {
-    const payload = token.split('.')[1]
-    if (!payload) return true
-    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: number }
-    return typeof decoded.exp === 'number' && decoded.exp * 1000 <= Date.now()
-  } catch {
-    return true
-  }
-}
 
 export function useAuth() {
   const context = useContext(AuthContext)
