@@ -124,6 +124,9 @@ function initSheets() {
   const users = setupSheet('Users', [
     'id', 'name', 'email', 'passwordHash', 'role', 'createdAt'
   ]);
+  setupSheet('Sessions', [
+    'token', 'userId', 'email', 'role', 'createdAt', 'expiresAt', 'revokedAt'
+  ]);
   [products, users].forEach(sheet => {
     if (sheet.getLastRow() < 2) return;
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -249,20 +252,57 @@ function requireAuth(params) {
     try { return JSON.parse(cached); } catch (err) { cache.remove(key); }
   }
 
-  const data = getGoogleTokenData(token);
   initSheets();
-  const email = text(data.email).toLowerCase();
+  const sessionActor = getSessionActor(token);
+  if (sessionActor) {
+    cache.put(key, JSON.stringify(sessionActor), 1800);
+    return sessionActor;
+  }
+
+  const data = getGoogleTokenData(token);
+  const actor = getUserActorByEmail(text(data.email).toLowerCase());
+  cache.put(key, JSON.stringify(actor), 300);
+  return actor;
+}
+
+function getSessionActor(token) {
+  const sessionsSheet = ss.getSheetByName('Sessions');
+  if (!sessionsSheet) return null;
+  const sessions = sheetToObjects(sessionsSheet);
+  const session = sessions.find(item => text(item.token) === token && !text(item.revokedAt));
+  if (!session) return null;
+  const expiresAt = new Date(text(session.expiresAt));
+  if (!text(session.expiresAt) || expiresAt.getTime() <= Date.now()) return null;
+  return getUserActorByEmail(text(session.email).toLowerCase());
+}
+
+function getUserActorByEmail(email) {
   const users = sheetToObjects(ss.getSheetByName('Users'));
   const user = users.find(u => text(u.email).toLowerCase() === email);
   if (!user) throw new Error('Employee account မရှိသေးပါ။ Admin ကို ဒီ Google email ထည့်ခိုင်းပါ။');
-  const actor = {
+  return {
     id: text(user.id),
     name: text(user.name, email.split('@')[0]),
     email,
     role: text(user.role, 'employee').toLowerCase()
   };
-  cache.put(key, JSON.stringify(actor), 300);
-  return actor;
+}
+
+function createSessionForUser(user) {
+  const sessionsSheet = ss.getSheetByName('Sessions');
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000);
+  const session = {
+    token: Utilities.getUuid() + '-' + Utilities.getUuid(),
+    userId: text(user.id),
+    email: text(user.email).toLowerCase(),
+    role: text(user.role, 'employee').toLowerCase(),
+    createdAt: now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    revokedAt: ''
+  };
+  appendObject(sessionsSheet, session);
+  return session.token;
 }
 
 function getProducts() {
@@ -428,7 +468,8 @@ function googleLogin(idToken) {
         id: text(user.id),
         name: text(user.name, email.split('@')[0]),
         email,
-        role: text(user.role, 'employee').toLowerCase()
+        role: text(user.role, 'employee').toLowerCase(),
+        sessionToken: createSessionForUser(user)
       }
     };
   } catch (err) {

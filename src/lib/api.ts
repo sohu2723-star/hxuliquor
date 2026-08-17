@@ -72,6 +72,24 @@ export type User = {
   name: string
   email: string
   role: string
+  sessionToken?: string
+}
+
+
+export type ProductGroup = 'all' | 'barcode' | 'noBarcode' | 'pack'
+
+export const PRODUCT_GROUPS: { id: ProductGroup; label: string; description: string }[] = [
+  { id: 'all', label: 'အားလုံး', description: 'Product အားလုံး' },
+  { id: 'barcode', label: 'Barcode ရှိ', description: 'Scan ဖတ်ရောင်းမည့် product' },
+  { id: 'noBarcode', label: 'Barcode မရှိ', description: 'ပုံနှိပ်ပြီး manual ရောင်းမည့် product' },
+  { id: 'pack', label: 'ပါကင်လိုက်', description: 'ပါကင်လိုက်ရောင်းမည့် product' },
+]
+
+export function productMatchesGroup(product: Product, group: ProductGroup): boolean {
+  if (group === 'all') return true
+  if (group === 'pack') return product.saleType === 'pack'
+  if (group === 'barcode') return product.saleType !== 'pack' && Boolean(product.barcode.trim())
+  return product.saleType !== 'pack' && !product.barcode.trim()
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -152,7 +170,7 @@ function normalizeSaleItem(value: unknown): SaleItem | null {
     id,
     saleId: asString(value.saleId),
     productId: asString(value.productId),
-    productName: asString(value.productName),
+    productName: asString(value.productName, asString(value.name, 'Unknown product')),
     quantity: asInteger(value.quantity),
     unitPrice: asNumber(value.unitPrice),
     subtotal: asNumber(value.subtotal),
@@ -173,6 +191,7 @@ function normalizeUser(value: unknown): User | null {
     name: asString(value.name, email.split('@')[0]),
     email,
     role: asString(value.role, 'employee').toLowerCase(),
+    sessionToken: asString(value.sessionToken) || undefined,
   }
 }
 
@@ -423,7 +442,7 @@ export const api = {
   async googleLogin(idToken: string): Promise<User> {
     const data = unwrapObject(await gasFetch('googleLogin', { idToken }), 'user')
     const user = normalizeUser(data)
-    if (!user) throw new Error('Login response မမှန်ပါ။ Google login ပြန်လုပ်ပါ။')
+    if (!user?.sessionToken) throw new Error('Login response မမှန်ပါ။ Google login ပြန်လုပ်ပါ။')
     return user
   },
 
