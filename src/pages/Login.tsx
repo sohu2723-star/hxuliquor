@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import GoogleSignInButton from '../components/GoogleSignInButton'
@@ -8,10 +8,12 @@ import ReceiptLogo from '../components/ReceiptLogo'
 export default function Login() {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const lastIdTokenRef = useRef('')
   const { googleLogin, isLoading, user } = useAuth()
   const navigate = useNavigate()
 
   const handleGoogleSuccess = async (idToken: string) => {
+    lastIdTokenRef.current = idToken
     setIsSubmitting(true)
     setError('')
 
@@ -28,6 +30,12 @@ export default function Login() {
   const handleGoogleError = (errorMessage: string) => {
     setError(errorMessage)
     setIsSubmitting(false)
+  }
+
+  const handleRetryLogin = () => {
+    if (lastIdTokenRef.current) {
+      void handleGoogleSuccess(lastIdTokenRef.current)
+    }
   }
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
@@ -53,7 +61,18 @@ export default function Login() {
 
         {error && (
           <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-            {error}
+            <p>{error}</p>
+            <p className="mt-1 text-xs font-semibold text-red-600">Internet မတည်ငြိမ်တာ၊ Google Apps Script ခဏနိုးနေတာကြောင့် တခါတလေဖြစ်နိုင်ပါတယ်။ ခဏစောင့်ပြီး Retry လုပ်ပါ။</p>
+            {lastIdTokenRef.current && (
+              <button
+                type="button"
+                onClick={handleRetryLogin}
+                disabled={isSubmitting}
+                className="mt-3 rounded-full bg-red-600 px-4 py-2 text-xs font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Retry login
+              </button>
+            )}
           </div>
         )}
 
