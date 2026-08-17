@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import LoadingSpinner from './LoadingSpinner'
 
 declare global {
   interface Window {
     google?: {
       accounts: {
         id: {
-          initialize: (config: { client_id: string; callback: (response: { credential?: string }) => void }) => void
-          renderButton: (parent: HTMLElement | null, options: { theme?: string; size?: string; width?: number }) => void
+          initialize: (config: { client_id: string; callback: (response: { credential?: string }) => void; auto_select?: boolean; cancel_on_tap_outside?: boolean }) => void
+          renderButton: (parent: HTMLElement | null, options: { theme?: string; size?: string; width?: number; type?: string; shape?: string; text?: string }) => void
         }
       }
     }
@@ -87,17 +88,22 @@ export default function GoogleSignInButton({ clientId, onSuccess, onError }: Goo
         if (response.credential) onSuccessRef.current(response.credential)
         else onErrorRef.current?.('Google Sign-In failed')
       },
+      auto_select: false,
+      cancel_on_tap_outside: true,
     })
 
     window.google.accounts.id.renderButton(container, {
       theme: 'outline',
       size: 'large',
       width: container.offsetWidth || 320,
+      type: 'standard',
+      shape: 'pill',
+      text: 'signin_with',
     })
   }, [isScriptLoaded, clientId])
 
   if (!isScriptLoaded) {
-    return <div className="flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>
+    return <div className="flex justify-center"><LoadingSpinner className="h-9 w-9" /></div>
   }
 
   return <div ref={buttonRef} className="flex justify-center" />
