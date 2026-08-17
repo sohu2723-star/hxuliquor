@@ -32,6 +32,17 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
   const [isSubmitting, setIsSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const unitsPerPackValue = Math.max(1, parseInt(formData.unitsPerPack) || 1)
+  const stockQtyValue = parseInt(formData.stockQty) || 0
+  const costPriceValue = parseFloat(formData.costPrice) || 0
+  const packPriceValue = parseFloat(formData.packPrice) || 0
+  const unitPriceValue = parseFloat(formData.price) || 0
+  const stockUnitLabel = formData.saleType === 'pack' ? 'ပါကင်' : 'အသေးဆုံး unit (ခု/ဘူး)'
+  const costUnitLabel = formData.saleType === 'pack' ? 'တစ်ပါကင် ဝယ်ရင်းဈေး' : 'တစ်ခု/တစ်ဘူး ဝယ်ရင်းဈေး'
+  const inventoryCostPreview = stockQtyValue * costPriceValue
+  const packProfitPreview = formData.saleType === 'both' ? packPriceValue - (costPriceValue * unitsPerPackValue) : formData.saleType === 'pack' ? unitPriceValue - costPriceValue : 0
+  const unitProfitPreview = formData.saleType !== 'pack' ? unitPriceValue - costPriceValue : 0
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     if (name === 'barcode') setProductKind(value.trim() ? 'barcode' : 'noBarcode')
@@ -132,7 +143,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 <button type="button" onClick={() => selectProductKind('pack')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><span className="block font-semibold">ပါကင် သီးသန့်</span><small>Stock ကို ပါကင်ဖြင့်ထည့်ပါ</small></button>
                 <button type="button" onClick={() => selectProductKind('both')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'both' ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'bg-white'}`}><span className="block font-semibold">ပါကင် + တစ်ခုချင်း</span><small>Stock ကို တစ်ခုချင်းစုစုပေါင်းထည့်ပါ</small></button>
               </div>
-              <p className="mt-2 text-xs text-slate-500">ပါကင် + တစ်ခုချင်း ကိုရွေးလျှင် stock ကို အတွင်းပါ တစ်ခုချင်းစုစုပေါင်းဖြင့်သိမ်းပြီး ပါကင်ရောင်းလျှင် တစ်ပါကင်ပါဝင်မှုအတိုင်း အလိုအလျောက်လျှော့ပါမည်။</p>
+              <p className="mt-2 text-xs text-slate-500">ပါကင်သီးသန့် = stock/cost/price အားလုံးကို ပါကင်အလိုက် ထည့်ပါ။ ပါကင် + တစ်ခုချင်း = stock/cost ကို အသေးဆုံး unit (တစ်ခု/တစ်ဘူး) အလိုက် ထည့်ပြီး ပါကင်ရောင်းလျှင် တစ်ပါကင်ပါဝင်မှုအတိုင်း stock နှုတ်ပါမည်။</p>
             </fieldset>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -231,7 +242,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
               <div className="flex flex-col">
                 <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">
-                  Cost Price (Ks)
+                  {costUnitLabel} (Ks)
                 </label>
                 <input
                   type="number"
@@ -247,7 +258,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
             {formData.saleType !== 'unit' && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
               <h3 className="font-semibold text-slate-900">ပါကင် Product အချက်အလက်</h3>
-              <p className="mb-3 mt-1 text-xs text-slate-600">ပါကင်သီးသန့်ဆို Stock Quantity တွင် ပါကင်အရေအတွက် ထည့်ပါ။ ပါကင် + တစ်ခုချင်းဆို Stock Quantity တွင် အတွင်းပါ တစ်ခုချင်းစုစုပေါင်း ထည့်ပါ (ဥပမာ 10 ပါကင် × 12 ခု = 120)။</p>
+              <p className="mb-3 mt-1 text-xs text-slate-600">ပါကင်သီးသန့်ဆို Stock Quantity ({stockUnitLabel}) တွင် ပါကင်အရေအတွက်၊ Cost/Price တွင် တစ်ပါကင်နှုန်း ထည့်ပါ။ ပါကင် + တစ်ခုချင်းဆို Stock Quantity ({stockUnitLabel}) တွင် အတွင်းပါ အသေးဆုံး unit စုစုပေါင်း ထည့်ပါ (ဥပမာ 10 ပါကင် × 12 ခု = 120)။</p>
               <div>
                 <label className="text-sm font-medium text-gray-700">တစ်ပါကင်ပါဝင်မှု
                   <input type="number" name="unitsPerPack" min="2" value={formData.unitsPerPack} onChange={handleChange} required className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
@@ -258,13 +269,13 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   <input type="number" name="packPrice" value={formData.packPrice} onChange={handleChange} required step="0.01" className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
                 </label>
               </div>}
-              <p className="mt-3 rounded-lg bg-white p-3 text-xs text-violet-800">တစ်ခုချင်း stock ကုန်သွားလျှင် ပါကင် + တစ်ခုချင်း product တွင် Stock ကျန်နေသေးသရွေ့ ပါကင်ဖောက်ရောင်းသကဲ့သို့ တစ်ခုချင်းရောင်းနိုင်ပါသည်။ ဆေးလိပ် carton/ဘူး/အလိပ်လို အဆင့် ၃ ဆင့်ရှိလျှင် အလိပ်ကို smallest unit အဖြစ် stock ထားပြီး carton နှင့် ဘူးကို sale item သီးသန့် product အဖြစ် ဖွင့်ပါ။</p>
+              <p className="mt-3 rounded-lg bg-white p-3 text-xs text-violet-800">Small unit ကို သီးသန့် field မထည့်ပါနှင့် — Stock Quantity ({stockUnitLabel}) ကို အမြဲ အသေးဆုံးရောင်းမည့် unit ဖြင့်ထည့်ပါ။ ဥပမာ carton/ဘူး/အလိပ်ဆို အလိပ်ကို smallest unit အဖြစ် stock ထားပြီး packPrice တွင် carton/bundle ဈေးထည့်ပါ။ ပါကင်နှင့်တစ်ခုချင်း profit မတူနိုင်သောကြောင့် အောက်တွင် preview ပြထားပါသည်။</p>
             </div>}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Stock Quantity
+                  Stock Quantity ({stockUnitLabel})
                 </label>
                 <input
                   type="number"
@@ -287,6 +298,14 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+              <p className="font-semibold">Stock / Profit preview</p>
+              <p>ရင်းနှီးမှု ခန့်မှန်းချက်: {stockQtyValue} × {costPriceValue.toLocaleString()} = {inventoryCostPreview.toLocaleString()} Ks</p>
+              {formData.saleType !== 'pack' && <p>တစ်ခုချင်း အမြတ်: {(unitProfitPreview || 0).toLocaleString()} Ks / unit</p>}
+              {formData.saleType !== 'unit' && <p>ပါကင် အမြတ်: {(packProfitPreview || 0).toLocaleString()} Ks / pack</p>}
+              <p className="mt-1 text-emerald-800">ရောင်းပြီး checkout လုပ်လျှင် stock နှင့် ဆိုင်ထဲရင်းနှီးမှု amount အလိုအလျောက်လျော့ပါမည်။ Product ထပ်ထည့်လျှင် existing product ဖြစ်ပါက stock ကို ပေါင်းထည့်ပါမည်။</p>
             </div>
 
             <div className="flex items-center">

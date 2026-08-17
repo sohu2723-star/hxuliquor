@@ -10,10 +10,10 @@ const EMPLOYEE_CACHE_MS = 10 * 60 * 1000
 
 const RETRYABLE_ACTIONS = new Set(['getProducts', 'getProductByBarcode', 'searchProducts', 'getCategories', 'getSales', 'getEmployees'])
 const LOGIN_ACTIONS = new Set(['googleLogin'])
-const MAX_READ_RETRIES = 2
+const MAX_READ_RETRIES = 3
 const MAX_LOGIN_RETRIES = 2
-const REQUEST_TIMEOUT_MS = 20000
-const LOGIN_TIMEOUT_MS = 45000
+const REQUEST_TIMEOUT_MS = 35000
+const LOGIN_TIMEOUT_MS = 60000
 
 const inFlightReads = new Map<string, Promise<unknown>>()
 
@@ -382,8 +382,8 @@ async function gasFetch(action: string, payload?: Json): Promise<unknown> {
     if (lastError instanceof ApiError) throw lastError
     if (lastError instanceof DOMException && lastError.name === 'AbortError') {
       throw new Error(isLoginAction
-        ? 'Login server response ကြာနေပါသည်။ Network မတည်ငြိမ်ပါက Retry ကိုနှိပ်ပါ။'
-        : 'Network timeout. Server response ကြာနေပါသည်။ Retry ပြန်လုပ်ပါ။')
+        ? 'Login server response ကြာနေပါသည်။ Internet မတည်ငြိမ်ပါက ခဏစောင့်ပြီး Retry နှိပ်ပါ။'
+        : 'Server response ကြာနေပါသည်။ App က အလိုအလျောက် retry လုပ်ပြီးပါပြီ။ Internet စစ်ပြီး Retry ပြန်လုပ်ပါ။')
     }
     throw new Error(isLoginAction
       ? 'Login network error ဖြစ်နေပါသည်။ Internet connection စစ်ပြီး Retry ပြန်နှိပ်ပါ။'
