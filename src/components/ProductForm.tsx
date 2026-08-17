@@ -190,8 +190,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Barcode မရှိသော product များအတွက် camera OCR မဟုတ်ဘဲ QR text ထဲတွင် product name / color / size ပါအောင်ထည့်ပါ။ POS scan သည် ထို text များနှင့် fallback match လုပ်ပါမည်။</p>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="flex flex-col">
+                <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">
                   {formData.saleType === 'pack' ? 'တစ်ပါကင် ရောင်းဈေး (Ks)' : 'တစ်ဘူး / တစ်ခု ရောင်းဈေး (Ks)'}
                 </label>
                 <input
@@ -204,8 +204,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+              <div className="flex flex-col">
+                <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">
                   Cost Price (Ks)
                 </label>
                 <input

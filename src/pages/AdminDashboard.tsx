@@ -80,14 +80,13 @@ export default function AdminDashboard() {
   const lowStock = products.filter((product) => product.stockQty <= product.lowStockThreshold)
   const unpaidCredits = sales.filter((sale) => sale.balanceDue > 0)
   const dailyIncome = useMemo(() => {
-    const totals = new Map<string, number>()
-    sales.forEach((sale) => {
-      if (!sale.paidAmount) return
-      const date = myanmarDate(sale.isCredit ? sale.settledAt : sale.createdAt)
-      totals.set(date, (totals.get(date) || 0) + sale.paidAmount)
-    })
-    const max = Math.max(...totals.values(), 1)
-    return [...totals.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, amount]) => ({ date, amount, percent: amount / max * 100 }))
+    const today = myanmarDate(new Date())
+    const amount = sales.reduce((sum, sale) => {
+      if (!sale.paidAmount) return sum
+      const paidDate = myanmarDate(sale.isCredit ? sale.settledAt : sale.createdAt)
+      return paidDate === today ? sum + sale.paidAmount : sum
+    }, 0)
+    return { date: today, amount, percent: amount > 0 ? 100 : 0 }
   }, [sales])
 
   const monthlyIncomeChart = useMemo(() => {
@@ -152,8 +151,8 @@ export default function AdminDashboard() {
       <section className="mt-5 surface-card p-5"><h2 className="font-bold text-lg text-red-700">ကုန်တော့မည့်ပစ္စည်း Warning ({lowStock.length})</h2><div className="mt-3 divide-y">{lowStock.length ? lowStock.map((product) => <div key={product.id} className="py-2 flex justify-between"><span>{product.name} <small className="text-slate-500">({product.saleType === 'pack' ? 'ပါကင် Product' : 'တစ်ခုချင်း Product'})</small></span><b className="text-red-600">Stock {product.stockQty} {product.saleType === 'pack' ? 'ပါကင်' : 'ခု/ဘူး'}</b></div>) : <p className="text-green-700">Stock အားလုံးလုံလောက်ပါသည်</p>}</div></section>
       <section className="mt-5 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <div className="surface-card p-5">
-          <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">Daily Income Chart</h2><p className="text-xs text-slate-500">နေ့စဉ် ဝင်ငွေကို bar chart ဖြင့်ပြထားသည်။</p></div><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">{dailyIncome.length} days</span></div>
-          <div className="mt-4 flex h-48 items-end gap-2 overflow-x-auto rounded-2xl bg-slate-50 p-3">{dailyIncome.length ? dailyIncome.map((day) => <div key={day.date} className="group flex min-w-10 flex-1 flex-col items-center justify-end"><span className="mb-2 rounded bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white opacity-0 transition group-hover:opacity-100">{formatCurrency(day.amount)}</span><div className="w-full rounded-t-xl bg-gradient-to-t from-primary to-amber-500" style={{ height: `${Math.max(day.percent, 4)}%` }} /><span className="mt-2 text-[10px] font-semibold text-slate-500">{day.date.slice(8)}</span></div>) : <p className="m-auto text-sm text-slate-500">Daily income မရှိသေးပါ</p>}</div>
+          <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">Daily Income Chart</h2><p className="text-xs text-slate-500">ယနေ့တစ်ရက်စာဝင်ငွေကို bar chart ဖြင့်ပြထားသည်။ နောက်နေ့တွင် 0 မှပြန်စပါသည်။</p></div><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">Today</span></div>
+          <div className="mt-4 flex h-48 items-end justify-center rounded-2xl bg-slate-50 p-3"><div className="group flex h-full w-24 flex-col items-center justify-end"><span className="mb-2 rounded bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white">{formatCurrency(dailyIncome.amount)}</span><div className="w-full rounded-t-xl bg-gradient-to-t from-primary to-amber-500" style={{ height: `${Math.max(dailyIncome.percent, dailyIncome.amount ? 4 : 0)}%` }} /><span className="mt-2 text-[10px] font-semibold text-slate-500">{dailyIncome.date.slice(8)}</span></div></div>
         </div>
         <div className="surface-card p-5">
           <h2 className="text-lg font-bold">Monthly Income Chart</h2><p className="text-xs text-slate-500">လအတွင်း ငွေရပြီး၊ အကြွေးကျန်၊ အမြတ်</p>
