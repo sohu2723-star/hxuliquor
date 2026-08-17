@@ -79,6 +79,10 @@ export default function AdminDashboard() {
 
   const lowStock = products.filter((product) => product.stockQty <= product.lowStockThreshold)
   const unpaidCredits = sales.filter((sale) => sale.balanceDue > 0)
+  const inventoryInvestment = useMemo(() => products.reduce((sum, product) => {
+    const stockUnits = product.saleType === 'pack' ? product.stockQty * Math.max(1, product.unitsPerPack) : product.stockQty
+    return sum + (stockUnits * product.costPrice)
+  }, 0), [products])
   const dailyIncome = useMemo(() => {
     const today = myanmarDate(new Date())
     const amount = sales.reduce((sum, sale) => {
@@ -143,15 +147,16 @@ export default function AdminDashboard() {
         </label>
       </div>
       {error && <p className="bg-red-50 text-red-700 p-3 mb-4 rounded-lg">{error}</p>}
-      {loading ? <div className="surface-card p-8 text-center text-slate-500">စာရင်းတွက်နေပါသည်…</div> : <div className="grid md:grid-cols-2 gap-4">
+      {loading ? <div className="surface-card p-8 text-center text-slate-500">စာရင်းတွက်နေပါသည်…</div> : <div className="grid md:grid-cols-3 gap-4">
         <Card title="ယနေ့ Daily (မြန်မာစံတော်ချိန်)" data={report.today} />
         <Card title={`${selectedMonth} Monthly`} data={report.month} />
+        <section className="surface-card p-5"><h2 className="font-bold text-lg">ဆိုင်ထဲ Product ရင်းနှီးမှု</h2><p className="mt-3 text-sm text-gray-500">လက်ကျန် stock × cost price</p><p className="text-2xl font-bold text-violet-700">{formatCurrency(inventoryInvestment)}</p><p className="mt-3 border-t pt-3 text-sm text-slate-500">ပါကင်သီးသန့် stock ကို တစ်ခုချင်းအရေအတွက်သို့ပြောင်းတွက်ထားပါသည်။</p></section>
       </div>}
       <section className="mt-5 surface-card p-5"><h2 className="font-bold text-lg text-red-700">ကုန်တော့မည့်ပစ္စည်း Warning ({lowStock.length})</h2><div className="mt-3 divide-y">{lowStock.length ? lowStock.map((product) => <div key={product.id} className="py-2 flex justify-between"><span>{product.name} <small className="text-slate-500">({product.saleType === 'pack' ? 'ပါကင် Product' : 'တစ်ခုချင်း Product'})</small></span><b className="text-red-600">Stock {product.stockQty} {product.saleType === 'pack' ? 'ပါကင်' : 'ခု/ဘူး'}</b></div>) : <p className="text-green-700">Stock အားလုံးလုံလောက်ပါသည်</p>}</div></section>
       <section className="mt-5 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <div className="surface-card p-5">
-          <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">Daily Income Chart</h2><p className="text-xs text-slate-500">ယနေ့တစ်ရက်စာဝင်ငွေကို bar chart ဖြင့်ပြထားသည်။ နောက်နေ့တွင် 0 မှပြန်စပါသည်။</p></div><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">Today</span></div>
-          <div className="mt-4 flex h-48 items-end justify-center rounded-2xl bg-slate-50 p-3"><div className="group flex h-full w-24 flex-col items-center justify-end"><span className="mb-2 rounded bg-slate-900 px-2 py-1 text-[10px] font-semibold text-white">{formatCurrency(dailyIncome.amount)}</span><div className="w-full rounded-t-xl bg-gradient-to-t from-primary to-amber-500" style={{ height: `${Math.max(dailyIncome.percent, dailyIncome.amount ? 4 : 0)}%` }} /><span className="mt-2 text-[10px] font-semibold text-slate-500">{dailyIncome.date.slice(8)}</span></div></div>
+          <div className="flex items-center justify-between"><div><h2 className="text-lg font-bold">Daily Income Bar</h2><p className="text-xs text-slate-500">Chart မဟုတ်ဘဲ ယနေ့ဝင်ငွေကို progress bar လေးဖြင့်ပြထားသည်။ နောက်နေ့တွင် 0 မှပြန်စပါသည်။</p></div><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">Today</span></div>
+          <div className="mt-5 rounded-2xl bg-slate-50 p-4"><div className="mb-2 flex items-center justify-between text-sm"><b>{dailyIncome.date}</b><span>{formatCurrency(dailyIncome.amount)}</span></div><div className="h-5 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-gradient-to-r from-primary to-amber-500" style={{ width: `${Math.max(dailyIncome.percent, dailyIncome.amount ? 8 : 0)}%` }} /></div><p className="mt-2 text-xs text-slate-500">Daily target မသတ်မှတ်ထားသေးသဖြင့် ဝင်ငွေရှိပါက bar ကို အပြည့်ပြထားပါသည်။</p></div>
         </div>
         <div className="surface-card p-5">
           <h2 className="text-lg font-bold">Monthly Income Chart</h2><p className="text-xs text-slate-500">လအတွင်း ငွေရပြီး၊ အကြွေးကျန်၊ အမြတ်</p>

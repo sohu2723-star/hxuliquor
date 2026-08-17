@@ -22,10 +22,10 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     lowStockThreshold: product?.lowStockThreshold?.toString() || '5',
     unitsPerPack: product?.unitsPerPack?.toString() || '1',
     packPrice: product?.packPrice?.toString() || '',
-    saleType: product?.saleType === 'pack' ? 'pack' : 'unit',
+    saleType: product?.saleType || 'unit',
     requiresAgeCheck: product?.requiresAgeCheck || false,
   })
-  const [productKind, setProductKind] = useState<'barcode' | 'noBarcode' | 'pack'>(product?.saleType === 'pack' ? 'pack' : product?.barcode ? 'barcode' : 'noBarcode')
+  const [productKind, setProductKind] = useState<'barcode' | 'noBarcode' | 'pack' | 'both'>(product?.saleType === 'pack' ? 'pack' : product?.saleType === 'both' ? 'both' : product?.barcode ? 'barcode' : 'noBarcode')
   const [imageFile, setImageFile] = useState<File | undefined>()
   const [imagePreview, setImagePreview] = useState<string | null>(product?.imageUrl || null)
   const [isScanning, setIsScanning] = useState(false)
@@ -36,17 +36,18 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     const { name, value, type } = e.target
     if (name === 'barcode') setProductKind(value.trim() ? 'barcode' : 'noBarcode')
     if (name === 'saleType' && value === 'pack') setProductKind('pack')
+    if (name === 'saleType' && value === 'both') setProductKind('both')
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     }))
   }
 
-  const selectProductKind = (kind: 'barcode' | 'noBarcode' | 'pack') => {
+  const selectProductKind = (kind: 'barcode' | 'noBarcode' | 'pack' | 'both') => {
     setProductKind(kind)
     setFormData((prev) => ({
       ...prev,
-      saleType: kind === 'pack' ? 'pack' : 'unit',
+      saleType: kind === 'pack' ? 'pack' : kind === 'both' ? 'both' : 'unit',
       ...(kind === 'noBarcode' ? { barcode: '' } : {}),
     }))
   }
@@ -96,7 +97,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       stockQty: parseInt(formData.stockQty) || 0,
       lowStockThreshold: parseInt(formData.lowStockThreshold) || 0,
       unitsPerPack: Math.max(1, parseInt(formData.unitsPerPack) || 1),
-      packPrice: formData.saleType === 'pack' ? (parseFloat(formData.price) || 0) : 0,
+      packPrice: formData.saleType === 'both' ? (parseFloat(formData.packPrice) || 0) : formData.saleType === 'pack' ? (parseFloat(formData.price) || 0) : 0,
       saleType: formData.saleType as 'unit' | 'pack' | 'both',
       requiresAgeCheck: formData.requiresAgeCheck,
     }
@@ -125,12 +126,13 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
           <form onSubmit={handleSubmit} className="space-y-4">
             <fieldset className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <legend className="px-1 text-sm font-semibold">Product အမျိုးအစား</legend>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
                 <button type="button" onClick={() => selectProductKind('barcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'barcode' ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><span className="block font-semibold">Barcode ရှိ Product</span><small>Barcode ထည့်ပြီး scan ရောင်းရန်</small></button>
                 <button type="button" onClick={() => selectProductKind('noBarcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'noBarcode' ? 'border-slate-500 bg-slate-50 text-slate-800' : 'bg-white'}`}><span className="block font-semibold">Barcode မရှိ Product</span><small>Barcode ကို ကွက်လပ်ထားပါ</small></button>
-                <button type="button" onClick={() => selectProductKind('pack')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><span className="block font-semibold">ပါကင်လိုက် Product</span><small>Stock ကို ပါကင်ဖြင့်ထည့်ပါ</small></button>
+                <button type="button" onClick={() => selectProductKind('pack')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><span className="block font-semibold">ပါကင် သီးသန့်</span><small>Stock ကို ပါကင်ဖြင့်ထည့်ပါ</small></button>
+                <button type="button" onClick={() => selectProductKind('both')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'both' ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'bg-white'}`}><span className="block font-semibold">ပါကင် + တစ်ခုချင်း</span><small>Stock ကို တစ်ခုချင်းစုစုပေါင်းထည့်ပါ</small></button>
               </div>
-              <p className="mt-2 text-xs text-slate-500">Barcode ရှိ/မရှိ အုပ်စုကို Barcode box ဖြည့်ထားခြင်းအလိုက် အလိုအလျောက်ခွဲပါသည်။ ပါကင်လိုက်ကိုရွေးလျှင် သီးသန့်ပါကင်အုပ်စုထဲဝင်ပါမည်။</p>
+              <p className="mt-2 text-xs text-slate-500">ပါကင် + တစ်ခုချင်း ကိုရွေးလျှင် stock ကို အတွင်းပါ တစ်ခုချင်းစုစုပေါင်းဖြင့်သိမ်းပြီး ပါကင်ရောင်းလျှင် တစ်ပါကင်ပါဝင်မှုအတိုင်း အလိုအလျောက်လျှော့ပါမည်။</p>
             </fieldset>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -243,14 +245,20 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
             </div>
 
-            {formData.saleType === 'pack' && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
+            {formData.saleType !== 'unit' && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
               <h3 className="font-semibold text-slate-900">ပါကင် Product အချက်အလက်</h3>
-              <p className="mb-3 mt-1 text-xs text-slate-600">Stock Quantity တွင် ကျန်သည့် “ပါကင်အရေအတွက်” ကို ထည့်ပါ။ Barcode မရှိလျှင် ကွက်လပ်ထားနိုင်ပါသည်။</p>
+              <p className="mb-3 mt-1 text-xs text-slate-600">ပါကင်သီးသန့်ဆို Stock Quantity တွင် ပါကင်အရေအတွက် ထည့်ပါ။ ပါကင် + တစ်ခုချင်းဆို Stock Quantity တွင် အတွင်းပါ တစ်ခုချင်းစုစုပေါင်း ထည့်ပါ (ဥပမာ 10 ပါကင် × 12 ခု = 120)။</p>
               <div>
                 <label className="text-sm font-medium text-gray-700">တစ်ပါကင်ပါဝင်မှု
                   <input type="number" name="unitsPerPack" min="2" value={formData.unitsPerPack} onChange={handleChange} required className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
                 </label>
               </div>
+              {formData.saleType === 'both' && <div className="mt-3">
+                <label className="text-sm font-medium text-gray-700">တစ်ပါကင် ရောင်းဈေး (Ks)
+                  <input type="number" name="packPrice" value={formData.packPrice} onChange={handleChange} required step="0.01" className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
+                </label>
+              </div>}
+              <p className="mt-3 rounded-lg bg-white p-3 text-xs text-violet-800">တစ်ခုချင်း stock ကုန်သွားလျှင် ပါကင် + တစ်ခုချင်း product တွင် Stock ကျန်နေသေးသရွေ့ ပါကင်ဖောက်ရောင်းသကဲ့သို့ တစ်ခုချင်းရောင်းနိုင်ပါသည်။ ဆေးလိပ် carton/ဘူး/အလိပ်လို အဆင့် ၃ ဆင့်ရှိလျှင် အလိပ်ကို smallest unit အဖြစ် stock ထားပြီး carton နှင့် ဘူးကို sale item သီးသန့် product အဖြစ် ဖွင့်ပါ။</p>
             </div>}
 
             <div className="grid grid-cols-2 gap-4">

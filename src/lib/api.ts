@@ -79,18 +79,20 @@ export type User = {
 }
 
 
-export type ProductGroup = 'all' | 'barcode' | 'noBarcode' | 'pack'
+export type ProductGroup = 'all' | 'barcode' | 'noBarcode' | 'pack' | 'both'
 
 export const PRODUCT_GROUPS: { id: ProductGroup; label: string; description: string }[] = [
   { id: 'all', label: 'အားလုံး', description: 'Product အားလုံး' },
   { id: 'barcode', label: 'Barcode ရှိ', description: 'Scan ဖတ်ရောင်းမည့် product' },
   { id: 'noBarcode', label: 'Barcode မရှိ', description: 'ပုံနှိပ်ပြီး manual ရောင်းမည့် product' },
-  { id: 'pack', label: 'ပါကင်လိုက်', description: 'ပါကင်လိုက်ရောင်းမည့် product' },
+  { id: 'pack', label: 'ပါကင်လိုက်', description: 'ပါကင် stock သီးသန့်ထားမည့် product' },
+  { id: 'both', label: 'ပါကင် + တစ်ခုချင်း', description: 'stock တစ်ခုတည်းမှ ပါကင်လိုက်/တစ်ခုချင်း နှစ်မျိုးရောင်းမည့် product' },
 ]
 
 export function productMatchesGroup(product: Product, group: ProductGroup): boolean {
   if (group === 'all') return true
   if (group === 'pack') return product.saleType === 'pack'
+  if (group === 'both') return product.saleType === 'both'
   if (group === 'barcode') return product.saleType !== 'pack' && Boolean(product.barcode.trim())
   return product.saleType !== 'pack' && !product.barcode.trim()
 }
