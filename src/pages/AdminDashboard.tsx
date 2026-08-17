@@ -43,7 +43,10 @@ export default function AdminDashboard() {
     if (!quiet) setLoading(true)
     setError('')
     try {
-      const [saleData, productData] = await Promise.all([api.getSales(start, end, quiet), api.getProducts(quiet)])
+      const [saleData, productData] = await Promise.all([
+        api.getSalesStaleFirst(start, end, setSales).then((result) => result.sales),
+        api.getProductsStaleFirst(setProducts).then((result) => result.products),
+      ])
       setSales(saleData); setProducts(productData)
     } catch (error) { setError(error instanceof Error ? error.message : 'Data ဆွဲမရပါ။') }
     finally { setLoading(false); loadingRef.current = false }

@@ -12,6 +12,8 @@ const RETRYABLE_ACTIONS = new Set(['getProducts', 'getProductByBarcode', 'search
 const MAX_READ_RETRIES = 2
 const REQUEST_TIMEOUT_MS = 20000
 
+const inFlightReads = new Map<string, Promise<unknown>>()
+
 let productCache: { products: Product[]; savedAt: number } | null = null
 let employeeCache: { users: User[]; savedAt: number } | null = null
 const salesCache = new Map<string, Sale[]>()
@@ -321,55 +323,72 @@ async function gasFetch(action: string, payload?: Json): Promise<unknown> {
   })()
   const requestPayload = token ? { ...(payload ?? {}), accessToken: token } : (payload ?? {})
   const body = JSON.stringify(requestPayload)
-  const maxAttempts = RETRYABLE_ACTIONS.has(action) ? MAX_READ_RETRIES + 1 : 1
-  let lastError: unknown
+  const canDedupe = RETRYABLE_ACTIONS.has(action)
+  const inFlightKey = canDedupe ? `${action}:${body}` : ''
+  if (inFlightKey && inFlightReads.has(inFlightKey)) return inFlightReads.get(inFlightKey)!
 
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const run = async () => {
+    const maxAttempts = canDedupe ? MAX_READ_RETRIES + 1 : 1
+    let lastError: unknown
 
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body,
-        signal: controller.signal,
-      })
-      const text = await response.text()
-      let data: unknown = null
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const controller = new AbortController()
+      const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
       try {
-        data = text ? JSON.parse(text) : null
-      } catch {
-        throw new ApiError('Server returned an invalid response. Please reload and try again.', response.status >= 500)
-      }
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body,
+          signal: controller.signal,
+        })
+        const text = await response.text()
+        let data: unknown = null
+        try {
+          data = text ? JSON.parse(text) : null
+        } catch {
+          throw new ApiError('Server returned an invalid response. Please reload and try again.', response.status >= 500)
+        }
 
-      if (!response.ok) {
-        const message = isRecord(data) && typeof data.message === 'string'
-          ? data.message
-          : `Server error (${response.status})`
-        throw new ApiError(message, response.status >= 500 || response.status === 429)
-      }
+        if (!response.ok) {
+          const message = isRecord(data) && typeof data.message === 'string'
+            ? data.message
+            : `Server error (${response.status})`
+          throw new ApiError(message, response.status >= 500 || response.status === 429)
+        }
 
-      if (isRecord(data) && data.success === false) {
-        throw new ApiError(asString(data.message, 'Request failed'))
-      }
+        if (isRecord(data) && data.success === false) {
+          throw new ApiError(asString(data.message, 'Request failed'))
+        }
 
-      return data
-    } catch (error) {
-      lastError = error
-      const retryable = error instanceof ApiError ? error.retryable : true
-      if (!retryable || attempt >= maxAttempts - 1) break
-      await new Promise((resolve) => window.setTimeout(resolve, 600 * (attempt + 1)))
-    } finally {
-      window.clearTimeout(timeoutId)
+        return data
+      } catch (error) {
+        lastError = error
+        const retryable = error instanceof ApiError ? error.retryable : true
+        if (!retryable || attempt >= maxAttempts - 1) break
+        await new Promise((resolve) => window.setTimeout(resolve, 600 * (attempt + 1)))
+      } finally {
+        window.clearTimeout(timeoutId)
+      }
     }
+
+    if (lastError instanceof ApiError) throw lastError
+    if (lastError instanceof DOMException && lastError.name === 'AbortError') {
+      throw new Error('Network timeout. Server response ကြာနေပါသည်။ Retry ပြန်လုပ်ပါ။')
+    }
+    throw new Error('Network error. Internet သို့မဟုတ် server connection ကို စစ်ပြီး Retry ပြန်လုပ်ပါ။')
   }
 
-  if (lastError instanceof ApiError) throw lastError
-  if (lastError instanceof DOMException && lastError.name === 'AbortError') {
-    throw new Error('Network timeout. Server response ကြာနေပါသည်။ Retry ပြန်လုပ်ပါ။')
+  const promise = run()
+  if (inFlightKey) {
+    inFlightReads.set(inFlightKey, promise)
+    promise.finally(() => inFlightReads.delete(inFlightKey)).catch(() => {})
   }
-  throw new Error('Network error. Internet သို့မဟုတ် server connection ကို စစ်ပြီး Retry ပြန်လုပ်ပါ။')
+  return promise
+}
+
+function normalizeSalesResponse(data: unknown): Sale[] {
+  return unwrapArray(data, 'sales').map(normalizeSale).filter((sale): sale is Sale => sale !== null)
 }
 
 export const api = {
@@ -437,10 +456,30 @@ export const api = {
     const params: Json = {}
     if (startDate) params.startDate = startDate
     if (endDate) params.endDate = endDate
-    const data = unwrapArray(await gasFetch('getSales', params), 'sales')
-    const sales = data.map(normalizeSale).filter((sale): sale is Sale => sale !== null)
+    const sales = normalizeSalesResponse(await gasFetch('getSales', params))
     saveSalesCache(cacheKey, sales)
     return sales
+  },
+
+  async getSalesStaleFirst(startDate?: string, endDate?: string, onFresh?: (sales: Sale[]) => void): Promise<{ sales: Sale[]; fromCache: boolean }> {
+    const cacheKey = salesCacheKey(startDate, endDate)
+    const params: Json = {}
+    if (startDate) params.startDate = startDate
+    if (endDate) params.endDate = endDate
+    const cached = readSalesCache(cacheKey)
+    if (cached) {
+      void gasFetch('getSales', params)
+        .then((data) => {
+          const fresh = normalizeSalesResponse(data)
+          saveSalesCache(cacheKey, fresh)
+          onFresh?.(fresh)
+        })
+        .catch(() => {})
+      return { sales: cached, fromCache: true }
+    }
+    const sales = normalizeSalesResponse(await gasFetch('getSales', params))
+    saveSalesCache(cacheKey, sales)
+    return { sales, fromCache: false }
   },
 
   async googleLogin(idToken: string): Promise<User> {

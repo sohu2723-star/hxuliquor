@@ -44,7 +44,7 @@ export default function POS() {
       return
     }
     try {
-      const { products: all } = await api.getProductsStaleFirst()
+      const { products: all } = await api.getProductsStaleFirst((fresh) => setProducts(fresh))
       setProducts(all)
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
