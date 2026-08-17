@@ -6,13 +6,14 @@ const PRODUCT_CACHE_KEY = 'hxu-products-v3'
 const EMPLOYEE_CACHE_KEY = 'hxu-employees-v1'
 const SALES_CACHE_PREFIX = 'hxu-sales-v1:'
 const PRODUCT_CACHE_MS = 15 * 60 * 1000
+const EMPLOYEE_CACHE_MS = 10 * 60 * 1000
 
 const RETRYABLE_ACTIONS = new Set(['getProducts', 'getProductByBarcode', 'searchProducts', 'getCategories', 'getSales', 'getEmployees'])
 const MAX_READ_RETRIES = 2
 const REQUEST_TIMEOUT_MS = 20000
 
 let productCache: { products: Product[]; savedAt: number } | null = null
-let employeeCache: User[] | null = null
+let employeeCache: { users: User[]; savedAt: number } | null = null
 const salesCache = new Map<string, Sale[]>()
 
 type Json = Record<string, unknown>
@@ -239,18 +240,21 @@ function clearProductCache() {
 }
 
 function readEmployeeCache(): User[] | null {
-  if (employeeCache) return employeeCache
+  if (employeeCache && Date.now() - employeeCache.savedAt < EMPLOYEE_CACHE_MS) return employeeCache.users
   try {
     const stored: unknown = JSON.parse(localStorage.getItem(EMPLOYEE_CACHE_KEY) || 'null')
-    if (!Array.isArray(stored)) return null
-    employeeCache = stored.map(normalizeUser).filter((user): user is User => user !== null)
-    return employeeCache
+    const storedUsers = Array.isArray(stored) ? stored : isRecord(stored) && Array.isArray(stored.users) ? stored.users : null
+    const savedAt = isRecord(stored) && Number.isFinite(Number(stored.savedAt)) ? Number(stored.savedAt) : Date.now()
+    if (!storedUsers || Date.now() - savedAt >= EMPLOYEE_CACHE_MS) return null
+    const users = storedUsers.map(normalizeUser).filter((user): user is User => user !== null)
+    employeeCache = { users, savedAt }
+    return users
   } catch { return null }
 }
 
 function saveEmployeeCache(users: User[]) {
-  employeeCache = users
-  try { localStorage.setItem(EMPLOYEE_CACHE_KEY, JSON.stringify(users)) } catch { /* storage unavailable */ }
+  employeeCache = { users, savedAt: Date.now() }
+  try { localStorage.setItem(EMPLOYEE_CACHE_KEY, JSON.stringify(employeeCache)) } catch { /* storage unavailable */ }
 }
 
 function salesCacheKey(startDate?: string, endDate?: string) {
@@ -380,13 +384,13 @@ export const api = {
     return products
   },
 
-  async getProductsStaleFirst(): Promise<{ products: Product[]; fromCache: boolean }> {
+  async getProductsStaleFirst(onFresh?: (products: Product[]) => void): Promise<{ products: Product[]; fromCache: boolean }> {
     const cached = readProductCache()
     if (cached) {
       void gasFetch('getProducts')
         .then((data) => {
           const fresh = unwrapArray(data, 'products').map(normalizeProduct).filter((p): p is Product => p !== null)
-          if (fresh.length > 0) saveProductCache(fresh)
+          if (fresh.length > 0) { saveProductCache(fresh); onFresh?.(fresh) }
         })
         .catch(() => {})
       return { products: cached, fromCache: true }

@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import GoogleSignInButton from '../components/GoogleSignInButton'
+import LoadingSpinner from '../components/LoadingSpinner'
+import ReceiptLogo from '../components/ReceiptLogo'
 
 export default function Login() {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { googleLogin } = useAuth()
+  const { googleLogin, isLoading, user } = useAuth()
   const navigate = useNavigate()
 
   const handleGoogleSuccess = async (idToken: string) => {
@@ -30,27 +32,43 @@ export default function Login() {
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <LoadingSpinner />
+      </div>
+    )
+  }
+
+  if (user) return <Navigate to="/pos" replace />
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
-        <h1 className="text-3xl font-bold text-center text-gray-900 mb-2">HXU Liquor POS</h1>
-        <p className="text-center text-gray-500 mb-8">Sign in with Google to continue</p>
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#fef3c7,transparent_34%),linear-gradient(135deg,#f8fafc,#eef2ff)] px-4">
+      <div className="w-full max-w-md rounded-[2rem] bg-white/95 p-8 shadow-2xl ring-1 ring-slate-200 backdrop-blur">
+        <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-3xl bg-primary/10 p-3 shadow-inner">
+          <ReceiptLogo className="h-20 w-20" />
+        </div>
+        <h1 className="text-center font-serif text-4xl font-black tracking-tight text-slate-950 drop-shadow-sm">HXU Liquor POS</h1>
+        <p className="mb-8 mt-2 text-center text-sm font-medium text-slate-500">Sign in securely with Google to continue</p>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm mb-4">
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
             {error}
           </div>
         )}
 
         {googleClientId ? (
-          <div>
+          <div className="relative">
             <GoogleSignInButton
               clientId={googleClientId}
               onSuccess={handleGoogleSuccess}
               onError={handleGoogleError}
             />
             {isSubmitting && (
-              <p className="text-center text-sm text-gray-500 mt-2">Signing in with Google...</p>
+              <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-white/85 backdrop-blur-sm">
+                <LoadingSpinner className="h-10 w-10" />
+                <p className="mt-2 text-center text-sm font-semibold text-slate-500">Signing in...</p>
+              </div>
             )}
           </div>
         ) : (

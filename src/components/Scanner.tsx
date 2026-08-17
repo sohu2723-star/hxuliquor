@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats, type CameraDevice } from 'html5-qrcode'
+import Icon from './Icon'
 
 interface ScannerProps { onScan: (code: string) => void }
 type ExtendedCapabilities = MediaTrackCapabilities & { focusMode?: string[]; zoom?: { min: number; max: number; step?: number }; torch?: boolean }
@@ -32,6 +33,7 @@ export default function Scanner({ onScan }: ScannerProps) {
   const lastScan = useRef({ code: '', time: 0 })
   const onScanRef = useRef(onScan)
   const scanLockedUntil = useRef(0)
+  const focusTimer = useRef<number | null>(null)
 
   useEffect(() => { onScanRef.current = onScan }, [onScan])
 
@@ -46,6 +48,7 @@ export default function Scanner({ onScan }: ScannerProps) {
     setCanTorch(false)
     setTorchOn(false)
     setZoomRange(null)
+    if (focusTimer.current) { window.clearInterval(focusTimer.current); focusTimer.current = null }
   }
 
   const startScanning = async (requestedCameraId?: string) => {
@@ -66,14 +69,9 @@ export default function Scanner({ onScan }: ScannerProps) {
       await scanner.start(
         selected,
         {
-          fps: 45,
-          aspectRatio: 1,
-          qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const width = Math.floor(viewfinderWidth * .86)
-            const height = Math.floor(Math.min(viewfinderHeight * .32, 180))
-            return { width, height }
-          },
-          videoConstraints: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 1280 } },
+          fps: 24,
+          aspectRatio: 1.333334,
+          videoConstraints: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 960 } },
         },
         (rawCode) => {
           const code = rawCode.trim()
@@ -92,14 +90,18 @@ export default function Scanner({ onScan }: ScannerProps) {
       const capabilities = scanner.getRunningTrackCapabilities() as ExtendedCapabilities
       const focusMode = capabilities.focusMode?.includes('continuous') ? 'continuous' : capabilities.focusMode?.includes('single-shot') ? 'single-shot' : undefined
       const zoomCapability = capabilities.zoom
-      const initialZoom = zoomCapability ? Math.min(zoomCapability.max, Math.max(zoomCapability.min, 3)) : undefined
+      const initialZoom = zoomCapability ? zoomCapability.min : undefined
       const advanced = [{ ...(focusMode && { focusMode }), ...(initialZoom !== undefined && { zoom: initialZoom }) }]
       try {
         await scanner.applyVideoConstraints({
-          width: { ideal: 1280 }, height: { ideal: 1280 },
           ...(advanced[0].focusMode || advanced[0].zoom !== undefined ? { advanced } : {}),
         } as ExtendedConstraints)
       } catch { /* Some browsers report capabilities but reject constraints. */ }
+      if (capabilities.focusMode?.includes('single-shot')) {
+        focusTimer.current = window.setInterval(() => {
+          void applyCameraControl({ focusMode: 'single-shot' }, true)
+        }, 1800)
+      }
       setCanTorch(capabilities.torch === true)
       if (zoomCapability) {
         setZoom(initialZoom ?? zoomCapability.min)
@@ -116,15 +118,15 @@ export default function Scanner({ onScan }: ScannerProps) {
 
   useEffect(() => () => { void stopScanning() }, [])
 
-  const applyCameraControl = async (control: { torch?: boolean; zoom?: number; focusMode?: string }) => {
+  const applyCameraControl = async (control: { torch?: boolean; zoom?: number; focusMode?: string }, silent = false) => {
     if (!scannerRef.current?.isScanning) return
     try { await scannerRef.current.applyVideoConstraints({ advanced: [control] } as ExtendedConstraints) }
-    catch { setError('ဤ camera/browser က ရွေးထားသော focus control ကို မပံ့ပိုးပါ။') }
+    catch { if (!silent) setError('ဤ camera/browser က ရွေးထားသော focus control ကို မပံ့ပိုးပါ။') }
   }
 
   return <div>
-    {!isScanning ? <button type="button" onClick={() => void startScanning()} className="w-full bg-primary text-white py-3 px-4 rounded-md font-medium">
-      📷 Barcode / QR Scan ဖတ်မည်
+    {!isScanning ? <button type="button" onClick={() => void startScanning()} className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 font-medium text-white">
+      <Icon name="camera" className="h-5 w-5" /> Barcode / QR Scan ဖတ်မည်
     </button> : <div className="flex gap-2 mb-2">
       {cameras.length > 1 && <select aria-label="Camera ရွေးရန်" value={cameraId} onChange={(event) => void startScanning(event.target.value)} className="min-w-0 flex-1 border rounded-md px-2 py-2">
         {cameras.map((camera, index) => <option key={camera.id} value={camera.id}>{camera.label || `Camera ${index + 1}`}</option>)}
@@ -132,17 +134,22 @@ export default function Scanner({ onScan }: ScannerProps) {
       <button type="button" onClick={() => void stopScanning()} className="bg-red-600 text-white py-2 px-4 rounded-md">Camera ပိတ်မည်</button>
     </div>}
     {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>}
-    {isScanning && <p className="my-2 text-sm text-center text-gray-600">Code တစ်ခုဖတ်ပြီး အသံကြားလျှင် နောက် product ကို ပြောင်းဖတ်ပါ။ တစ်ခါဖတ်လျှင် တစ်ခုသာထည့်ပါမည်။</p>}
+    {isScanning && <p className="my-2 text-center text-sm text-gray-600">Default အရှေ့ camera ဖြင့်ဖွင့်ထားသည်။ Barcode/QR ကို preview အလယ်ဘက်ထားပါ—အဖြူ box ထဲ တိတိကျကျထည့်စရာမလိုဘဲ full preview ကို scan ဖမ်းပါမည်။</p>}
     {isScanning && <div className="flex flex-wrap items-center gap-2 mb-2">
-      <button type="button" onClick={() => void applyCameraControl({ focusMode: 'single-shot' })} className="border rounded-md px-3 py-2 text-sm bg-white">🎯 ပြန် Focus</button>
-      {canTorch && <button type="button" onClick={() => { const next = !torchOn; setTorchOn(next); void applyCameraControl({ torch: next }) }} className="border rounded-md px-3 py-2 text-sm bg-white">{torchOn ? '🔦 မီးပိတ်' : '🔦 မီးဖွင့်'}</button>}
+      <button type="button" onClick={() => void applyCameraControl({ focusMode: 'single-shot' })} className="inline-flex items-center gap-1.5 rounded-md border bg-white px-3 py-2 text-sm"><Icon name="target" className="h-4 w-4" /> ပြန် Focus</button>
+      {canTorch && <button type="button" onClick={() => { const next = !torchOn; setTorchOn(next); void applyCameraControl({ torch: next }) }} className="inline-flex items-center gap-1.5 rounded-md border bg-white px-3 py-2 text-sm"><Icon name="flash" className="h-4 w-4" />{torchOn ? 'မီးပိတ်' : 'မီးဖွင့်'}</button>}
       {zoomRange && <label className="flex flex-1 min-w-44 items-center gap-2 text-sm">Zoom
         <input aria-label="Camera zoom" type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step} value={zoom} onChange={(event) => { const next = Number(event.target.value); setZoom(next); void applyCameraControl({ zoom: next }) }} className="flex-1" />
       </label>}
     </div>}
-    <div className={`relative mx-auto aspect-square max-h-[360px] w-full max-w-[360px] overflow-hidden rounded-lg bg-black ${isScanning ? '' : 'hidden'}`}>
+    <div className={`relative mx-auto aspect-[4/3] max-h-[360px] w-full max-w-md overflow-hidden rounded-2xl bg-black ${isScanning ? '' : 'hidden'}`}>
       <div id={readerId} />
-      <div className="pointer-events-none absolute inset-3 rounded-xl border-2 border-green-400/80 scanner-frame" />
+      <div className="pointer-events-none absolute inset-4 rounded-2xl border border-white/35" />
+      <div className="pointer-events-none absolute left-6 top-6 h-8 w-8 border-l-4 border-t-4 border-green-300" />
+      <div className="pointer-events-none absolute right-6 top-6 h-8 w-8 border-r-4 border-t-4 border-green-300" />
+      <div className="pointer-events-none absolute bottom-6 left-6 h-8 w-8 border-b-4 border-l-4 border-green-300" />
+      <div className="pointer-events-none absolute bottom-6 right-6 h-8 w-8 border-b-4 border-r-4 border-green-300" />
+      <div className="pointer-events-none absolute inset-x-8 top-1/2 h-0.5 -translate-y-1/2 bg-gradient-to-r from-transparent via-green-300 to-transparent shadow-[0_0_18px_rgba(134,239,172,0.95)]" />
     </div>
   </div>
 }
