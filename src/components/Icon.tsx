@@ -1,4 +1,4 @@
-type IconName = 'scan' | 'bottle' | 'box' | 'cart' | 'products' | 'users' | 'chart' | 'logout'
+type IconName = 'scan' | 'bottle' | 'box' | 'cart' | 'products' | 'users' | 'chart' | 'logout' | 'user' | 'mail' | 'shield' | 'monitor' | 'check' | 'warning'
 
 const paths: Record<IconName, React.ReactNode> = {
   scan: <><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3"/><path d="M7 12h10"/></>,
@@ -9,6 +9,12 @@ const paths: Record<IconName, React.ReactNode> = {
   users: <><circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 2-6 6-6s6 2 6 6M16 5a3 3 0 0 1 0 6M17 14c3 .5 4 2 4 6"/></>,
   chart: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>,
   logout: <><path d="M10 4H4v16h6M14 8l4 4-4 4M8 12h10"/></>,
+  user: <><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.2-6 8-6s6.5 2 8 6"/></>,
+  mail: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></>,
+  shield: <><path d="M12 3 20 6v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6l8-3Z"/><path d="m9 12 2 2 4-5"/></>,
+  monitor: <><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></>,
+  check: <path d="M5 13l4 4L19 7"/>,
+  warning: <><path d="M12 8v5m0 4h.01M4.93 19h14.14c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.2 16c-.77 1.33.19 3 1.73 3Z"/></>,
 }
 
 export default function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {

@@ -5,6 +5,8 @@ import ProductList from '../components/ProductList'
 import ProductForm from '../components/ProductForm'
 import AppHeader from '../components/AppHeader'
 import AppToast, { type ToastMessage } from '../components/AppToast'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { notify } from '../lib/notify'
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([])
@@ -16,16 +18,16 @@ export default function AdminProducts() {
   const [categories, setCategories] = useState<string[]>([])
   const [toast, setToast] = useState<ToastMessage | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
 
   const showToast = useCallback((message: string, type: ToastMessage['type']) => {
-    setToast({ message, type })
-    window.setTimeout(() => setToast(null), 4000)
+    notify(setToast, message, type)
   }, [])
 
   const refreshProducts = useCallback(async (force = false) => {
     if (!force) setIsLoading(true)
     try {
-      const all = force ? await api.getProducts(true) : (await api.getProductsStaleFirst()).products
+      const all = force ? await api.getProducts(true) : (await api.getProductsStaleFirst((fresh) => setProducts(fresh))).products
       setProducts(all)
     } catch (error) {
       showToast(getErrorMessage(error, 'Product data ဆွဲမရပါ။'), 'error')
@@ -98,7 +100,13 @@ export default function AdminProducts() {
   }
 
   const handleDelete = (id: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return
+    setDeleteProductId(id)
+  }
+
+  const confirmDelete = () => {
+    if (!deleteProductId) return
+    const id = deleteProductId
+    setDeleteProductId(null)
     const previous = products
     setProducts((current) => current.filter((product) => product.id !== id))
     showToast('Product delete ကို နောက်ကွယ်မှာ လုပ်နေပါသည်…', 'info')
@@ -173,6 +181,16 @@ export default function AdminProducts() {
           onEdit={handleEdit}
           onDelete={handleDelete}
         />
+
+        {deleteProductId && (
+          <ConfirmDialog
+            title="Delete product?"
+            message="ဒီ product ကို ဖျက်ရန် သေချာပါသလား။ ဖျက်ပြီးလျှင် dashboard data ကို ချက်ချင်း refresh လုပ်ပါမည်။"
+            confirmLabel="Delete"
+            onCancel={() => setDeleteProductId(null)}
+            onConfirm={confirmDelete}
+          />
+        )}
 
         {showForm && (
           <ProductForm
