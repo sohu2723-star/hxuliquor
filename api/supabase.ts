@@ -1,5 +1,4 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { Readable } from 'node:stream'
 
 export const config = { api: { bodyParser: false } }
 
@@ -12,6 +11,12 @@ function getSupabaseOrigin() {
   return configured
     .replace(/\/(?:rest|auth|storage|functions)\/v1\/?$/, '')
     .replace(/\/$/, '')
+}
+
+async function readRequestBody(req: IncomingMessage) {
+  const chunks: Buffer[] = []
+  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  return chunks.length ? Buffer.concat(chunks) : undefined
 }
 
 function sendJson(res: ServerResponse, statusCode: number, value: unknown) {
@@ -31,28 +36,27 @@ export default async function handler(req: ProxyRequest, res: ServerResponse) {
 
   for (const [key, value] of Object.entries(req.headers)) {
     const lower = key.toLowerCase()
-    if (value === undefined || lower === 'host' || lower === 'connection') continue
+    if (value === undefined || lower === 'host' || lower === 'connection' || lower === 'content-length') continue
     headers.set(key, Array.isArray(value) ? value.join(', ') : value)
   }
 
   try {
+    const body = method === 'GET' || method === 'HEAD' ? undefined : await readRequestBody(req)
     const upstream = await fetch(target, {
       method,
       headers,
-      body: method === 'GET' || method === 'HEAD' ? undefined : req as unknown as BodyInit,
-      duplex: 'half',
-    } as RequestInit & { duplex: 'half' })
+      body,
+    })
 
     res.statusCode = upstream.status
     upstream.headers.forEach((value, key) => {
       const lower = key.toLowerCase()
-      if (lower !== 'content-encoding' && lower !== 'transfer-encoding') res.setHeader(key, value)
+      if (lower !== 'content-encoding' && lower !== 'transfer-encoding' && lower !== 'content-length' && lower !== 'connection') {
+        res.setHeader(key, value)
+      }
     })
-    if (!upstream.body) {
-      res.end()
-      return
-    }
-    Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res)
+    const responseBody = await upstream.arrayBuffer()
+    res.end(Buffer.from(responseBody))
   } catch (error) {
     sendJson(res, 502, {
       error: 'Supabase proxy request failed',
@@ -60,3 +64,4 @@ export default async function handler(req: ProxyRequest, res: ServerResponse) {
     })
   }
 }
+
