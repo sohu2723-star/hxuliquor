@@ -12,7 +12,7 @@ export default function AdminEmployees() {
   useEffect(() => {
     void load()
     const initialRefresh = window.setTimeout(() => void load(true), 100)
-    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(true) }, 30000)
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(true) }, 5000)
     return () => { window.clearTimeout(initialRefresh); window.clearInterval(timer) }
   }, [])
 
@@ -38,7 +38,15 @@ export default function AdminEmployees() {
     </form>
     <div className="bg-white shadow rounded-lg divide-y">{employees.map((employee) => <div key={employee.id} className="p-4 flex items-center gap-3">
       <div className="flex-1"><p className="font-medium">{employee.name}</p><p className="text-sm text-gray-500">{employee.email} · {employee.role}</p></div>
-      {employee.role !== 'admin' && <button onClick={async () => { try { setMessage('Removing...'); await api.deleteEmployee(employee.id); setMessage('Employee ဖယ်ရှားပြီးပါပြီ။'); await load() } catch (error) { setMessage(error instanceof Error ? error.message : 'Remove failed') } }} className="text-red-700 px-3 py-2">Remove</button>}
+      {employee.role !== 'admin' && <button onClick={() => {
+        if (!confirm('Remove this employee?')) return
+        const previous = employees
+        setEmployees((current) => current.filter((item) => item.id !== employee.id))
+        setMessage('Employee remove ကို နောက်ကွယ်မှာ လုပ်နေပါသည်…')
+        void api.deleteEmployee(employee.id)
+          .then(() => { setMessage('Employee ဖယ်ရှားပြီးပါပြီ။'); void load(true) })
+          .catch((error) => { setEmployees(previous); setMessage(error instanceof Error ? error.message : 'Remove failed') })
+      }} className="text-red-700 px-3 py-2">Remove</button>}
     </div>)}</div>
   </main></div>
 }

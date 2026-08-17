@@ -46,7 +46,7 @@ export default function AdminProducts() {
   useEffect(() => {
     void refreshProducts()
     void loadCategories()
-    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshProducts(true) }, 10000)
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshProducts(true) }, 5000)
     return () => window.clearInterval(timer)
   }, [refreshProducts, loadCategories])
 
@@ -97,15 +97,17 @@ export default function AdminProducts() {
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!confirm('Are you sure you want to delete this product?')) return
-    try {
-      await api.deleteProduct(id)
-      showToast('Product deleted', 'success')
-      void refreshProducts()
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to delete product', 'error')
-    }
+    const previous = products
+    setProducts((current) => current.filter((product) => product.id !== id))
+    showToast('Product delete ကို နောက်ကွယ်မှာ လုပ်နေပါသည်…', 'info')
+    void api.deleteProduct(id)
+      .then(() => { showToast('Product deleted', 'success'); void refreshProducts(true) })
+      .catch((error) => {
+        setProducts(previous)
+        showToast(error instanceof Error ? error.message : 'Failed to delete product', 'error')
+      })
   }
 
   const handleEdit = (product: Product) => {

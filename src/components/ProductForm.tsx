@@ -25,6 +25,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     saleType: product?.saleType === 'pack' ? 'pack' : 'unit',
     requiresAgeCheck: product?.requiresAgeCheck || false,
   })
+  const [productKind, setProductKind] = useState<'barcode' | 'noBarcode' | 'pack'>(product?.saleType === 'pack' ? 'pack' : product?.barcode ? 'barcode' : 'noBarcode')
   const [imageFile, setImageFile] = useState<File | undefined>()
   const [imagePreview, setImagePreview] = useState<string | null>(product?.imageUrl || null)
   const [isScanning, setIsScanning] = useState(false)
@@ -33,9 +34,20 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
+    if (name === 'barcode') setProductKind(value.trim() ? 'barcode' : 'noBarcode')
+    if (name === 'saleType' && value === 'pack') setProductKind('pack')
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+    }))
+  }
+
+  const selectProductKind = (kind: 'barcode' | 'noBarcode' | 'pack') => {
+    setProductKind(kind)
+    setFormData((prev) => ({
+      ...prev,
+      saleType: kind === 'pack' ? 'pack' : 'unit',
+      ...(kind === 'noBarcode' ? { barcode: '' } : {}),
     }))
   }
 
@@ -57,8 +69,10 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
   const handleScan = (code: string) => {
     const detected = detectProductDetails(code)
+    setProductKind(detected.barcode || code ? 'barcode' : 'noBarcode')
     setFormData((prev) => ({
       ...prev,
+      saleType: 'unit',
       barcode: detected.barcode || code,
       name: detected.name || prev.name,
       productColor: detected.productColor || prev.productColor,
@@ -112,9 +126,9 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             <fieldset className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <legend className="px-1 text-sm font-semibold">Product အမျိုးအစား</legend>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <button type="button" onClick={() => setFormData((prev) => ({ ...prev, saleType: 'unit' }))} className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'unit' && formData.barcode.trim() ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><span className="block font-semibold">Barcode ရှိ Product</span><small>Barcode ထည့်ပြီး scan ရောင်းရန်</small></button>
-                <button type="button" onClick={() => setFormData((prev) => ({ ...prev, saleType: 'unit', barcode: '' }))} className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'unit' && !formData.barcode.trim() ? 'border-slate-500 bg-slate-50 text-slate-800' : 'bg-white'}`}><span className="block font-semibold">Barcode မရှိ Product</span><small>Barcode ကို ကွက်လပ်ထားပါ</small></button>
-                <label className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><input className="sr-only" type="radio" name="saleType" value="pack" checked={formData.saleType === 'pack'} onChange={handleChange} /><span className="block font-semibold">ပါကင်လိုက် Product</span><small>Stock ကို ပါကင်ဖြင့်ထည့်ပါ</small></label>
+                <button type="button" onClick={() => selectProductKind('barcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'barcode' ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><span className="block font-semibold">Barcode ရှိ Product</span><small>Barcode ထည့်ပြီး scan ရောင်းရန်</small></button>
+                <button type="button" onClick={() => selectProductKind('noBarcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'noBarcode' ? 'border-slate-500 bg-slate-50 text-slate-800' : 'bg-white'}`}><span className="block font-semibold">Barcode မရှိ Product</span><small>Barcode ကို ကွက်လပ်ထားပါ</small></button>
+                <button type="button" onClick={() => selectProductKind('pack')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><span className="block font-semibold">ပါကင်လိုက် Product</span><small>Stock ကို ပါကင်ဖြင့်ထည့်ပါ</small></button>
               </div>
               <p className="mt-2 text-xs text-slate-500">Barcode ရှိ/မရှိ အုပ်စုကို Barcode box ဖြည့်ထားခြင်းအလိုက် အလိုအလျောက်ခွဲပါသည်။ ပါကင်လိုက်ကိုရွေးလျှင် သီးသန့်ပါကင်အုပ်စုထဲဝင်ပါမည်။</p>
             </fieldset>
