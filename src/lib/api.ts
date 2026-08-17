@@ -170,7 +170,7 @@ function normalizeSaleItem(value: unknown): SaleItem | null {
     id,
     saleId: asString(value.saleId),
     productId: asString(value.productId),
-    productName: asString(value.productName),
+    productName: asString(value.productName, asString(value.name, 'Unknown product')),
     quantity: asInteger(value.quantity),
     unitPrice: asNumber(value.unitPrice),
     subtotal: asNumber(value.subtotal),

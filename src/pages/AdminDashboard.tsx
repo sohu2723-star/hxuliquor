@@ -55,7 +55,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     void loadDashboard()
     const initialRefresh = window.setTimeout(() => void loadDashboard(true), 100)
-    const timer = window.setInterval(() => void loadDashboard(true), 30000)
+    const timer = window.setInterval(() => void loadDashboard(true), 10000)
     return () => { window.clearTimeout(initialRefresh); window.clearInterval(timer) }
   }, [loadDashboard])
 

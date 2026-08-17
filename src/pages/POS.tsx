@@ -65,7 +65,7 @@ export default function POS() {
     document.addEventListener('visibilitychange', refreshWhenReturning)
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') void loadProducts(true, true)
-    }, 30000)
+    }, 10000)
     return () => {
       document.removeEventListener('visibilitychange', refreshWhenReturning)
       window.clearInterval(timer)

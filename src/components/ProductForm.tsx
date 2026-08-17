@@ -56,7 +56,14 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
   }
 
   const handleScan = (code: string) => {
-    setFormData((prev) => ({ ...prev, barcode: code }))
+    const detected = detectProductDetails(code)
+    setFormData((prev) => ({
+      ...prev,
+      barcode: detected.barcode || code,
+      name: detected.name || prev.name,
+      productColor: detected.productColor || prev.productColor,
+      productSize: detected.productSize || prev.productSize,
+    }))
     setIsScanning(false)
   }
 
@@ -137,7 +144,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   <Scanner onScan={handleScan} />
                 </div>
               )}
-              <p className="mt-1 text-xs text-gray-500">QR မတူလျှင် code အားလုံးကို comma ခြားထည့်ပါ။ အစပိုင်းတူပြီး အဆုံးသာပြောင်းလျှင် တူသောအစနောက်တွင် * ထည့်နိုင်သည် (ဥပမာ ABC123*)။ Code မရှိလျှင် ကွက်လပ်ထားပြီး POS product ပုံကိုနှိပ်ရောင်းနိုင်သည်။</p>
+              <p className="mt-1 text-xs text-gray-500">QR မတူလျှင် code အားလုံးကို comma ခြားထည့်ပါ။ Scan text ထဲတွင် name/color/size/ml ပါလျှင် Product Name, အရောင်, အရွယ်အစားကို အလိုအလျောက်ဖြည့်ပေးပါမည်။ Code မရှိလျှင် ကွက်လပ်ထားပြီး POS product ပုံကိုနှိပ်ရောင်းနိုင်သည်။</p>
             </div>
 
             <div>
@@ -316,4 +323,63 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       </div>
     </div>
   )
+}
+
+
+type DetectedProductDetails = {
+  barcode: string
+  name: string
+  productColor: string
+  productSize: string
+}
+
+const COLOR_WORDS = [
+  'black', 'white', 'red', 'blue', 'green', 'gold', 'golden', 'silver', 'yellow', 'orange', 'pink', 'purple', 'brown', 'gray', 'grey',
+  'အနက်', 'အဖြူ', 'အနီ', 'အပြာ', 'အစိမ်း', 'ရွှေ', 'ငွေ', 'အဝါ', 'လိမ္မော်', 'ပန်းရောင်', 'ခရမ်း', 'အညို', 'မီးခိုး',
+]
+
+function detectProductDetails(rawCode: string): DetectedProductDetails {
+  const raw = String(rawCode || '').trim()
+  const fields = parseScannedFields(raw)
+  const productSize = fields.size || fields.ml || fields.volume || detectSize(raw)
+  const productColor = fields.color || fields.colour || detectColor(raw)
+  const name = fields.name || fields.product || detectName(raw, productColor, productSize)
+  const barcode = fields.barcode || fields.code || fields.qr || (looksLikePlainBarcode(raw) ? raw : '')
+  return { barcode, name, productColor, productSize }
+}
+
+function parseScannedFields(raw: string): Record<string, string> {
+  return raw.split(/[\n|;,]+/).reduce<Record<string, string>>((fields, part) => {
+    const match = part.match(/^\s*([a-zA-Z ]{2,16})\s*[:=\-]\s*(.+?)\s*$/)
+    if (!match) return fields
+    const key = match[1].trim().toLowerCase().replace(/\s+/g, '')
+    fields[key] = match[2].trim()
+    return fields
+  }, {})
+}
+
+function detectSize(raw: string): string {
+  return raw.match(/\b\d+(?:\.\d+)?\s*(?:ml|l|liter|litre|cl)\b/i)?.[0]?.replace(/\s+/g, '') || ''
+}
+
+function detectColor(raw: string): string {
+  const normalized = raw.toLowerCase()
+  return COLOR_WORDS.find((color) => normalized.includes(color.toLowerCase())) || ''
+}
+
+function detectName(raw: string, productColor: string, productSize: string): string {
+  if (looksLikePlainBarcode(raw)) return ''
+  const cleaned = raw
+    .split(/[\n|;,]+/)
+    .filter((part) => !/^\s*(?:barcode|code|qr|color|colour|size|ml|volume)\s*[:=\-]/i.test(part))
+    .join(' ')
+    .replace(productColor, '')
+    .replace(productSize, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return cleaned.length >= 2 ? cleaned.slice(0, 80) : ''
+}
+
+function looksLikePlainBarcode(raw: string): boolean {
+  return /^[0-9A-Z\-\s]{6,}$/i.test(raw) && !/[\n|;,]/.test(raw)
 }

@@ -46,12 +46,15 @@ export default function AdminProducts() {
   useEffect(() => {
     void refreshProducts()
     void loadCategories()
-    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshProducts(true) }, 30000)
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshProducts(true) }, 10000)
     return () => window.clearInterval(timer)
   }, [refreshProducts, loadCategories])
 
   const handleSave = async (productData: Partial<Product> & { imageFile?: File }) => {
-    showToast(editingProduct ? 'Product update ကို နောက်ကွယ်မှာ သိမ်းနေပါသည်…' : 'Product add ကို နောက်ကွယ်မှာ သိမ်းနေပါသည်…', 'info')
+    const savingProduct = editingProduct
+    setShowForm(false)
+    setEditingProduct(null)
+    showToast(savingProduct ? 'Product update ကို နောက်ကွယ်မှာ သိမ်းနေပါသည်…' : 'Product add ကို နောက်ကွယ်မှာ သိမ်းနေပါသည်…', 'info')
     try {
       let imageBase64: string | undefined
       let imageFileName: string | undefined
@@ -78,8 +81,8 @@ export default function AdminProducts() {
         ...(imageBase64 && { imageBase64, imageFileName }),
       }
 
-      if (editingProduct) {
-        const updated = await api.updateProduct({ id: editingProduct.id, ...payload })
+      if (savingProduct) {
+        const updated = await api.updateProduct({ id: savingProduct.id, ...payload })
         setProducts((current) => current.map((item) => item.id === updated.id ? updated : item))
         showToast('Product updated အောင်မြင်ပါသည်', 'success')
       } else {
@@ -88,8 +91,6 @@ export default function AdminProducts() {
         showToast('Product added အောင်မြင်ပါသည်', 'success')
       }
 
-      setShowForm(false)
-      setEditingProduct(null)
       void loadCategories()
     } catch (error) {
       showToast(getErrorMessage(error, 'Product သိမ်းမရပါ။ နာမည်၊ category၊ ဈေး၊ ပုံဖိုင်အရွယ်အစားနှင့် internet connection ကို စစ်ပြီး ထပ်ကြိုးစားပါ။'), 'error')
