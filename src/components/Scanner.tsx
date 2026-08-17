@@ -69,14 +69,9 @@ export default function Scanner({ onScan }: ScannerProps) {
       await scanner.start(
         selected,
         {
-          fps: 30,
-          aspectRatio: 1.777778,
-          qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const width = Math.floor(viewfinderWidth * .96)
-            const height = Math.floor(Math.min(viewfinderHeight * .72, Math.max(220, viewfinderHeight * .62)))
-            return { width, height }
-          },
-          videoConstraints: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          fps: 24,
+          aspectRatio: 1.333334,
+          videoConstraints: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 960 } },
         },
         (rawCode) => {
           const code = rawCode.trim()
@@ -95,18 +90,17 @@ export default function Scanner({ onScan }: ScannerProps) {
       const capabilities = scanner.getRunningTrackCapabilities() as ExtendedCapabilities
       const focusMode = capabilities.focusMode?.includes('continuous') ? 'continuous' : capabilities.focusMode?.includes('single-shot') ? 'single-shot' : undefined
       const zoomCapability = capabilities.zoom
-      const initialZoom = zoomCapability ? Math.min(zoomCapability.max, Math.max(zoomCapability.min, 3)) : undefined
+      const initialZoom = zoomCapability ? zoomCapability.min : undefined
       const advanced = [{ ...(focusMode && { focusMode }), ...(initialZoom !== undefined && { zoom: initialZoom }) }]
       try {
         await scanner.applyVideoConstraints({
-          width: { ideal: 1920 }, height: { ideal: 1080 },
           ...(advanced[0].focusMode || advanced[0].zoom !== undefined ? { advanced } : {}),
         } as ExtendedConstraints)
       } catch { /* Some browsers report capabilities but reject constraints. */ }
-      if (focusMode) {
+      if (capabilities.focusMode?.includes('single-shot')) {
         focusTimer.current = window.setInterval(() => {
-          void applyCameraControl({ focusMode: capabilities.focusMode?.includes('single-shot') ? 'single-shot' : focusMode }, true)
-        }, 1600)
+          void applyCameraControl({ focusMode: 'single-shot' }, true)
+        }, 1800)
       }
       setCanTorch(capabilities.torch === true)
       if (zoomCapability) {
@@ -140,7 +134,7 @@ export default function Scanner({ onScan }: ScannerProps) {
       <button type="button" onClick={() => void stopScanning()} className="bg-red-600 text-white py-2 px-4 rounded-md">Camera ပိတ်မည်</button>
     </div>}
     {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>}
-    {isScanning && <p className="my-2 text-center text-sm text-gray-600">Camera ကို barcode/QR ဆီ ချိန်ထားရုံပါပဲ။ အဖြူလေးထောင့်အတွင်း တိတိကျကျဝင်အောင် လိုက်ချိန်စရာမလိုအောင် scan area ကိုကျယ်ပြီး live focus ပြန်ဖမ်းပေးထားပါသည်။</p>}
+    {isScanning && <p className="my-2 text-center text-sm text-gray-600">Default အရှေ့ camera ဖြင့်ဖွင့်ထားသည်။ Barcode/QR ကို preview အလယ်ဘက်ထားပါ—အဖြူ box ထဲ တိတိကျကျထည့်စရာမလိုဘဲ full preview ကို scan ဖမ်းပါမည်။</p>}
     {isScanning && <div className="flex flex-wrap items-center gap-2 mb-2">
       <button type="button" onClick={() => void applyCameraControl({ focusMode: 'single-shot' })} className="inline-flex items-center gap-1.5 rounded-md border bg-white px-3 py-2 text-sm"><Icon name="target" className="h-4 w-4" /> ပြန် Focus</button>
       {canTorch && <button type="button" onClick={() => { const next = !torchOn; setTorchOn(next); void applyCameraControl({ torch: next }) }} className="inline-flex items-center gap-1.5 rounded-md border bg-white px-3 py-2 text-sm"><Icon name="flash" className="h-4 w-4" />{torchOn ? 'မီးပိတ်' : 'မီးဖွင့်'}</button>}
@@ -148,9 +142,13 @@ export default function Scanner({ onScan }: ScannerProps) {
         <input aria-label="Camera zoom" type="range" min={zoomRange.min} max={zoomRange.max} step={zoomRange.step} value={zoom} onChange={(event) => { const next = Number(event.target.value); setZoom(next); void applyCameraControl({ zoom: next }) }} className="flex-1" />
       </label>}
     </div>}
-    <div className={`relative mx-auto aspect-video max-h-[360px] w-full max-w-xl overflow-hidden rounded-2xl bg-black ${isScanning ? '' : 'hidden'}`}>
+    <div className={`relative mx-auto aspect-[4/3] max-h-[360px] w-full max-w-md overflow-hidden rounded-2xl bg-black ${isScanning ? '' : 'hidden'}`}>
       <div id={readerId} />
-      <div className="pointer-events-none absolute inset-x-3 top-1/2 h-[72%] -translate-y-1/2 rounded-3xl border-2 border-white/80 shadow-[0_0_0_999px_rgba(15,23,42,0.20)] scanner-frame" />
+      <div className="pointer-events-none absolute inset-4 rounded-2xl border border-white/35" />
+      <div className="pointer-events-none absolute left-6 top-6 h-8 w-8 border-l-4 border-t-4 border-green-300" />
+      <div className="pointer-events-none absolute right-6 top-6 h-8 w-8 border-r-4 border-t-4 border-green-300" />
+      <div className="pointer-events-none absolute bottom-6 left-6 h-8 w-8 border-b-4 border-l-4 border-green-300" />
+      <div className="pointer-events-none absolute bottom-6 right-6 h-8 w-8 border-b-4 border-r-4 border-green-300" />
       <div className="pointer-events-none absolute inset-x-8 top-1/2 h-0.5 -translate-y-1/2 bg-gradient-to-r from-transparent via-green-300 to-transparent shadow-[0_0_18px_rgba(134,239,172,0.95)]" />
     </div>
   </div>
