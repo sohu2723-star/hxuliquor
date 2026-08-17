@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { Readable } from 'node:stream'
 
 export const config = { api: { bodyParser: false } }
 
@@ -47,7 +48,11 @@ export default async function handler(req: ProxyRequest, res: ServerResponse) {
       const lower = key.toLowerCase()
       if (lower !== 'content-encoding' && lower !== 'transfer-encoding') res.setHeader(key, value)
     })
-    res.end(Buffer.from(await upstream.arrayBuffer()))
+    if (!upstream.body) {
+      res.end()
+      return
+    }
+    Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res)
   } catch (error) {
     sendJson(res, 502, {
       error: 'Supabase proxy request failed',
