@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import AppHeader from '../components/AppHeader'
-import AppToast, { type ToastMessage } from '../components/AppToast'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { api, type User } from '../lib/api'
-import { notify } from '../lib/notify'
+import { useToast } from '../contexts/ToastContext'
 
 export default function AdminEmployees() {
   const [employees, setEmployees] = useState<User[]>([])
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [toast, setToast] = useState<ToastMessage | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [removeEmployee, setRemoveEmployee] = useState<User | null>(null)
 
-  const showToast = useCallback((message: string, type: ToastMessage['type']) => notify(setToast, message, type), [])
+  const { showToast } = useToast()
   const load = useCallback((force = false) => api.getEmployees(force).then((fresh) => setEmployees((current) => JSON.stringify(current) === JSON.stringify(fresh) ? current : fresh)).catch((e: unknown) => { if (!force) showToast(e instanceof Error ? e.message : 'Employee data ဆွဲမရပါ။', 'error') }), [showToast])
 
   useEffect(() => {
@@ -49,7 +47,7 @@ export default function AdminEmployees() {
       .catch((error) => { setEmployees(previous); showToast(error instanceof Error ? error.message : 'Remove failed', 'error') })
   }
 
-  return <div className="min-h-screen bg-gray-100"><AppHeader /><AppToast toast={toast} /><main className="max-w-3xl mx-auto p-4 lg:p-6">
+  return <div className="min-h-screen bg-gray-100"><AppHeader /><main className="max-w-3xl mx-auto p-4 lg:p-6">
     <h1 className="text-2xl font-bold">Employee Accounts</h1>
     <p className="text-gray-600 mt-1 mb-5">ဝန်ထမ်း၏ Google email ကို အရင်ထည့်ပါ။ Employee သည် အဲဒီ account ဖြင့် login ဝင်ပြီး Scan / Sale သာလုပ်နိုင်မည်။</p>
     <form onSubmit={add} className="bg-white shadow rounded-lg p-4 grid sm:grid-cols-3 gap-3 mb-5">

@@ -8,7 +8,7 @@ import AppHeader from '../components/AppHeader'
 import Scanner from '../components/Scanner'
 import Icon from '../components/Icon'
 import ReceiptLogo from '../components/ReceiptLogo'
-import AppToast, { type ToastMessage } from '../components/AppToast'
+import { useToast } from '../contexts/ToastContext'
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
@@ -18,7 +18,6 @@ export default function POS() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [searchResults, setSearchResults] = useState<Product[]>([])
   const [isSearching, setIsSearching] = useState(false)
-  const [toast, setToast] = useState<ToastMessage | null>(null)
   const [showCheckout, setShowCheckout] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
@@ -26,10 +25,7 @@ export default function POS() {
   const lastHandledScan = useRef({ code: '', time: 0 })
   const productsRefreshing = useRef(false)
 
-  const showToast = useCallback((message: string, type: ToastMessage['type']) => {
-    setToast({ message, type })
-    window.setTimeout(() => setToast(null), 3000)
-  }, [])
+  const { showToast } = useToast()
 
   const loadProducts = useCallback(async (forceRefresh = false, quiet = false) => {
     if (productsRefreshing.current) return
@@ -198,8 +194,6 @@ export default function POS() {
           </div>
         )
       })()}
-      <AppToast toast={toast} />
-
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
 

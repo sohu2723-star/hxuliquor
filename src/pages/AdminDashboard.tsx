@@ -2,9 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import { api, type Product, type Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
-import AppToast, { type ToastMessage } from '../components/AppToast'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { notify } from '../lib/notify'
+import { useToast } from '../contexts/ToastContext'
 
 const MYANMAR_TIME_ZONE = 'Asia/Yangon'
 
@@ -32,13 +31,10 @@ export default function AdminDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(currentMyanmarMonth)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState<ToastMessage | null>(null)
   const [confirmCredit, setConfirmCredit] = useState<Sale | null>(null)
   const loadingRef = useRef(false)
 
-  const showToast = useCallback((message: string, type: ToastMessage['type']) => {
-    notify(setToast, message, type)
-  }, [])
+  const { showToast } = useToast()
 
   const loadDashboard = useCallback(async (quiet = false) => {
     if (loadingRef.current || document.visibilityState === 'hidden') return
@@ -136,7 +132,6 @@ export default function AdminDashboard() {
 
   return <div className="min-h-screen bg-slate-50">
     <AppHeader />
-    <AppToast toast={toast} />
     <main className="max-w-5xl mx-auto p-4 lg:p-6">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><h1 className="text-2xl font-bold">Income & Stock Dashboard</h1><p className="text-sm text-slate-500">Daily စာရင်းကို မြန်မာစံတော်ချိန် (UTC+6:30) ဖြင့်တွက်ထားပါသည်။</p></div>

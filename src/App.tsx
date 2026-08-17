@@ -6,6 +6,7 @@ import AdminProducts from './pages/AdminProducts'
 import AdminEmployees from './pages/AdminEmployees'
 import AdminDashboard from './pages/AdminDashboard'
 import LoadingSpinner from './components/LoadingSpinner'
+import { ToastProvider } from './contexts/ToastContext'
 
 function ProtectedRoute({ children, adminOnly = false }: { children: React.JSX.Element; adminOnly?: boolean }) {
   const { user, isLoading } = useAuth()
@@ -31,6 +32,7 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.JSX.E
 
 function App() {
   return (
+    <ToastProvider>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route
@@ -59,6 +61,7 @@ function App() {
       />
       <Route path="/" element={<Navigate to="/pos" replace />} />
     </Routes>
+    </ToastProvider>
   )
 }
 

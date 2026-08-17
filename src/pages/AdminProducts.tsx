@@ -4,9 +4,8 @@ import type { Product } from '../lib/api'
 import ProductList from '../components/ProductList'
 import ProductForm from '../components/ProductForm'
 import AppHeader from '../components/AppHeader'
-import AppToast, { type ToastMessage } from '../components/AppToast'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { notify } from '../lib/notify'
+import { useToast } from '../contexts/ToastContext'
 
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([])
@@ -16,13 +15,10 @@ export default function AdminProducts() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [productGroup, setProductGroup] = useState<ProductGroup>('all')
   const [categories, setCategories] = useState<string[]>([])
-  const [toast, setToast] = useState<ToastMessage | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
 
-  const showToast = useCallback((message: string, type: ToastMessage['type']) => {
-    notify(setToast, message, type)
-  }, [])
+  const { showToast } = useToast()
 
   const refreshProducts = useCallback(async (force = false) => {
     if (!force) setIsLoading(true)
@@ -134,8 +130,6 @@ export default function AdminProducts() {
     <div className="min-h-screen bg-slate-50">
       <AppHeader />
       <main className="p-4 lg:p-6">
-      <AppToast toast={toast} />
-
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-2xl font-bold">Product Management</h1>
