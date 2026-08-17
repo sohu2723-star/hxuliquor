@@ -32,10 +32,10 @@ export default function Login() {
     setIsSubmitting(false)
   }
 
-  const handleRetryLogin = () => {
-    if (lastIdTokenRef.current) {
-      void handleGoogleSuccess(lastIdTokenRef.current)
-    }
+    const handleRetryLogin = () => {
+    // Clear stale token — user gets fresh Google credential
+    lastIdTokenRef.current = ''
+    setError('')
   }
 
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
