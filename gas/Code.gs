@@ -684,7 +684,7 @@ function addProduct(params) {
   if (!name || !category) return { success: false, message: 'Product name နှင့် category လိုအပ်ပါသည်။' };
 
   const incomingStock = integerValue(params.stockQty);
-  const saleType = ['unit', 'pack'].includes(text(params.saleType)) ? text(params.saleType) : 'both';
+  const saleType = ['unit', 'pack', 'both'].includes(text(params.saleType)) ? text(params.saleType) : 'both';
   const products = sheetToObjects(sheet);
   const barcodeMatch = barcode ? products.find(p => getProductByBarcodeMatch(text(p.barcode), barcode)) : null;
   const nameMatch = products.find(p => !barcode && text(p.name).toLowerCase() === name.toLowerCase() && text(p.category).toLowerCase() === category.toLowerCase() && text(p.productColor).toLowerCase() === productColor.toLowerCase() && text(p.productSize).toLowerCase() === productSize.toLowerCase() && text(p.saleType, 'both') === saleType);
@@ -767,7 +767,7 @@ function updateProduct(params) {
     lowStockThreshold: params.lowStockThreshold === undefined ? integerValue(current.lowStockThreshold) : integerValue(params.lowStockThreshold),
     unitsPerPack: params.unitsPerPack === undefined ? Math.max(1, integerValue(current.unitsPerPack, 1)) : Math.max(1, integerValue(params.unitsPerPack, 1)),
     packPrice: params.packPrice === undefined ? numberValue(current.packPrice) : numberValue(params.packPrice),
-    saleType: params.saleType === undefined ? text(current.saleType, 'both') : (['unit', 'pack'].includes(text(params.saleType)) ? text(params.saleType) : 'both'),
+    saleType: params.saleType === undefined ? text(current.saleType, 'both') : (['unit', 'pack', 'both'].includes(text(params.saleType)) ? text(params.saleType) : 'both'),
     requiresAgeCheck: params.requiresAgeCheck === undefined ? booleanValue(current.requiresAgeCheck) : booleanValue(params.requiresAgeCheck),
     imageUrl: imageUrl,
     createdAt: text(current.createdAt, new Date().toISOString())
