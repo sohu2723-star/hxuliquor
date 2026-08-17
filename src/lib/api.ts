@@ -354,8 +354,8 @@ export const api = {
     return normalizeUser(data)
   },
 
-  async signInWithGoogle(): Promise<void> {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/login` } })
+  async signInWithGoogle(idToken: string): Promise<void> {
+    const { error } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken })
     if (error) throwDatabaseError(error)
   },
 

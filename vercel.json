@@ -5,6 +5,10 @@
     { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] }
   ],
   "rewrites": [
+    { "source": "/api/supabase/auth/v1/:path*", "destination": "https://zgiixmeanpevvdrcizfh.supabase.co/auth/v1/:path*" },
+    { "source": "/api/supabase/rest/v1/:path*", "destination": "https://zgiixmeanpevvdrcizfh.supabase.co/rest/v1/:path*" },
+    { "source": "/api/supabase/storage/v1/:path*", "destination": "https://zgiixmeanpevvdrcizfh.supabase.co/storage/v1/:path*" },
+    { "source": "/api/supabase/functions/v1/:path*", "destination": "https://zgiixmeanpevvdrcizfh.supabase.co/functions/v1/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

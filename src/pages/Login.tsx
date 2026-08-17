@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ReceiptLogo from '../components/ReceiptLogo'
+import GoogleSignInButton from '../components/GoogleSignInButton'
 import { useToast } from '../contexts/ToastContext'
 
 export default function Login() {
@@ -27,17 +28,22 @@ export default function Login() {
     return () => window.clearTimeout(timer)
   }, [location.state, navigate, showToast, user])
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleLogin = async (idToken: string) => {
     setError('')
     setIsSubmitting(true)
     try {
-      await signInWithGoogle()
+      await signInWithGoogle(idToken)
       const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/pos'
       navigate(destination)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Google login failed')
       setIsSubmitting(false)
     }
+  }
+
+  const handleGoogleError = (message: string) => {
+    setError(message)
+    setIsSubmitting(false)
   }
 
   if (isLoading) {
@@ -55,10 +61,9 @@ export default function Login() {
 
         {error && <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"><p>{error}</p><p className="mt-1 text-xs font-semibold text-red-600">Supabase Google OAuth configuration နှင့် Internet connection ကို စစ်ပြီး Retry ပြန်လုပ်ပါ။</p></div>}
 
-        <button type="button" onClick={() => void handleGoogleLogin()} disabled={isSubmitting} className="flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
-          {isSubmitting ? <LoadingSpinner className="h-5 w-5" /> : <span className="text-lg font-black text-blue-600">G</span>}
-          {isSubmitting ? 'Signing in...' : 'Continue with Google'}
-        </button>
+        <div className="min-h-12 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          {isSubmitting ? <div className="flex items-center justify-center gap-3 py-1 text-sm font-bold text-slate-600"><LoadingSpinner className="h-5 w-5" />Signing in...</div> : <GoogleSignInButton clientId="524254578493-9ce8ttte7c63hjo61rn9seo2m6jpfbjb.apps.googleusercontent.com" onSuccess={(idToken) => { void handleGoogleLogin(idToken) }} onError={handleGoogleError} />}
+        </div>
       </div>
     </div>
   )

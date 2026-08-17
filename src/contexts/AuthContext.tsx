@@ -5,7 +5,7 @@ import type { User } from '../lib/api'
 
 interface AuthContextType {
   user: User | null
-  signInWithGoogle: () => Promise<void>
+  signInWithGoogle: (idToken: string) => Promise<void>
   logout: () => Promise<void>
   isLoading: boolean
   authError: string
@@ -94,9 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(timer)
   }, [user])
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (idToken: string) => {
     setAuthError('')
-    await api.signInWithGoogle()
+    await api.signInWithGoogle(idToken)
   }
 
   const logout = async () => {
