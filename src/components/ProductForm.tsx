@@ -223,7 +223,6 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 <input type="text" name="productSize" value={formData.productSize} onChange={handleChange} placeholder="ဥပမာ 500ml, 1L, Small" className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
             </div>
-            <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">Barcode မရှိသော product များအတွက် camera OCR မဟုတ်ဘဲ QR text ထဲတွင် product name / color / size ပါအောင်ထည့်ပါ။ POS scan သည် ထို text များနှင့် fallback match လုပ်ပါမည်။</p>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
@@ -258,7 +257,6 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
             {formData.saleType !== 'unit' && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
               <h3 className="font-semibold text-slate-900">ပါကင် Product အချက်အလက်</h3>
-              <p className="mb-3 mt-1 text-xs text-slate-600">ပါကင်သီးသန့်ဆို Stock Quantity ({stockUnitLabel}) တွင် ပါကင်အရေအတွက်၊ Cost/Price တွင် တစ်ပါကင်နှုန်း ထည့်ပါ။ ပါကင် + တစ်ခုချင်းဆို Stock Quantity ({stockUnitLabel}) တွင် အတွင်းပါ အသေးဆုံး unit စုစုပေါင်း ထည့်ပါ (ဥပမာ 10 ပါကင် × 12 ခု = 120)။</p>
               <div className="flex flex-col">
                 <label className="flex h-14 flex-col text-sm font-medium leading-5 text-gray-700">တစ်ပါကင်ပါဝင်မှု
                   <input type="number" name="unitsPerPack" min="2" value={formData.unitsPerPack} onChange={handleChange} required className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
@@ -269,7 +267,6 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   <input type="number" name="packPrice" value={formData.packPrice} onChange={handleChange} required step="0.01" className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </label>
               </div>}
-              <p className="mt-3 rounded-lg bg-white p-3 text-xs text-violet-800">Small unit ကို သီးသန့် field မထည့်ပါနှင့် — Stock Quantity ({stockUnitLabel}) ကို အမြဲ အသေးဆုံးရောင်းမည့် unit ဖြင့်ထည့်ပါ။ ဥပမာ carton/ဘူး/အလိပ်ဆို အလိပ်ကို smallest unit အဖြစ် stock ထားပြီး packPrice တွင် carton/bundle ဈေးထည့်ပါ။ ပါကင်နှင့်တစ်ခုချင်း profit မတူနိုင်သောကြောင့် အောက်တွင် preview ပြထားပါသည်။</p>
             </div>}
 
             <div className="grid grid-cols-2 gap-4">
@@ -305,7 +302,6 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               <p>ရင်းနှီးမှု ခန့်မှန်းချက်: {stockQtyValue} × {costPriceValue.toLocaleString()} = {inventoryCostPreview.toLocaleString()} Ks</p>
               {formData.saleType !== 'pack' && <p>တစ်ခုချင်း အမြတ်: {(unitProfitPreview || 0).toLocaleString()} Ks / unit</p>}
               {formData.saleType !== 'unit' && <p>ပါကင် အမြတ်: {(packProfitPreview || 0).toLocaleString()} Ks / pack</p>}
-              <p className="mt-1 text-emerald-800">ရောင်းပြီး checkout လုပ်လျှင် stock နှင့် ဆိုင်ထဲရင်းနှီးမှု amount အလိုအလျောက်လျော့ပါမည်။ Product ထပ်ထည့်လျှင် existing product ဖြစ်ပါက stock ကို ပေါင်းထည့်ပါမည်။</p>
             </div>
 
             <div className="flex items-center">
