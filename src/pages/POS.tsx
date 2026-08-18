@@ -10,6 +10,8 @@ import Icon from '../components/Icon'
 import ReceiptLogo from '../components/ReceiptLogo'
 import { useToast } from '../contexts/ToastContext'
 
+const WELCOME_SESSION_KEY = 'hxu_show_welcome'
+
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<{ product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]>([])
@@ -20,10 +22,18 @@ export default function POS() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
+  const [welcomeOpen, setWelcomeOpen] = useState(() => window.sessionStorage.getItem(WELCOME_SESSION_KEY) === '1')
   const lastHandledScan = useRef({ code: '', time: 0 })
   const productsRefreshing = useRef(false)
 
   const { showToast } = useToast()
+
+  useEffect(() => {
+    if (!welcomeOpen) return
+    window.sessionStorage.removeItem(WELCOME_SESSION_KEY)
+    const timer = window.setTimeout(() => setWelcomeOpen(false), 2500)
+    return () => window.clearTimeout(timer)
+  }, [welcomeOpen])
 
   const loadProducts = useCallback(async (forceRefresh = false, quiet = false) => {
     if (productsRefreshing.current) return
@@ -168,6 +178,13 @@ export default function POS() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      {welcomeOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-live="polite" aria-modal="true" aria-label="Welcome">
+        <div className="relative w-full max-w-sm rounded-3xl bg-white px-8 py-10 text-center shadow-2xl ring-1 ring-white/70">
+          <button type="button" onClick={() => setWelcomeOpen(false)} className="absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" /></svg></button>
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><svg viewBox="0 0 24 24" className="h-12 w-12" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path strokeLinecap="round" strokeLinejoin="round" d="m8 12 2.5 2.5L16.5 9" /></svg></div>
+          <h2 className="mt-5 text-2xl font-extrabold text-slate-950">Welcome</h2>
+        </div>
+      </div>}
       <AppHeader />
       {(() => {
         const lowStock = products.filter((p) => p.stockQty <= p.lowStockThreshold)

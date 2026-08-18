@@ -4,7 +4,6 @@ import { api, type Product, type Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 
 const MYANMAR_TIME_ZONE = 'Asia/Yangon'
-const WELCOME_SESSION_KEY = 'hxu_show_welcome'
 
 function myanmarDate(date: Date | string) {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -30,12 +29,7 @@ export default function AdminDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(currentMyanmarMonth)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
-  const [welcomeOpen, setWelcomeOpen] = useState(() => window.sessionStorage.getItem(WELCOME_SESSION_KEY) === '1')
   const loadingRef = useRef(false)
-
-  useEffect(() => {
-    window.sessionStorage.removeItem(WELCOME_SESSION_KEY)
-  }, [])
 
   const loadDashboard = useCallback(async (quiet = false) => {
     if (loadingRef.current || document.visibilityState === 'hidden') return
@@ -116,13 +110,6 @@ export default function AdminDashboard() {
   )
 
   return <div className="min-h-screen bg-slate-50">
-    {welcomeOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-modal="true" aria-label="Welcome">
-      <div className="relative w-full max-w-sm rounded-3xl bg-white px-8 py-10 text-center shadow-2xl ring-1 ring-white/70">
-        <button type="button" onClick={() => setWelcomeOpen(false)} className="absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" /></svg></button>
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><svg viewBox="0 0 24 24" className="h-12 w-12" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path strokeLinecap="round" strokeLinejoin="round" d="m8 12 2.5 2.5L16.5 9" /></svg></div>
-        <h2 className="mt-5 text-2xl font-extrabold text-slate-950">Welcome</h2>
-      </div>
-    </div>}
     <AppHeader />
     <main className="max-w-5xl mx-auto p-4 lg:p-6">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
