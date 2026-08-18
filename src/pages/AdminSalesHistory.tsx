@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import { api, type Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
+import { downloadReceipt } from '../lib/receiptDownload'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useToast } from '../contexts/ToastContext'
 import { useActionLoading } from '../contexts/ActionLoadingContext'
@@ -25,7 +26,7 @@ export default function AdminSalesHistory() {
   const [printedReceiptIds, setPrintedReceiptIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { showToast } = useToast()
   const { isLoading: isActionLoading, runWithLoading } = useActionLoading()
 
@@ -71,6 +72,20 @@ export default function AdminSalesHistory() {
     if (success) showToast(`${t('refresh')} ${t('done')}`, 'success')
   }
 
+  const handleDownloadStoredReceipt = async (sale: Sale) => {
+    try {
+      const storedReceipt = await api.getPrintedReceipt(sale.id)
+      if (!storedReceipt) {
+        showToast(t('receiptDownloadError'), 'error')
+        return
+      }
+      downloadReceipt(storedReceipt, language)
+      showToast(t('receiptDownloaded'), 'success')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : t('receiptDownloadError'), 'error')
+    }
+  }
+
   const total = sales.reduce((sum, sale) => sum + sale.totalAmount, 0)
   const paid = sales.reduce((sum, sale) => sum + sale.paidAmount, 0)
   const credit = sales.reduce((sum, sale) => sum + sale.balanceDue, 0)
@@ -94,7 +109,7 @@ export default function AdminSalesHistory() {
       {loading ? <div className="surface-card p-8 text-center text-slate-500">{t('loading')}</div> : <section className="surface-card p-5">
         <div className="divide-y">{sales.length ? sales.map((sale) => <details key={sale.id} className="py-4 first:pt-0 last:pb-0">
           <summary className="flex cursor-pointer list-none flex-wrap justify-between gap-3"><span><b>{new Date(sale.createdAt).toLocaleString('en-GB', { timeZone: MYANMAR_TIME_ZONE })}</b><small className="mt-1 block text-slate-500">{sale.cashierName} · {sale.cashierEmail}{sale.customerName ? ` · ${t('customer')}: ${sale.customerName}` : ''}{printedReceiptIds.has(sale.id) ? ` · ${t('printedReceipt')}` : ''}</small></span><span className="text-right"><b>{formatCurrency(sale.totalAmount)}</b><small className={`mt-1 block ${sale.balanceDue ? 'text-amber-700' : 'text-emerald-700'}`}>{sale.balanceDue ? `${t('outstanding')} ${formatCurrency(sale.balanceDue)}` : t('paid')}</small></span></summary>
-          <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm">{sale.items.map((item) => <div key={item.id} className="flex justify-between gap-3 border-b border-slate-200 py-2 last:border-0"><span>{item.productName} · {item.saleUnit === 'pack' ? t('pack') : t('unit')} × {item.saleQuantity}</span><span className="shrink-0 font-semibold">{formatCurrency(item.subtotal)}</span></div>)}</div>
+          <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm">{sale.items.map((item) => <div key={item.id} className="flex justify-between gap-3 border-b border-slate-200 py-2 last:border-0"><span>{item.productName} · {item.saleUnit === 'pack' ? t('pack') : t('unit')} × {item.saleQuantity}</span><span className="shrink-0 font-semibold">{formatCurrency(item.subtotal)}</span></div>)}{printedReceiptIds.has(sale.id) && <button type="button" onClick={() => void handleDownloadStoredReceipt(sale)} className="mt-3 w-full rounded-lg bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-800 ring-1 ring-violet-200 hover:bg-violet-100">{t('downloadReceipt')}</button>}</div>
         </details>) : <p className="py-6 text-center text-slate-500">{t('noSalesThisMonth')}</p>}</div>
       </section>}
     </main>

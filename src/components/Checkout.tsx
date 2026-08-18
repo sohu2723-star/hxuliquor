@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../lib/api'
 import type { Product, Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
@@ -17,32 +17,78 @@ type PaymentMethod = 'Cash' | 'Card' | 'Mobile Wallet' | 'Credit'
 
 const CHECKOUT_DRAFT_KEY = 'hxu-checkout-draft'
 
+function readDraft() {
+  try {
+    const value = JSON.parse(localStorage.getItem(CHECKOUT_DRAFT_KEY) || 'null')
+    return value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  } catch {
+    return {}
+  }
+}
+
+function numericValue(value: string) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0
+}
+
 export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, onError }: CheckoutProps) {
-  const [ageVerified, setAgeVerified] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(CHECKOUT_DRAFT_KEY) || 'null')?.ageVerified === true } catch { return false }
-  })
+  const draft = readDraft()
+  const [ageVerified, setAgeVerified] = useState(draft.ageVerified === true)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(() => {
-    try {
-      const value = JSON.parse(localStorage.getItem(CHECKOUT_DRAFT_KEY) || 'null')?.paymentMethod
-      return value === 'Card' || value === 'Mobile Wallet' || value === 'Credit' ? value : 'Cash'
-    } catch { return 'Cash' }
+    const value = draft.paymentMethod
+    return value === 'Card' || value === 'Mobile Wallet' || value === 'Credit' ? value : 'Cash'
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [customerName, setCustomerName] = useState(() => {
-    try { return String(JSON.parse(localStorage.getItem(CHECKOUT_DRAFT_KEY) || 'null')?.customerName || '') } catch { return '' }
-  })
+  const [customerName, setCustomerName] = useState(String(draft.customerName || ''))
+  const [initialPaidAmount, setInitialPaidAmount] = useState(String(draft.initialPaidAmount || '0'))
+  const [depositBalance, setDepositBalance] = useState(0)
+  const [depositLoading, setDepositLoading] = useState(false)
   const { runWithLoading } = useActionLoading()
   const { t } = useLanguage()
 
   useEffect(() => {
-    try { localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({ ageVerified, paymentMethod, customerName })) } catch { /* storage unavailable */ }
-  }, [ageVerified, paymentMethod, customerName])
+    try {
+      localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({ ageVerified, paymentMethod, customerName, initialPaidAmount }))
+    } catch { /* storage unavailable */ }
+  }, [ageVerified, paymentMethod, customerName, initialPaidAmount])
 
-  const total = cart.reduce(
+  const total = useMemo(() => cart.reduce(
     (sum, item) => sum + (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity,
     0
-  )
+  ), [cart])
+  const paidNow = numericValue(initialPaidAmount)
+  const depositApplied = Math.min(depositBalance, Math.max(total - paidNow, 0))
+  const balanceDue = Math.max(total - paidNow - depositApplied, 0)
+
+  useEffect(() => {
+    if (paymentMethod !== 'Credit' || !customerName.trim()) {
+      setDepositBalance(0)
+      setDepositLoading(false)
+      return
+    }
+
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      setDepositLoading(true)
+      try {
+        const balances = await api.getCustomerBalances()
+        if (cancelled) return
+        const normalized = customerName.trim().toLocaleLowerCase()
+        const customer = balances.find((item) => item.customerName.trim().toLocaleLowerCase() === normalized)
+        setDepositBalance(customer?.depositBalance || 0)
+      } catch {
+        if (!cancelled) setDepositBalance(0)
+      } finally {
+        if (!cancelled) setDepositLoading(false)
+      }
+    }, 350)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [customerName, paymentMethod])
 
   const handleSubmit = async () => {
     if (requiresAgeCheck && !ageVerified) {
@@ -50,28 +96,27 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
       return
     }
 
-    setIsSubmitting(true)
     setError('')
-
-    const user = JSON.parse(localStorage.getItem('minimart-pos-user') || '{}')
     if (paymentMethod === 'Credit' && !customerName.trim()) {
       setError(t('creditCustomerRequired'))
-      setIsSubmitting(false)
+      return
+    }
+    if (paymentMethod === 'Credit' && paidNow > total) {
+      setError(t('partialPaymentTooHigh'))
       return
     }
 
+    setIsSubmitting(true)
+    const user = JSON.parse(localStorage.getItem('minimart-pos-user') || '{}')
     const payload = {
       cashierId: user.id || 'unknown',
       cashierName: user.name || 'Cashier',
-      items: cart.map((item) => ({
-        productId: item.product.id,
-        quantity: item.quantity,
-        saleUnit: item.saleUnit,
-      })),
+      items: cart.map((item) => ({ productId: item.product.id, quantity: item.quantity, saleUnit: item.saleUnit })),
       ageVerified: requiresAgeCheck ? ageVerified : true,
       paymentMethod,
       isCredit: paymentMethod === 'Credit',
       customerName: customerName.trim(),
+      initialPaidAmount: paymentMethod === 'Credit' ? paidNow : undefined,
     }
 
     try {
@@ -89,98 +134,72 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white shadow-xl">
         <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
+          <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-bold">{t('checkout')}</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-2xl"
-            >
-              ×
-            </button>
+            <button onClick={onClose} className="text-2xl text-gray-500 hover:text-gray-700" aria-label={t('close')}>×</button>
           </div>
 
           <div className="space-y-4">
-            <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="font-semibold mb-2">{t('items')}</h3>
+            <div className="rounded-md bg-gray-50 p-4">
+              <h3 className="mb-2 font-semibold">{t('items')}</h3>
               {cart.map(({ product, quantity, saleUnit }) => (
-                <div key={`${product.id}-${saleUnit}`} className="flex justify-between text-sm mb-1">
-                  <span>
-                    {product.name} ({saleUnit === 'pack' ? (product.saleType === 'pack' ? t('pack') : `${t('pack')} × ${product.unitsPerPack}`) : t('unit')}) × {quantity}
-                  </span>
+                <div key={`${product.id}-${saleUnit}`} className="mb-1 flex justify-between text-sm">
+                  <span>{product.name} ({saleUnit === 'pack' ? (product.saleType === 'pack' ? t('pack') : `${t('pack')} × ${product.unitsPerPack}`) : t('unit')}) × {quantity}</span>
                   <span>{formatCurrency((saleUnit === 'pack' ? product.packPrice : product.price) * quantity)}</span>
                 </div>
               ))}
-              <div className="border-t mt-2 pt-2 flex justify-between font-bold">
+              <div className="mt-2 flex justify-between border-t pt-2 font-bold">
                 <span>{t('total')}</span>
                 <span>{formatCurrency(total)}</span>
               </div>
             </div>
 
             {requiresAgeCheck && (
-              <div className="border border-yellow-200 bg-yellow-50 p-4 rounded-md">
-                <label className="block text-sm font-medium text-yellow-800 mb-2">
-                  {t('ageVerified')}
-                </label>
+              <div className="rounded-md border border-yellow-200 bg-yellow-50 p-4">
+                <label className="mb-2 block text-sm font-medium text-yellow-800">{t('ageVerified')}</label>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => setAgeVerified(true)}
-                    className={`flex-1 py-2 px-4 rounded-md border ${
-                      ageVerified
-                        ? 'bg-primary text-white border-primary'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    {t('yes')}
-                  </button>
-                  <button
-                    onClick={() => setAgeVerified(false)}
-                    className={`flex-1 py-2 px-4 rounded-md border ${
-                      !ageVerified
-                        ? 'bg-red-600 text-white border-red-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    {t('no')}
-                  </button>
+                  <button onClick={() => setAgeVerified(true)} className={`flex-1 rounded-md border px-4 py-2 ${ageVerified ? 'border-primary bg-primary text-white' : 'border-gray-300 bg-white text-gray-700'}`}>{t('yes')}</button>
+                  <button onClick={() => setAgeVerified(false)} className={`flex-1 rounded-md border px-4 py-2 ${!ageVerified ? 'border-red-600 bg-red-600 text-white' : 'border-gray-300 bg-white text-gray-700'}`}>{t('no')}</button>
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('paymentMethod')}
-              </label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              >
+              <label className="mb-1 block text-sm font-medium text-gray-700">{t('paymentMethod')}</label>
+              <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)} className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
                 <option value="Cash">{t('cash')}</option>
                 <option value="Card">{t('card')}</option>
                 <option value="Mobile Wallet">{t('mobileWallet')}</option>
                 <option value="Credit">{t('credit')}</option>
               </select>
             </div>
-            {paymentMethod === 'Credit' && <label className="block text-sm font-medium text-gray-700">{t('customerName')}
-              <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder={t('customerNamePlaceholder')} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
-              <span className="mt-1 block text-xs text-amber-700">{t('creditIncomeExclusion')}</span>
-            </label>}
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
-                {error}
+            {paymentMethod === 'Credit' && (
+              <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4">
+                <label className="block text-sm font-medium text-gray-700">
+                  {t('customerName')}
+                  <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder={t('customerNamePlaceholder')} className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2" />
+                </label>
+                <label className="block text-sm font-medium text-gray-700">
+                  {t('partialPayment')}
+                  <input type="number" min="0" step="1" inputMode="decimal" value={initialPaidAmount} onChange={(event) => setInitialPaidAmount(event.target.value)} className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2" />
+                </label>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between"><span>{t('depositBalance')}</span><span className="font-semibold text-emerald-700">{depositLoading ? t('loading') : formatCurrency(depositBalance)}</span></div>
+                  <div className="flex justify-between"><span>{t('depositApplied')}</span><span className="font-semibold text-emerald-700">{formatCurrency(depositApplied)}</span></div>
+                  <div className="flex justify-between border-t border-amber-200 pt-1 font-bold"><span>{t('balanceDue')}</span><span className={balanceDue > 0 ? 'text-red-700' : 'text-emerald-700'}>{formatCurrency(balanceDue)}</span></div>
+                </div>
+                <p className="text-xs text-amber-800">{t('creditIncomeExclusion')}</p>
               </div>
             )}
 
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="w-full bg-primary text-white py-3 px-4 rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-            >
-              {isSubmitting ? t('processing') : `${t('pay')} ${formatCurrency(total)}`}
+            {error && <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+            <button onClick={handleSubmit} disabled={isSubmitting} className="w-full rounded-md bg-primary px-4 py-3 font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
+              {isSubmitting ? t('processing') : `${t('pay')} ${formatCurrency(paymentMethod === 'Credit' ? paidNow : total)}`}
             </button>
           </div>
         </div>

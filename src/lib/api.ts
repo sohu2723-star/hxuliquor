@@ -75,6 +75,23 @@ export type CashTransaction = {
   createdBy: string
 }
 
+export type CustomerLedgerEntry = {
+  id: string
+  customerName: string
+  saleId: string
+  entryType: 'sale_credit' | 'payment' | 'deposit' | 'deposit_applied'
+  amount: number
+  note: string
+  createdAt: string
+}
+
+export type CustomerBalance = {
+  customerName: string
+  creditDue: number
+  depositBalance: number
+  netBalance: number
+}
+
 export type ProductGroup = 'all' | 'barcode' | 'noBarcode' | 'pack' | 'both'
 
 export const PRODUCT_GROUPS: { id: ProductGroup; label: string; description: string }[] = [
@@ -200,6 +217,34 @@ function normalizeCashTransaction(value: unknown): CashTransaction | null {
     note: asString(value.note),
     createdAt: asString(value.createdAt ?? value.created_at),
     createdBy: asString(value.createdBy ?? value.created_by),
+  }
+}
+
+function normalizeCustomerLedgerEntry(value: unknown): CustomerLedgerEntry | null {
+  if (!isRecord(value)) return null
+  const id = asString(value.id)
+  const entryType = asString(value.entryType ?? value.entry_type)
+  if (!id || !['sale_credit', 'payment', 'deposit', 'deposit_applied'].includes(entryType)) return null
+  return {
+    id,
+    customerName: asString(value.customerName ?? value.customer_name),
+    saleId: asString(value.saleId ?? value.sale_id),
+    entryType: entryType as CustomerLedgerEntry['entryType'],
+    amount: asNumber(value.amount),
+    note: asString(value.note),
+    createdAt: asString(value.createdAt ?? value.created_at),
+  }
+}
+
+function normalizeCustomerBalance(value: unknown): CustomerBalance | null {
+  if (!isRecord(value)) return null
+  const customerName = asString(value.customerName ?? value.customer_name)
+  if (!customerName) return null
+  return {
+    customerName,
+    creditDue: asNumber(value.creditDue ?? value.credit_due),
+    depositBalance: asNumber(value.depositBalance ?? value.deposit_balance),
+    netBalance: asNumber(value.netBalance ?? value.net_balance),
   }
 }
 
@@ -477,8 +522,24 @@ export const api = {
     return ((data || []) as { sale_id: string }[]).map((row) => row.sale_id)
   },
 
-  async createSale(payload: { cashierId: string; cashierName: string; items: { productId: string; quantity: number; saleUnit: 'unit' | 'pack' }[]; ageVerified: boolean; paymentMethod: string; customerName?: string; isCredit?: boolean }): Promise<Sale> {
-    const { data, error } = await supabase.rpc('create_sale', { p_items: payload.items, p_age_verified: payload.ageVerified, p_payment_method: payload.paymentMethod, p_customer_name: payload.customerName || '', p_is_credit: payload.isCredit || false })
+  async getPrintedReceipt(saleId: string): Promise<Sale | null> {
+    const { data, error } = await supabase.from('printed_receipts').select('receipt_data').eq('sale_id', saleId).maybeSingle()
+    if (error) throwDatabaseError(error)
+    return normalizeSale((data as { receipt_data?: unknown } | null)?.receipt_data || null)
+  },
+
+  async createSale(payload: { cashierId: string; cashierName: string; items: { productId: string; quantity: number; saleUnit: 'unit' | 'pack' }[]; ageVerified: boolean; paymentMethod: string; customerName?: string; isCredit?: boolean; initialPaidAmount?: number }): Promise<Sale> {
+    const useLedgerPayment = Boolean(payload.isCredit)
+    const rpcName = useLedgerPayment ? 'create_sale_with_payment' : 'create_sale'
+    const rpcArgs = {
+      p_items: payload.items,
+      p_age_verified: payload.ageVerified,
+      p_payment_method: payload.paymentMethod,
+      p_customer_name: payload.customerName || '',
+      p_is_credit: payload.isCredit || false,
+      ...(useLedgerPayment ? { p_initial_paid_amount: Math.max(0, asNumber(payload.initialPaidAmount)) } : {}),
+    }
+    const { data, error } = await supabase.rpc(rpcName, rpcArgs)
     if (error) throwDatabaseError(error)
     clearProductCache(); clearSalesCache()
     const sale = normalizeSale((data as Record<string, unknown> | null)?.sale || data)
@@ -493,6 +554,31 @@ export const api = {
     const sale = normalizeSale((data as Record<string, unknown> | null)?.sale || data)
     if (!sale) throw new Error(localizedError('The credit payment response was invalid.', 'အကြွေးငွေပေးချေမှုအဖြေ မမှန်ကန်ပါ။'))
     return sale
+  },
+
+  async addCustomerPayment(payload: { customerName: string; amount: number; saleId?: string; note?: string }): Promise<{ applied: number; depositAdded: number; balanceDue: number }> {
+    const { data, error } = await supabase.rpc('add_customer_payment', {
+      p_customer_name: payload.customerName.trim(),
+      p_amount: asNumber(payload.amount),
+      p_sale_id: payload.saleId || null,
+      p_note: payload.note?.trim() || '',
+    })
+    if (error) throwDatabaseError(error)
+    clearSalesCache()
+    const result = isRecord(data) ? data : {}
+    return { applied: asNumber(result.applied), depositAdded: asNumber(result.depositAdded ?? result.deposit_added), balanceDue: asNumber(result.balanceDue ?? result.balance_due) }
+  },
+
+  async getCustomerBalances(): Promise<CustomerBalance[]> {
+    const { data, error } = await supabase.rpc('get_customer_balances')
+    if (error) throwDatabaseError(error)
+    return (Array.isArray(data) ? data : []).map(normalizeCustomerBalance).filter((item): item is CustomerBalance => item !== null)
+  },
+
+  async getCustomerLedger(customerName: string): Promise<CustomerLedgerEntry[]> {
+    const { data, error } = await supabase.rpc('get_customer_ledger', { p_customer_name: customerName })
+    if (error) throwDatabaseError(error)
+    return (Array.isArray(data) ? data : []).map(normalizeCustomerLedgerEntry).filter((item): item is CustomerLedgerEntry => item !== null)
   },
 
   async addProduct(payload: { barcode: string; name: string; category: string; productColor?: string; productSize?: string; price: number; costPrice: number; stockQty: number; lowStockThreshold: number; unitsPerPack: number; packPrice: number; saleType: 'unit' | 'pack' | 'both'; requiresAgeCheck: boolean; imageBase64?: string; imageFileName?: string }): Promise<Product> {

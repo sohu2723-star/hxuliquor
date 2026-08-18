@@ -4,6 +4,7 @@ import Checkout from '../components/Checkout'
 import type { Product, Sale } from '../lib/api'
 import { api, barcodeMatches, PRODUCT_GROUPS, productMatchesGroup, type ProductGroup } from '../lib/api'
 import { formatCurrency } from '../lib/format'
+import { downloadReceipt } from '../lib/receiptDownload'
 import AppHeader from '../components/AppHeader'
 import Scanner from '../components/Scanner'
 import Icon from '../components/Icon'
@@ -31,7 +32,6 @@ export default function POS() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
-  const [lowStockOpen, setLowStockOpen] = useState(false)
   const [receiptSaving, setReceiptSaving] = useState(false)
   const [welcomeOpen, setWelcomeOpen] = useState(() => window.sessionStorage.getItem(WELCOME_SESSION_KEY) === '1')
   const lastHandledScan = useRef({ code: '', time: 0 })
@@ -95,17 +95,6 @@ export default function POS() {
   }, [loadProducts])
 
   const lowStockProducts = useMemo(() => products.filter((product) => product.stockQty <= product.lowStockThreshold), [products])
-  const lowStockSignature = useMemo(() => lowStockProducts.map((product) => `${product.id}:${product.stockQty}:${product.lowStockThreshold}`).sort().join('|'), [lowStockProducts])
-  const lastLowStockSignature = useRef('')
-  const lowStockInitialized = useRef(false)
-
-  useEffect(() => {
-    if (!products.length) return
-    if (lowStockSignature && (!lowStockInitialized.current || lastLowStockSignature.current !== lowStockSignature)) setLowStockOpen(true)
-    lastLowStockSignature.current = lowStockSignature
-    lowStockInitialized.current = true
-  }, [products.length, lowStockSignature])
-
   useEffect(() => {
     if (!products.length) return
     setCart((current) => {
@@ -212,18 +201,34 @@ export default function POS() {
     if (success) showToast(`${t('refresh')} ${t('done')}`, 'success')
   }
 
-  const handlePrintReceipt = async () => {
-    if (!completedSale || receiptSaving) return
+  const saveReceiptArchive = async () => {
+    if (!completedSale || receiptSaving) return false
     setReceiptSaving(true)
     try {
       await api.recordPrintedReceipt(completedSale)
-      showToast(t('receiptSaved'), 'success')
+      return true
     } catch (error) {
       showToast(error instanceof Error ? error.message : t('receiptSaveError'), 'error')
+      return false
     } finally {
       setReceiptSaving(false)
-      window.print()
     }
+  }
+
+  const handlePrintReceipt = async () => {
+    if (!completedSale || receiptSaving) return
+    const saved = await saveReceiptArchive()
+    if (!saved) return
+    showToast(t('receiptSaved'), 'success')
+    window.print()
+  }
+
+  const handleDownloadReceipt = async () => {
+    if (!completedSale || receiptSaving) return
+    const saved = await saveReceiptArchive()
+    if (!saved) return
+    downloadReceipt(completedSale, language)
+    showToast(t('receiptDownloaded'), 'success')
   }
 
   const handleCheckoutSuccess = (sale: Sale) => {
@@ -261,17 +266,16 @@ export default function POS() {
           <h2 className="mt-5 text-2xl font-extrabold text-slate-950">{t('welcome')}</h2>
         </div>
       </div>}
-      {lowStockOpen && lowStockProducts.length > 0 && <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true" aria-label={t('warningPage')}>
-        <div className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl ring-1 ring-red-100">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-100 text-red-700"><Icon name="warning" className="h-6 w-6" /></div><div><h2 className="text-lg font-extrabold text-red-700">{t('warningPage')}</h2><p className="text-sm text-slate-500">{t('warningCount', { count: lowStockProducts.length })}</p></div></div>
-            <button type="button" onClick={() => setLowStockOpen(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100" aria-label={t('close')}><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" /></svg></button>
+      <AppHeader />
+      {lowStockProducts.length > 0 && <div className="sticky top-0 z-30 border-b border-red-200 bg-red-50 px-4 py-2.5 text-red-900 shadow-sm" role="status" aria-live="polite">
+        <div className="mx-auto flex max-w-5xl items-start gap-2 text-sm">
+          <Icon name="warning" className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
+          <div className="min-w-0 flex-1">
+            <p className="font-bold">{t('warningCount', { count: lowStockProducts.length })}</p>
+            <p className="mt-0.5 truncate text-xs text-red-800">{lowStockProducts.map((product) => product.name).join(' · ')}</p>
           </div>
-          <div className="mt-4 space-y-2">{lowStockProducts.map((product) => <div key={product.id} className="flex items-center justify-between gap-3 rounded-2xl border border-red-100 bg-red-50/60 p-3"><div className="min-w-0"><p className="truncate font-bold text-slate-950">{product.name}</p><p className="truncate text-xs text-slate-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ') || t('categoryUnknown')}</p></div><div className="shrink-0 text-right"><p className="text-xs text-slate-500">{t('warningStock')}</p>{product.saleType === 'both' ? <><p className="font-extrabold text-red-700">{Math.floor(product.stockQty / Math.max(2, product.unitsPerPack || 2))} {t('pack')}</p><p className="text-xs text-red-700">{t('looseUnits')}: {product.stockQty % Math.max(2, product.unitsPerPack || 2)} · {t('totalUnitStock')}: {product.stockQty}</p></> : <p className="font-extrabold text-red-700">{product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</p>}</div></div>)}</div>
-          <button type="button" onClick={() => setLowStockOpen(false)} className="mt-5 w-full rounded-xl bg-primary px-4 py-3 font-semibold text-white">{t('done')}</button>
         </div>
       </div>}
-      <AppHeader />
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
 
@@ -472,7 +476,7 @@ export default function POS() {
           <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm print:text-xs"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
           <div className="mt-4 border-t pt-3 print:mt-2 print:pt-2"><div className="flex justify-between text-lg font-bold print:text-sm"><span>{t('total')}</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800 print:text-xs">{t('credit')} · {completedSale.customerName} · {t('creditBalance')} {formatCurrency(completedSale.balanceDue)}</p>}</div>
           <p className="mt-4 text-center text-xs text-slate-500 print:mt-2">{t('thankYou')}</p>
-          <div className="mt-5 grid grid-cols-2 gap-2 print:hidden"><button onClick={() => void handlePrintReceipt()} disabled={receiptSaving} className="rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-800 shadow-sm disabled:opacity-60">{receiptSaving ? t('saving') : t('printSlip')}</button><button onClick={() => setCompletedSale(null)} className="rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm">{t('done')}</button></div>
+          <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3 print:hidden"><button onClick={() => void handlePrintReceipt()} disabled={receiptSaving} className="rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-800 shadow-sm disabled:opacity-60">{receiptSaving ? t('saving') : t('printSlip')}</button><button onClick={() => void handleDownloadReceipt()} disabled={receiptSaving} className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 font-semibold text-violet-800 shadow-sm disabled:opacity-60">{t('downloadReceipt')}</button><button onClick={() => setCompletedSale(null)} className="rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm">{t('done')}</button></div>
         </div>
       </div>}
     </div>
