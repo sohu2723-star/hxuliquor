@@ -82,6 +82,8 @@ export default function Scanner({ onScan }: ScannerProps) {
             // A decoder reports the same visible barcode on many consecutive
             // video frames. Lock briefly so one physical scan adds exactly once.
             scanLockedUntil.current = now + 650
+            // Re-focus immediately after a valid detection so the next barcode starts sharp.
+            void applyCameraControl({ focusMode: 'single-shot' }, true)
             onScanRef.current(code)
           }
         },

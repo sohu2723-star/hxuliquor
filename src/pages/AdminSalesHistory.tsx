@@ -59,7 +59,7 @@ export default function AdminSalesHistory() {
     <AppHeader />
     <main className="mx-auto max-w-5xl p-4 lg:p-6">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div><h1 className="text-2xl font-bold text-slate-950">ရောင်းချမှု History</h1><p className="mt-1 text-sm text-slate-500">Income page မှ ခွဲထားသော လအလိုက် ဘောင်ချာနှင့် product ရောင်းချမှုမှတ်တမ်း။</p></div>
+        <div><h1 className="text-2xl font-bold text-slate-950">ရောင်းချမှု History</h1></div>
         <label className="text-sm font-semibold text-slate-700">လရွေးရန်<input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2" /></label>
       </div>
       {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}

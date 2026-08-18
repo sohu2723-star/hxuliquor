@@ -165,7 +165,6 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 <button type="button" onClick={() => selectProductKind('pack')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><span className="block font-semibold">ပါကင် သီးသန့်</span><small>Stock ကို ပါကင်ဖြင့်ထည့်ပါ</small></button>
                 <button type="button" onClick={() => selectProductKind('both')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'both' ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'bg-white'}`}><span className="block font-semibold">ပါကင် + တစ်ခုချင်း</span><small>Stock ကို တစ်ခုချင်းစုစုပေါင်းထည့်ပါ</small></button>
               </div>
-              <p className="mt-2 text-xs text-slate-500">ပါကင်သီးသန့် = stock/cost/price အားလုံးကို ပါကင်အလိုက် ထည့်ပါ။ ပါကင် + တစ်ခုချင်း = stock/cost ကို အသေးဆုံး unit (တစ်ခု/တစ်ဘူး) အလိုက် ထည့်ပြီး ပါကင်ရောင်းလျှင် တစ်ပါကင်ပါဝင်မှုအတိုင်း stock နှုတ်ပါမည်။</p>
             </fieldset>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -193,7 +192,6 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   <Scanner onScan={handleScan} />
                 </div>
               )}
-              <p className="mt-1 text-xs text-gray-500">QR မတူလျှင် code အားလုံးကို comma ခြားထည့်ပါ။ Scan text ထဲတွင် name/color/size/ml ပါလျှင် Product Name, အရောင်, အရွယ်အစားကို အလိုအလျောက်ဖြည့်ပေးပါမည်။ Code မရှိလျှင် ကွက်လပ်ထားပြီး POS product ပုံကိုနှိပ်ရောင်းနိုင်သည်။</p>
             </div>
 
             <div>

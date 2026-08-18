@@ -122,7 +122,7 @@ export default function AdminDashboard() {
     <AppHeader />
     <main className="max-w-5xl mx-auto p-4 lg:p-6">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div><h1 className="text-2xl font-bold">Income & Stock Dashboard</h1><p className="text-sm text-slate-500">Daily စာရင်းကို မြန်မာစံတော်ချိန် (UTC+6:30) ဖြင့်တွက်ထားပါသည်။</p></div>
+        <div><h1 className="text-2xl font-bold">Income & Stock Dashboard</h1></div>
         <label className="text-sm font-medium">လစဉ်စာရင်းရွေးရန်
           <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2" />
         </label>

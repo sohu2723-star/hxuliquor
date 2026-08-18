@@ -106,7 +106,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
               {cart.map(({ product, quantity, saleUnit }) => (
                 <div key={`${product.id}-${saleUnit}`} className="flex justify-between text-sm mb-1">
                   <span>
-                    {product.name} ({saleUnit === 'pack' ? `ပါကင် × ${product.unitsPerPack}` : 'ဘူး/ခု'}) × {quantity}
+                    {product.name} ({saleUnit === 'pack' ? (product.saleType === 'pack' ? 'တစ်ပါကင်' : `ပါကင် × ${product.unitsPerPack}`) : 'ဘူး/ခု'}) × {quantity}
                   </span>
                   <span>{formatCurrency((saleUnit === 'pack' ? product.packPrice : product.price) * quantity)}</span>
                 </div>

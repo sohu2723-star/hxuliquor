@@ -76,7 +76,6 @@ export default function AdminCredits() {
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-950">အကြွေးစာရင်း</h1>
-          <p className="mt-1 text-sm text-slate-500">Income page မှ ခွဲထားသော customer credit စာရင်းနှင့် ပေးချေမှုများ။</p>
         </div>
         <button onClick={() => void load()} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50">Refresh</button>
       </div>

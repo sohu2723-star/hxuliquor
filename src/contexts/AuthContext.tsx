@@ -87,7 +87,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // The explicit sign-in flow validates the allowlist before Login navigates.
       // Avoid a second competing profile request while that validation is in flight.
       if (event === 'SIGNED_IN' && signInInFlightRef.current) return
-      if (event === 'SIGNED_IN') setIsLoading(true)
+      // Token refresh/reconnect events should keep the cached app visible; only a
+      // real sign-in without a cached user needs the full-screen loading state.
+      if (event === 'SIGNED_IN' && !readStoredUser()) setIsLoading(true)
       window.setTimeout(() => { if (mounted) void loadUser() }, 0)
     })
     return () => {

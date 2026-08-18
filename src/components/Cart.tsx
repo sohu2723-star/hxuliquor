@@ -43,7 +43,7 @@ export default function Cart({
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <p className="font-medium">{product.name}</p>
-                  <p className="flex items-center gap-1 text-sm font-medium text-gray-500"><Icon name={saleUnit === 'pack' ? 'box' : 'bottle'} className="h-4 w-4" />{saleUnit === 'pack' ? `ပါကင် (${product.unitsPerPack} ခု)` : 'တစ်ဘူး / တစ်ခု'}</p>
+                  <p className="flex items-center gap-1 text-sm font-medium text-gray-500"><Icon name={saleUnit === 'pack' ? 'box' : 'bottle'} className="h-4 w-4" />{saleUnit === 'pack' ? (product.saleType === 'pack' ? 'တစ်ပါကင်' : `ပါကင် (${product.unitsPerPack} ခု)`) : 'တစ်ဘူး / တစ်ခု'}</p>
                   <p className="font-semibold text-primary mt-1">
                     {formatCurrency(saleUnit === 'pack' ? product.packPrice : product.price)}
                   </p>
