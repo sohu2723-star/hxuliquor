@@ -16,8 +16,6 @@ export default function POS() {
   const [searchQuery, setSearchQuery] = useState('')
   const [productGroup, setProductGroup] = useState<ProductGroup>('all')
   const [categoryFilter, setCategoryFilter] = useState('')
-  const [searchResults, setSearchResults] = useState<Product[]>([])
-  const [isSearching, setIsSearching] = useState(false)
   const [showCheckout, setShowCheckout] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
@@ -57,12 +55,12 @@ export default function POS() {
   useEffect(() => {
     void loadProducts()
     const refreshWhenReturning = () => {
-      if (document.visibilityState === 'visible') void loadProducts(true, true)
+      if (document.visibilityState === 'visible') void loadProducts(false, true)
     }
     document.addEventListener('visibilitychange', refreshWhenReturning)
     const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void loadProducts(true, true)
-    }, 5000)
+      if (document.visibilityState === 'visible') void loadProducts(false, true)
+    }, 30000)
     return () => {
       document.removeEventListener('visibilitychange', refreshWhenReturning)
       window.clearInterval(timer)
@@ -126,27 +124,19 @@ export default function POS() {
     }
   }
 
-  const handleSearch = async (query: string) => {
-    setSearchQuery(query)
-    if (query.length < 2) {
-      setSearchResults([])
-      return
-    }
-    setIsSearching(true)
-    try {
-      const results = await api.searchProducts(query)
-      setSearchResults(results)
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Search failed', 'error')
-    } finally {
-      setIsSearching(false)
-    }
-  }
+  const handleSearch = (query: string) => setSearchQuery(query)
 
   const productCategories = useMemo(() => [...new Set(products.map((product) => product.category).filter(Boolean))].sort(), [products])
   const matchesCategoryFilter = useCallback((product: Product) => !categoryFilter || product.category === categoryFilter, [categoryFilter])
-  const visibleProducts = products.filter((product) => productMatchesGroup(product, productGroup) && matchesCategoryFilter(product))
-  const filteredSearchResults = searchResults.filter(matchesCategoryFilter)
+  const visibleProducts = useMemo(() => products.filter((product) => productMatchesGroup(product, productGroup) && matchesCategoryFilter(product)), [products, productGroup, matchesCategoryFilter])
+  const filteredSearchResults = useMemo(() => {
+    const normalized = searchQuery.trim().toLowerCase()
+    if (normalized.length < 2) return []
+    return products.filter((product) => {
+      const searchable = [product.name, product.barcode, product.category, product.productColor, product.productSize].join(' ').toLowerCase()
+      return searchable.includes(normalized) && matchesCategoryFilter(product)
+    })
+  }, [products, searchQuery, matchesCategoryFilter])
 
   const requiresAgeCheck = cart.some((item) => item.product.requiresAgeCheck)
 
@@ -156,7 +146,7 @@ export default function POS() {
     setCompletedSale(sale)
     if (sale.id.startsWith('local-')) setProducts((current) => reduceSoldStock(current, sale))
     showToast('Checkout အောင်မြင်ပါသည်။ Slip ထုတ်နိုင်ပါပြီ။', 'success')
-    void loadProducts(true, true)
+    void loadProducts(false, true)
   }
 
   const ProductImage = ({ url, name }: { url: string; name: string }) => {
@@ -218,9 +208,6 @@ export default function POS() {
                 {productCategories.map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
             </div>
-            {isSearching && (
-              <p className="mt-2 text-sm text-gray-500">Searching...</p>
-            )}
             {filteredSearchResults.length > 0 && (
               <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
                 {filteredSearchResults.map((product) => (
@@ -229,7 +216,6 @@ export default function POS() {
                     onClick={() => {
                       addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit')
                       setSearchQuery('')
-                      setSearchResults([])
                     }}
                     className="w-full text-left p-3 border border-gray-200 rounded-md hover:bg-gray-50 flex justify-between items-center"
                   >
@@ -247,7 +233,7 @@ export default function POS() {
                 ))}
               </div>
             )}
-            {searchQuery.length >= 2 && !isSearching && filteredSearchResults.length === 0 && (
+            {searchQuery.trim().length >= 2 && filteredSearchResults.length === 0 && (
               <p className="mt-3 text-sm text-gray-500">No products found</p>
             )}
           </div>

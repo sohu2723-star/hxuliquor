@@ -27,7 +27,8 @@ export default function AdminSalesHistory() {
     setError('')
     try {
       const { start, end } = monthRange(selectedMonth)
-      setSales(await api.getSales(start, end, true))
+      const result = await api.getSalesStaleFirst(start, end, (fresh) => setSales(fresh))
+      setSales(result.sales)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ရောင်းချမှု history ဆွဲမရပါ။')
     } finally {
@@ -39,7 +40,7 @@ export default function AdminSalesHistory() {
     void load()
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') void load(true)
-    }, 10000)
+    }, 60000)
     return () => window.clearInterval(timer)
   }, [load])
 

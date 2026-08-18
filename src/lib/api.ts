@@ -209,6 +209,9 @@ function saveEmployeeCache(users: User[]) {
 
 function salesCacheKey(startDate?: string, endDate?: string) { return `${SALES_CACHE_PREFIX}${startDate || ''}:${endDate || ''}` }
 
+let productsFetchInFlight: Promise<Product[]> | null = null
+const salesFetchInFlight = new Map<string, Promise<Sale[]>>()
+
 function readSalesCache(key: string): Sale[] | null {
   try {
     const stored = JSON.parse(localStorage.getItem(key) || 'null')
@@ -265,18 +268,34 @@ async function uploadProductImage(productId: string, imageBase64: string, fileNa
 }
 
 async function fetchProducts(): Promise<Product[]> {
-  const { data, error } = await supabase.from('products').select('*').eq('is_active', true).order('name', { ascending: true })
+  const { data, error } = await supabase.from('products').select('id,barcode,name,category,product_color,product_size,price,cost_price,stock_qty,low_stock_threshold,units_per_pack,pack_price,sale_type,requires_age_check,image_url,created_at').eq('is_active', true).order('name', { ascending: true })
   if (error) throwDatabaseError(error)
   return (data || []).map(normalizeProduct).filter((product): product is Product => product !== null)
 }
 
 async function fetchSales(startDate?: string, endDate?: string): Promise<Sale[]> {
-  let query = supabase.from('sales').select('*, sale_items(*)').order('created_at', { ascending: false })
+  let query = supabase.from('sales').select('id,cashier_id,cashier_name,cashier_email,total_amount,paid_amount,balance_due,customer_name,is_credit,settled_at,payment_method,age_verified,created_at,sale_items(id,sale_id,product_id,product_name,quantity,unit_price,subtotal,unit_cost,profit,sale_unit,sale_quantity)').order('created_at', { ascending: false })
   if (startDate) query = query.gte('created_at', `${startDate}T00:00:00+06:30`)
   if (endDate) query = query.lte('created_at', `${endDate}T23:59:59+06:30`)
   const { data, error } = await query
   if (error) throwDatabaseError(error)
   return (data || []).map(normalizeSale).filter((sale): sale is Sale => sale !== null)
+}
+
+function fetchProductsOnce(): Promise<Product[]> {
+  if (!productsFetchInFlight) {
+    productsFetchInFlight = fetchProducts().finally(() => { productsFetchInFlight = null })
+  }
+  return productsFetchInFlight
+}
+
+function fetchSalesOnce(startDate?: string, endDate?: string): Promise<Sale[]> {
+  const key = salesCacheKey(startDate, endDate)
+  const existing = salesFetchInFlight.get(key)
+  if (existing) return existing
+  const request = fetchSales(startDate, endDate).finally(() => { salesFetchInFlight.delete(key) })
+  salesFetchInFlight.set(key, request)
+  return request
 }
 
 export const api = {
@@ -285,7 +304,7 @@ export const api = {
       const cached = readProductCache()
       if (cached) return cached
     }
-    const products = await fetchProducts()
+    const products = await fetchProductsOnce()
     saveProductCache(products)
     return products
   },
@@ -293,10 +312,10 @@ export const api = {
   async getProductsStaleFirst(onFresh?: (products: Product[]) => void): Promise<{ products: Product[]; fromCache: boolean }> {
     const cached = readProductCache()
     if (cached) {
-      void fetchProducts().then((fresh) => { saveProductCache(fresh); onFresh?.(fresh) }).catch(() => {})
+      void fetchProductsOnce().then((fresh) => { saveProductCache(fresh); onFresh?.(fresh) }).catch(() => {})
       return { products: cached, fromCache: true }
     }
-    const products = await fetchProducts()
+    const products = await fetchProductsOnce()
     saveProductCache(products)
     return { products, fromCache: false }
   },
@@ -321,7 +340,7 @@ export const api = {
       const cached = readSalesCache(cacheKey)
       if (cached) return cached
     }
-    const sales = await fetchSales(startDate, endDate)
+    const sales = await fetchSalesOnce(startDate, endDate)
     saveSalesCache(cacheKey, sales)
     return sales
   },
@@ -330,10 +349,10 @@ export const api = {
     const cacheKey = salesCacheKey(startDate, endDate)
     const cached = readSalesCache(cacheKey)
     if (cached) {
-      void fetchSales(startDate, endDate).then((fresh) => { saveSalesCache(cacheKey, fresh); onFresh?.(fresh) }).catch(() => {})
+      void fetchSalesOnce(startDate, endDate).then((fresh) => { saveSalesCache(cacheKey, fresh); onFresh?.(fresh) }).catch(() => {})
       return { sales: cached, fromCache: true }
     }
-    const sales = await fetchSales(startDate, endDate)
+    const sales = await fetchSalesOnce(startDate, endDate)
     saveSalesCache(cacheKey, sales)
     return { sales, fromCache: false }
   },
@@ -361,7 +380,7 @@ export const api = {
       const cached = readEmployeeCache()
       if (cached) return cached
     }
-    const { data, error } = await supabase.from('profiles').select('*').order('name', { ascending: true })
+    const { data, error } = await supabase.from('profiles').select('id,name,email,role,is_authorized').order('name', { ascending: true })
     if (error) throwDatabaseError(error)
     const users = (data || []).map(normalizeUser).filter((user): user is User => user !== null)
     saveEmployeeCache(users)

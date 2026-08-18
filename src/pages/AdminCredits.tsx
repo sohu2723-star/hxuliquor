@@ -24,7 +24,8 @@ export default function AdminCredits() {
     if (!quiet) setLoading(true)
     setError('')
     try {
-      setSales(await api.getSales(undefined, undefined, true))
+      const result = await api.getSalesStaleFirst(undefined, undefined, (fresh) => setSales(fresh))
+      setSales(result.sales)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'အကြွေးစာရင်း ဆွဲမရပါ။')
     } finally {
@@ -36,7 +37,7 @@ export default function AdminCredits() {
     void load()
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') void load(true)
-    }, 10000)
+    }, 60000)
     return () => window.clearInterval(timer)
   }, [load])
 
@@ -44,6 +45,17 @@ export default function AdminCredits() {
   const unpaid = credits.filter((sale) => sale.balanceDue > 0)
   const unpaidAmount = unpaid.reduce((sum, sale) => sum + sale.balanceDue, 0)
   const paidAmount = credits.filter((sale) => sale.balanceDue <= 0).reduce((sum, sale) => sum + sale.paidAmount, 0)
+  const totalCreditAmount = credits.reduce((sum, sale) => sum + sale.totalAmount, 0)
+  const customerCreditRows = useMemo(() => {
+    const grouped = new Map<string, number>()
+    unpaid.forEach((sale) => {
+      const customer = sale.customerName?.trim() || 'Customer name မရှိပါ'
+      grouped.set(customer, (grouped.get(customer) || 0) + sale.balanceDue)
+    })
+    return [...grouped.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+  }, [unpaid])
+  const maxCustomerBalance = customerCreditRows[0]?.[1] || 1
+  const outstandingPercent = totalCreditAmount > 0 ? Math.min(100, (unpaidAmount / totalCreditAmount) * 100) : 0
 
   const markCreditPaid = (sale: Sale) => {
     setConfirmCredit(null)
@@ -77,6 +89,22 @@ export default function AdminCredits() {
         <section className="surface-card p-5"><p className="text-sm text-slate-500">ပေးရန်ကျန်ငွေ</p><p className="mt-2 text-2xl font-bold text-red-700">{formatCurrency(unpaidAmount)}</p></section>
         <section className="surface-card p-5"><p className="text-sm text-slate-500">အကြွေးမှ ရပြီးငွေ</p><p className="mt-2 text-2xl font-bold text-emerald-700">{formatCurrency(paidAmount)}</p></section>
       </div>
+      <section className="surface-card mb-5 p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div><h2 className="text-lg font-bold text-slate-900">အကြွေးကျန် Bar Chart</h2><p className="mt-1 text-sm text-slate-500">Customer အလိုက် ပေးရန်ကျန်ငွေကို အများဆုံးမှ အနည်းဆုံးစီထားပါသည်။</p></div>
+          <p className="text-sm font-semibold text-red-700">စုစုပေါင်းကျန် {formatCurrency(unpaidAmount)}</p>
+        </div>
+        <div className="mt-5 space-y-4">
+          {customerCreditRows.length ? customerCreditRows.map(([customer, amount]) => <div key={customer}>
+            <div className="mb-1 flex items-center justify-between gap-3 text-sm"><span className="min-w-0 truncate font-semibold text-slate-700">{customer}</span><span className="shrink-0 font-bold text-red-700">{formatCurrency(amount)}</span></div>
+            <div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-red-500 transition-all" style={{ width: `${Math.max(4, (amount / maxCustomerBalance) * 100)}%` }} /></div>
+          </div>) : <p className="py-3 text-center text-emerald-700">ပေးရန်ကျန်သည့်အကြွေး မရှိပါ။</p>}
+        </div>
+        <div className="mt-5 border-t border-slate-100 pt-4">
+          <div className="mb-1 flex justify-between text-xs font-semibold text-slate-500"><span>အကြွေးစုစုပေါင်းထဲမှ ကျန်ငွေရာခိုင်နှုန်း</span><span>{outstandingPercent.toFixed(0)}%</span></div>
+          <div className="h-2 overflow-hidden rounded-full bg-emerald-100"><div className="h-full rounded-full bg-red-500" style={{ width: `${outstandingPercent}%` }} /></div>
+        </div>
+      </section>
       {loading ? <div className="surface-card p-8 text-center text-slate-500">အကြွေးစာရင်း ဆွဲနေပါသည်…</div> : <>
         <section className="surface-card p-5">
           <h2 className="text-lg font-bold text-amber-700">ပေးရန်ကျန်သည့်စာရင်း ({unpaid.length})</h2>

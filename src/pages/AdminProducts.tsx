@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, PRODUCT_GROUPS, productMatchesGroup, type ProductGroup } from '../lib/api'
 import type { Product } from '../lib/api'
 import ProductList from '../components/ProductList'
@@ -15,7 +15,6 @@ export default function AdminProducts() {
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [productGroup, setProductGroup] = useState<ProductGroup>('all')
-  const [categories, setCategories] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
 
@@ -34,21 +33,11 @@ export default function AdminProducts() {
     }
   }, [showToast])
 
-  const loadCategories = useCallback(async () => {
-    try {
-      const cats = await api.getCategories()
-      setCategories(cats)
-    } catch (error) {
-      showToast(getErrorMessage(error, 'Category data ဆွဲမရပါ။'), 'error')
-    }
-  }, [showToast])
-
   useEffect(() => {
     void refreshProducts()
-    void loadCategories()
-    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshProducts(true) }, 30000)
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshProducts() }, 60000)
     return () => window.clearInterval(timer)
-  }, [refreshProducts, loadCategories])
+  }, [refreshProducts])
 
   const handleSave = async (productData: Partial<Product> & { imageFile?: File }) => {
     const savingProduct = editingProduct
@@ -91,7 +80,6 @@ export default function AdminProducts() {
         showToast('Product added အောင်မြင်ပါသည်', 'success')
       }
 
-        void loadCategories()
       })
     } catch (error) {
       showToast(getErrorMessage(error, 'Product သိမ်းမရပါ။ နာမည်၊ category၊ ဈေး၊ ပုံဖိုင်အရွယ်အစားနှင့် internet connection ကို စစ်ပြီး ထပ်ကြိုးစားပါ။'), 'error')
@@ -112,7 +100,7 @@ export default function AdminProducts() {
       try {
         await api.deleteProduct(id)
         showToast('Product deleted', 'success')
-        await refreshProducts(true)
+        await refreshProducts()
       } catch (error) {
         setProducts(previous)
         showToast(error instanceof Error ? error.message : 'Failed to delete product', 'error')
@@ -124,6 +112,8 @@ export default function AdminProducts() {
     setEditingProduct(product)
     setShowForm(true)
   }
+
+  const categories = useMemo(() => [...new Set(products.map((product) => product.category).filter(Boolean))].sort(), [products])
 
   const filteredProducts = products.filter((p) => {
     const matchesSearch = String(p.name).toLowerCase().includes(searchQuery.toLowerCase()) ||
