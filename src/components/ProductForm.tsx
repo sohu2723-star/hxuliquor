@@ -215,11 +215,11 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
-                <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">Product Color / အရောင်</label>
+                <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">Product Color / အရောင်</label>
                 <input type="text" name="productColor" value={formData.productColor} onChange={handleChange} placeholder="ဥပမာ Red, Blue, Gold" className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div className="flex flex-col">
-                <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">Product Size / အရွယ်အစား</label>
+                <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">Product Size / အရွယ်အစား</label>
                 <input type="text" name="productSize" value={formData.productSize} onChange={handleChange} placeholder="ဥပမာ 500ml, 1L, Small" className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
             </div>
@@ -227,7 +227,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
-                <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">
+                <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">
                   {formData.saleType === 'pack' ? 'တစ်ပါကင် ရောင်းဈေး (Ks)' : 'တစ်ဘူး / တစ်ခု ရောင်းဈေး (Ks)'}
                 </label>
                 <input
@@ -241,7 +241,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 />
               </div>
               <div className="flex flex-col">
-                <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">
+                <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">
                   {costUnitLabel} (Ks)
                 </label>
                 <input
@@ -260,12 +260,12 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               <h3 className="font-semibold text-slate-900">ပါကင် Product အချက်အလက်</h3>
               <p className="mb-3 mt-1 text-xs text-slate-600">ပါကင်သီးသန့်ဆို Stock Quantity ({stockUnitLabel}) တွင် ပါကင်အရေအတွက်၊ Cost/Price တွင် တစ်ပါကင်နှုန်း ထည့်ပါ။ ပါကင် + တစ်ခုချင်းဆို Stock Quantity ({stockUnitLabel}) တွင် အတွင်းပါ အသေးဆုံး unit စုစုပေါင်း ထည့်ပါ (ဥပမာ 10 ပါကင် × 12 ခု = 120)။</p>
               <div className="flex flex-col">
-                <label className="flex min-h-10 flex-col text-sm font-medium text-gray-700">တစ်ပါကင်ပါဝင်မှု
+                <label className="flex h-14 flex-col text-sm font-medium leading-5 text-gray-700">တစ်ပါကင်ပါဝင်မှု
                   <input type="number" name="unitsPerPack" min="2" value={formData.unitsPerPack} onChange={handleChange} required className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </label>
               </div>
               {formData.saleType === 'both' && <div className="mt-3 flex flex-col">
-                <label className="flex min-h-10 flex-col text-sm font-medium text-gray-700">တစ်ပါကင် ရောင်းဈေး (Ks)
+                <label className="flex h-14 flex-col text-sm font-medium leading-5 text-gray-700">တစ်ပါကင် ရောင်းဈေး (Ks)
                   <input type="number" name="packPrice" value={formData.packPrice} onChange={handleChange} required step="0.01" className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </label>
               </div>}
@@ -274,7 +274,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
-                <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">
+                <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">
                   Stock Quantity ({stockUnitLabel})
                 </label>
                 <input
@@ -287,7 +287,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 />
               </div>
               <div className="flex flex-col">
-                <label className="mb-1 flex min-h-10 items-end text-sm font-medium text-gray-700">
+                <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">
                   Low Stock Threshold
                 </label>
                 <input
