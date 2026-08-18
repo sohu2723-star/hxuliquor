@@ -49,8 +49,17 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     void loadDashboard()
-    const timer = window.setInterval(() => void loadDashboard(true), 60000)
-    return () => window.clearInterval(timer)
+    const refreshWhenReturning = () => {
+      if (document.visibilityState === 'visible') void loadDashboard(true)
+    }
+    document.addEventListener('visibilitychange', refreshWhenReturning)
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void loadDashboard(true)
+    }, 60000)
+    return () => {
+      document.removeEventListener('visibilitychange', refreshWhenReturning)
+      window.clearInterval(timer)
+    }
   }, [loadDashboard])
 
   const report = useMemo(() => {

@@ -11,21 +11,29 @@ import ReceiptLogo from '../components/ReceiptLogo'
 import { useToast } from '../contexts/ToastContext'
 
 const WELCOME_SESSION_KEY = 'hxu_show_welcome'
+const POS_DRAFT_KEY = 'hxu-pos-draft'
+type CartDraftItem = { productId: string; quantity: number; saleUnit: 'unit' | 'pack' }
+type PosDraft = { cart?: CartDraftItem[]; searchQuery?: string; productGroup?: ProductGroup; categoryFilter?: string; showCheckout?: boolean }
+
+const readPosDraft = (): PosDraft => {
+  try { return JSON.parse(localStorage.getItem(POS_DRAFT_KEY) || '{}') as PosDraft } catch { return {} }
+}
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<{ product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [productGroup, setProductGroup] = useState<ProductGroup>('all')
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [showCheckout, setShowCheckout] = useState(false)
+  const [searchQuery, setSearchQuery] = useState(() => readPosDraft().searchQuery || '')
+  const [productGroup, setProductGroup] = useState<ProductGroup>(() => readPosDraft().productGroup || 'all')
+  const [categoryFilter, setCategoryFilter] = useState(() => readPosDraft().categoryFilter || '')
+  const [showCheckout, setShowCheckout] = useState(() => readPosDraft().showCheckout === true)
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
   const [welcomeOpen, setWelcomeOpen] = useState(() => window.sessionStorage.getItem(WELCOME_SESSION_KEY) === '1')
   const lastHandledScan = useRef({ code: '', time: 0 })
   const productsRefreshing = useRef(false)
-
+  const cartHydrated = useRef(false)
+  const savedCartDraft = useRef(readPosDraft().cart || [])
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -76,6 +84,34 @@ export default function POS() {
       window.clearInterval(timer)
     }
   }, [loadProducts])
+
+  useEffect(() => {
+    if (!products.length) return
+    setCart((current) => {
+      const source = cartHydrated.current ? current.map((item) => ({ ...item })) : savedCartDraft.current.map((item) => ({ product: products.find((product) => product.id === item.productId), quantity: item.quantity, saleUnit: item.saleUnit })).filter((item): item is { product: Product; quantity: number; saleUnit: 'unit' | 'pack' } => Boolean(item.product))
+      cartHydrated.current = true
+      savedCartDraft.current = []
+      return source.map((item) => {
+        const freshProduct = products.find((product) => product.id === item.product.id)
+        if (!freshProduct) return null
+        const unitsPerSale = item.saleUnit === 'pack' && freshProduct.saleType !== 'pack' ? Math.max(1, freshProduct.unitsPerPack) : 1
+        const maxQuantity = Math.floor(freshProduct.stockQty / unitsPerSale)
+        return maxQuantity > 0 ? { product: freshProduct, quantity: Math.min(item.quantity, maxQuantity), saleUnit: item.saleUnit } : null
+      }).filter((item): item is { product: Product; quantity: number; saleUnit: 'unit' | 'pack' } => Boolean(item))
+    })
+  }, [products])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(POS_DRAFT_KEY, JSON.stringify({
+        cart: cart.map((item) => ({ productId: item.product.id, quantity: item.quantity, saleUnit: item.saleUnit })),
+        searchQuery,
+        productGroup,
+        categoryFilter,
+        showCheckout,
+      }))
+    } catch { /* storage unavailable */ }
+  }, [cart, searchQuery, productGroup, categoryFilter, showCheckout])
 
   const addToCart = useCallback((product: Product, saleUnit: 'unit' | 'pack' = 'unit') => {
     const stockUnits = saleUnit === 'pack' && product.saleType !== 'pack' ? product.unitsPerPack : 1

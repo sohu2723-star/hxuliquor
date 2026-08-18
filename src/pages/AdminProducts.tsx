@@ -8,18 +8,29 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../contexts/ToastContext'
 import { useActionLoading } from '../contexts/ActionLoadingContext'
 
+const ADMIN_PRODUCTS_VIEW_KEY = 'hxu-admin-products-view'
+const PRODUCT_FORM_DRAFT_KEY = 'hxu-product-form-draft:new'
+
+const readAdminProductsView = () => {
+  try { return JSON.parse(localStorage.getItem(ADMIN_PRODUCTS_VIEW_KEY) || '{}') as { searchQuery?: string; categoryFilter?: string; productGroup?: ProductGroup } } catch { return {} }
+}
+
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([])
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [showForm, setShowForm] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
-  const [productGroup, setProductGroup] = useState<ProductGroup>('all')
+  const [showForm, setShowForm] = useState(() => Boolean(localStorage.getItem(PRODUCT_FORM_DRAFT_KEY)))
+  const [searchQuery, setSearchQuery] = useState(() => readAdminProductsView().searchQuery || '')
+  const [categoryFilter, setCategoryFilter] = useState(() => readAdminProductsView().categoryFilter || '')
+  const [productGroup, setProductGroup] = useState<ProductGroup>(() => readAdminProductsView().productGroup || 'all')
   const [isLoading, setIsLoading] = useState(true)
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
 
   const { showToast } = useToast()
   const { runWithLoading } = useActionLoading()
+
+  useEffect(() => {
+    try { localStorage.setItem(ADMIN_PRODUCTS_VIEW_KEY, JSON.stringify({ searchQuery, categoryFilter, productGroup })) } catch { /* storage unavailable */ }
+  }, [searchQuery, categoryFilter, productGroup])
 
   const refreshProducts = useCallback(async (force = false, notify = false) => {
     if (notify || !force) setIsLoading(true)
@@ -36,8 +47,17 @@ export default function AdminProducts() {
 
   useEffect(() => {
     void refreshProducts()
-    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void refreshProducts() }, 60000)
-    return () => window.clearInterval(timer)
+    const refreshWhenReturning = () => {
+      if (document.visibilityState === 'visible') void refreshProducts(true, false)
+    }
+    document.addEventListener('visibilitychange', refreshWhenReturning)
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshProducts(true, false)
+    }, 60000)
+    return () => {
+      document.removeEventListener('visibilitychange', refreshWhenReturning)
+      window.clearInterval(timer)
+    }
   }, [refreshProducts])
 
   const handleSave = async (productData: Partial<Product> & { imageFile?: File }) => {

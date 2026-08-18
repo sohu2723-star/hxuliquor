@@ -5,21 +5,32 @@ import { api, type User } from '../lib/api'
 import { useToast } from '../contexts/ToastContext'
 import { useActionLoading } from '../contexts/ActionLoadingContext'
 
+const EMPLOYEE_FORM_DRAFT_KEY = 'hxu-employee-form-draft'
+
 export default function AdminEmployees() {
   const [employees, setEmployees] = useState<User[]>([])
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [name, setName] = useState(() => {
+    try { return String(JSON.parse(localStorage.getItem(EMPLOYEE_FORM_DRAFT_KEY) || 'null')?.name || '') } catch { return '' }
+  })
+  const [email, setEmail] = useState(() => {
+    try { return String(JSON.parse(localStorage.getItem(EMPLOYEE_FORM_DRAFT_KEY) || 'null')?.email || '') } catch { return '' }
+  })
   const [isSaving, setIsSaving] = useState(false)
   const [removeEmployee, setRemoveEmployee] = useState<User | null>(null)
 
   const { showToast } = useToast()
   const { runWithLoading } = useActionLoading()
+
+  useEffect(() => {
+    try { localStorage.setItem(EMPLOYEE_FORM_DRAFT_KEY, JSON.stringify({ name, email })) } catch { /* storage unavailable */ }
+  }, [name, email])
+
   const load = useCallback((force = false) => api.getEmployees(force).then((fresh) => setEmployees((current) => JSON.stringify(current) === JSON.stringify(fresh) ? current : fresh)).catch((e: unknown) => { if (!force) showToast(e instanceof Error ? e.message : 'Employee data ဆွဲမရပါ။', 'error') }), [showToast])
 
   useEffect(() => {
     void load()
     const initialRefresh = window.setTimeout(() => void load(true), 100)
-    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(true) }, 5000)
+    const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(true) }, 60000)
     return () => { window.clearTimeout(initialRefresh); window.clearInterval(timer) }
   }, [load])
 
@@ -31,6 +42,7 @@ export default function AdminEmployees() {
       setEmployees((current) => [...current.filter((item) => item.id !== added.id), added])
       setName('')
       setEmail('')
+      try { localStorage.removeItem(EMPLOYEE_FORM_DRAFT_KEY) } catch { /* storage unavailable */ }
       showToast('Employee account ထည့်ပြီးပါပြီ။', 'success')
       void load(true)
     } catch (error) { showToast(error instanceof Error ? error.message : 'Employee add failed', 'error') }

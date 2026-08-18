@@ -38,10 +38,17 @@ export default function AdminSalesHistory() {
 
   useEffect(() => {
     void load()
+    const refreshWhenReturning = () => {
+      if (document.visibilityState === 'visible') void load(true)
+    }
+    document.addEventListener('visibilitychange', refreshWhenReturning)
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') void load(true)
     }, 60000)
-    return () => window.clearInterval(timer)
+    return () => {
+      document.removeEventListener('visibilitychange', refreshWhenReturning)
+      window.clearInterval(timer)
+    }
   }, [load])
 
   const total = sales.reduce((sum, sale) => sum + sale.totalAmount, 0)

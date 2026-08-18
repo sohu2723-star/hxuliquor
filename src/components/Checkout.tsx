@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import type { Product, Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
@@ -14,13 +14,28 @@ interface CheckoutProps {
 
 type PaymentMethod = 'Cash' | 'Card' | 'Mobile Wallet' | 'Credit'
 
+const CHECKOUT_DRAFT_KEY = 'hxu-checkout-draft'
+
 export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, onError }: CheckoutProps) {
-  const [ageVerified, setAgeVerified] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash')
+  const [ageVerified, setAgeVerified] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(CHECKOUT_DRAFT_KEY) || 'null')?.ageVerified === true } catch { return false }
+  })
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(() => {
+    try {
+      const value = JSON.parse(localStorage.getItem(CHECKOUT_DRAFT_KEY) || 'null')?.paymentMethod
+      return value === 'Card' || value === 'Mobile Wallet' || value === 'Credit' ? value : 'Cash'
+    } catch { return 'Cash' }
+  })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [customerName, setCustomerName] = useState('')
+  const [customerName, setCustomerName] = useState(() => {
+    try { return String(JSON.parse(localStorage.getItem(CHECKOUT_DRAFT_KEY) || 'null')?.customerName || '') } catch { return '' }
+  })
   const { runWithLoading } = useActionLoading()
+
+  useEffect(() => {
+    try { localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({ ageVerified, paymentMethod, customerName })) } catch { /* storage unavailable */ }
+  }, [ageVerified, paymentMethod, customerName])
 
   const total = cart.reduce(
     (sum, item) => sum + (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity,
@@ -60,6 +75,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
     try {
       const sale = await runWithLoading(() => api.createSale(payload))
       onSuccess(sale)
+      try { localStorage.removeItem(CHECKOUT_DRAFT_KEY) } catch { /* storage unavailable */ }
       onClose()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Checkout failed'

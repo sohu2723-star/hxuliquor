@@ -1,6 +1,8 @@
-import { useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import type { Product } from '../lib/api'
 import Scanner from './Scanner'
+
+const PRODUCT_FORM_DRAFT_PREFIX = 'hxu-product-form-draft:'
 
 interface ProductFormProps {
   product: Product | null
@@ -10,7 +12,8 @@ interface ProductFormProps {
 }
 
 export default function ProductForm({ product, categories, onSave, onClose }: ProductFormProps) {
-  const [formData, setFormData] = useState({
+  const draftKey = `${PRODUCT_FORM_DRAFT_PREFIX}${product?.id || 'new'}`
+  const initialFormData = {
     barcode: product?.barcode || '',
     name: product?.name || '',
     category: product?.category || '',
@@ -24,13 +27,29 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     packPrice: product?.packPrice?.toString() || '',
     saleType: product?.saleType || 'unit',
     requiresAgeCheck: product?.requiresAgeCheck || false,
+  }
+  const initialProductKind = product?.saleType === 'pack' ? 'pack' : product?.saleType === 'both' ? 'both' : product?.barcode ? 'barcode' : 'noBarcode'
+  const [formData, setFormData] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(draftKey) || 'null') as { formData?: Partial<typeof initialFormData> } | null
+      return saved?.formData ? { ...initialFormData, ...saved.formData } : initialFormData
+    } catch { return initialFormData }
   })
-  const [productKind, setProductKind] = useState<'barcode' | 'noBarcode' | 'pack' | 'both'>(product?.saleType === 'pack' ? 'pack' : product?.saleType === 'both' ? 'both' : product?.barcode ? 'barcode' : 'noBarcode')
+  const [productKind, setProductKind] = useState<'barcode' | 'noBarcode' | 'pack' | 'both'>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(draftKey) || 'null') as { productKind?: 'barcode' | 'noBarcode' | 'pack' | 'both' } | null
+      return saved?.productKind || initialProductKind
+    } catch { return initialProductKind }
+  })
   const [imageFile, setImageFile] = useState<File | undefined>()
   const [imagePreview, setImagePreview] = useState<string | null>(product?.imageUrl || null)
   const [isScanning, setIsScanning] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    try { localStorage.setItem(draftKey, JSON.stringify({ formData, productKind })) } catch { /* storage unavailable */ }
+  }, [draftKey, formData, productKind])
 
   const unitsPerPackValue = Math.max(1, parseInt(formData.unitsPerPack) || 1)
   const stockQtyValue = parseInt(formData.stockQty) || 0
@@ -117,7 +136,10 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       data.imageFile = imageFile
     }
 
-    try { await onSave(data) } finally { setIsSubmitting(false) }
+    try {
+      await onSave(data)
+      try { localStorage.removeItem(draftKey) } catch { /* storage unavailable */ }
+    } finally { setIsSubmitting(false) }
   }
 
   return (
