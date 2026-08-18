@@ -309,7 +309,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 <label className="flex h-14 flex-col text-sm font-medium leading-5 text-gray-700">{t('packSalePrice')}
                   <input type="number" name="packPrice" value={formData.packPrice} onChange={handleChange} required step="0.01" className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </label>
-                <p className="mt-2 rounded-lg bg-white/80 px-3 py-2 text-sm font-semibold text-violet-800">{t('packCountPreview')}: {packCountPreview} {t('pack')} · {t('looseUnits')}: {looseUnitPreview} {t('unitCount')}</p>
+                <div className="mt-2 space-y-1 rounded-lg bg-white/80 px-3 py-2 text-sm font-semibold text-violet-800"><p>• {t('packCountPreview')} - {packCountPreview} {t('pack')}</p><p>• {t('looseUnits')} - {looseUnitPreview} {t('unitCount')}</p><p>• {t('totalUnitStock')} - {stockQtyValue} {t('unitCount')}</p></div>
                 <p className="mt-2 rounded-lg bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700">{t('packPurchasePriceShort')}: {(costPriceValue * unitsPerPackValue).toLocaleString()} Ks</p>
               </div>}
             </div>}
@@ -324,7 +324,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{t('looseUnits')}</label>
                   <input type="number" name="looseUnits" min="0" max={Math.max(0, unitsPerPackValue - 1)} value={formData.looseUnits} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
-                <div className="col-span-2 rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">{t('totalUnitStock')}: {stockQtyValue} {t('unitCount')} · {t('packCountPreview')}: {packCountPreview} {t('pack')}</div>
+                <div className="col-span-2 space-y-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700"><p>• {t('totalUnitStock')} - {stockQtyValue} {t('unitCount')}</p><p>• {t('packCountPreview')} - {packCountPreview} {t('pack')}</p></div>
                 <div className="col-span-2 flex flex-col">
                   <label className="mb-1 flex h-10 items-end text-sm font-medium leading-5 text-gray-700">{t('lowStockThreshold')}</label>
                   <input type="number" name="lowStockThreshold" value={formData.lowStockThreshold} onChange={handleChange} className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />

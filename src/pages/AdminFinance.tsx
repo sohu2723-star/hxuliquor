@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import AppHeader from '../components/AppHeader'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { api, type CashTransaction, type Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -34,6 +35,7 @@ export default function AdminFinance() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(null)
   const [type, setType] = useState<TransactionType>('expense')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
@@ -117,15 +119,23 @@ export default function AdminFinance() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const removeTransaction = async (id: string) => {
-    if (!window.confirm(t('deleteTransactionQuestion'))) return
-    try {
-      await api.deleteCashTransaction(id)
-      setTransactions((current) => current.filter((item) => item.id !== id))
-      showToast(t('transactionDeleted'), 'success')
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : t('financeLoadError'), 'error')
-    }
+  const removeTransaction = (id: string) => {
+    setDeleteTransactionId(id)
+  }
+
+  const confirmRemoveTransaction = () => {
+    if (!deleteTransactionId) return
+    const id = deleteTransactionId
+    setDeleteTransactionId(null)
+    void runWithLoading(async () => {
+      try {
+        await api.deleteCashTransaction(id)
+        setTransactions((current) => current.filter((item) => item.id !== id))
+        showToast(t('transactionDeleted'), 'success')
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : t('financeLoadError'), 'error')
+      }
+    })
   }
 
   const Card = ({ label, value, className = 'text-slate-950' }: { label: string; value: number; className?: string }) => (
@@ -200,6 +210,14 @@ export default function AdminFinance() {
           </div>}
         </section>
       </div>
+      {deleteTransactionId && <ConfirmDialog
+        title={t('delete')}
+        message={t('deleteTransactionQuestion')}
+        confirmLabel={t('delete')}
+        cancelLabel={t('cancel')}
+        onCancel={() => setDeleteTransactionId(null)}
+        onConfirm={confirmRemoveTransaction}
+      />}
     </main>
   </div>
 }

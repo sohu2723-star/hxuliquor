@@ -10,8 +10,6 @@ import { useActionLoading } from '../contexts/ActionLoadingContext'
 import { useLanguage } from '../contexts/LanguageContext'
 
 const ADMIN_PRODUCTS_VIEW_KEY = 'hxu-admin-products-view'
-const PRODUCT_FORM_DRAFT_KEY = 'hxu-product-form-draft:new'
-
 const readAdminProductsView = () => {
   try { return JSON.parse(localStorage.getItem(ADMIN_PRODUCTS_VIEW_KEY) || '{}') as { searchQuery?: string; categoryFilter?: string; productGroup?: ProductGroup } } catch { return {} }
 }
@@ -19,7 +17,7 @@ const readAdminProductsView = () => {
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([])
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [showForm, setShowForm] = useState(() => Boolean(localStorage.getItem(PRODUCT_FORM_DRAFT_KEY)))
+  const [showForm, setShowForm] = useState(false)
   const [searchQuery, setSearchQuery] = useState(() => readAdminProductsView().searchQuery || '')
   const [categoryFilter, setCategoryFilter] = useState(() => readAdminProductsView().categoryFilter || '')
   const [productGroup, setProductGroup] = useState<ProductGroup>(() => readAdminProductsView().productGroup || 'all')

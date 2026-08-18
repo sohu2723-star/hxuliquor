@@ -189,3 +189,4 @@ export default function AdminCredits() {
       </div>
     </div>}
   </div>
+}

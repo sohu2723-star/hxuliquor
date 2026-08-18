@@ -53,10 +53,11 @@ export default function ProductList({ products, onEdit, onDelete }: ProductListP
                 </>}
               </td>
               <td className={`px-4 py-3 whitespace-nowrap font-bold ${isLowStock ? 'text-red-600' : 'text-emerald-700'}`}>
-                {product.saleType === 'both' ? <>
-                  <div>{t('fullPacks')}: {fullPacks} {t('pack')}</div>
-                  <div className="mt-1 text-sm">{t('looseUnits')}: {looseUnits} · {t('totalUnitStock')}: {product.stockQty} {t('unitCount')}</div>
-                </> : <div>{product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</div>}
+                {product.saleType === 'both' ? <div className="space-y-1 rounded-xl bg-emerald-50 px-3 py-2 text-emerald-800 ring-1 ring-emerald-100">
+                  <div>• {t('fullPacks')} - {fullPacks} {t('pack')}</div>
+                  <div className="text-sm">• {t('looseUnits')} - {looseUnits} {t('unitCount')}</div>
+                  <div className="text-sm">• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</div>
+                </div> : <div>• {t('stock')} - {product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</div>}
                 {isLowStock && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">{t('low')}</span>}
               </td>
               <td className="px-4 py-3 whitespace-nowrap text-sm">{product.requiresAgeCheck ? <span className="text-orange-600 font-medium">{t('yes')}</span> : <span className="text-gray-400">{t('no')}</span>}</td>
