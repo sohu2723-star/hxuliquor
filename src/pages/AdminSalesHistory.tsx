@@ -3,6 +3,7 @@ import AppHeader from '../components/AppHeader'
 import { api, type Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import { useLanguage } from '../contexts/LanguageContext'
+import { useToast } from '../contexts/ToastContext'
 
 const MYANMAR_TIME_ZONE = 'Asia/Yangon'
 
@@ -23,6 +24,7 @@ export default function AdminSalesHistory() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const { t } = useLanguage()
+  const { showToast } = useToast()
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true)
@@ -31,8 +33,10 @@ export default function AdminSalesHistory() {
       const { start, end } = monthRange(selectedMonth)
       const result = await api.getSalesStaleFirst(start, end, (fresh) => setSales(fresh))
       setSales(result.sales)
+      return true
     } catch (err) {
       setError(err instanceof Error ? err.message : t('salesLoadError'))
+      return false
     } finally {
       setLoading(false)
     }
@@ -53,6 +57,11 @@ export default function AdminSalesHistory() {
     }
   }, [load])
 
+  const handleRefresh = async () => {
+    const success = await load()
+    if (success) showToast(`${t('refresh')} ${t('done')}`, 'success')
+  }
+
   const total = sales.reduce((sum, sale) => sum + sale.totalAmount, 0)
   const paid = sales.reduce((sum, sale) => sum + sale.paidAmount, 0)
   const credit = sales.reduce((sum, sale) => sum + sale.balanceDue, 0)
@@ -62,7 +71,10 @@ export default function AdminSalesHistory() {
     <main className="mx-auto max-w-5xl p-4 lg:p-6">
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div><h1 className="text-2xl font-bold text-slate-950">{t('salesHistory')}</h1></div>
-        <label className="text-sm font-semibold text-slate-700">{t('chooseMonth')}<input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2" /></label>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="text-sm font-semibold text-slate-700">{t('chooseMonth')}<input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2" /></label>
+          <button onClick={() => void handleRefresh()} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50">{t('refresh')}</button>
+        </div>
       </div>
       {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <div className="mb-5 grid gap-4 sm:grid-cols-3">

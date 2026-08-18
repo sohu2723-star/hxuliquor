@@ -1,0 +1,5 @@
+{
+  "project_id": "zgiixmeanpevvdrcizfh",
+  "name": "cash_transactions",
+  "query": "create table if not exists public.cash_transactions (\n  id uuid primary key default gen_random_uuid(),\n  type text not null check (type in ('outside_income', 'expense')),\n  amount numeric(12,2) not null check (amount > 0),\n  note text not null default '',\n  created_at timestamptz not null default now(),\n  created_by uuid references public.profiles(id) on delete set null\n);\n\ncreate index if not exists cash_transactions_created_at_idx on public.cash_transactions (created_at desc);\ncreate index if not exists cash_transactions_type_idx on public.cash_transactions (type);\n\nalter table public.cash_transactions enable row level security;\n\ndrop policy if exists cash_transactions_admin_access on public.cash_transactions;\ncreate policy cash_transactions_admin_access on public.cash_transactions\nfor all to authenticated\nusing (public.is_admin())\nwith check (public.is_admin());"
+}

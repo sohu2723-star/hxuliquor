@@ -68,12 +68,16 @@ export default function Scanner({ onScan }: ScannerProps) {
 
       const scanner = new Html5Qrcode(readerId, { formatsToSupport: FORMATS, verbose: false })
       scannerRef.current = scanner
+      const hasExplicitCamera = Boolean(requestedCameraId || cameraId)
+      const videoConstraints: MediaTrackConstraints = hasExplicitCamera
+        ? { deviceId: { exact: selected }, width: { ideal: 1280 }, height: { ideal: 960 } }
+        : { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 960 } }
       await scanner.start(
         selected,
         {
           fps: 24,
           aspectRatio: 1.333334,
-          videoConstraints: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 960 } },
+          videoConstraints,
         },
         (rawCode) => {
           const code = rawCode.trim()

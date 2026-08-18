@@ -66,6 +66,15 @@ export type User = {
   sessionToken?: string
 }
 
+export type CashTransaction = {
+  id: string
+  type: 'outside_income' | 'expense'
+  amount: number
+  note: string
+  createdAt: string
+  createdBy: string
+}
+
 export type ProductGroup = 'all' | 'barcode' | 'noBarcode' | 'pack' | 'both'
 
 export const PRODUCT_GROUPS: { id: ProductGroup; label: string; description: string }[] = [
@@ -177,6 +186,21 @@ function normalizeUser(value: unknown): User | null {
   const email = asString(value.email).toLowerCase()
   if (!id || !email) return null
   return { id, name: asString(value.name, email.split('@')[0]), email, role: asString(value.role, 'employee').toLowerCase() }
+}
+
+function normalizeCashTransaction(value: unknown): CashTransaction | null {
+  if (!isRecord(value)) return null
+  const id = asString(value.id)
+  const type = asString(value.type)
+  if (!id || (type !== 'outside_income' && type !== 'expense')) return null
+  return {
+    id,
+    type,
+    amount: asNumber(value.amount),
+    note: asString(value.note),
+    createdAt: asString(value.createdAt ?? value.created_at),
+    createdBy: asString(value.createdBy ?? value.created_by),
+  }
 }
 
 function readProductCache(): Product[] | null {
@@ -363,6 +387,36 @@ export const api = {
     const sales = await fetchSalesOnce(startDate, endDate)
     saveSalesCache(cacheKey, sales)
     return { sales, fromCache: false }
+  },
+
+  async getCashTransactions(startDate?: string, endDate?: string): Promise<CashTransaction[]> {
+    let query = supabase.from('cash_transactions').select('id,type,amount,note,created_at,created_by').order('created_at', { ascending: false })
+    if (startDate) query = query.gte('created_at', `${startDate}T00:00:00+06:30`)
+    if (endDate) query = query.lte('created_at', `${endDate}T23:59:59+06:30`)
+    const { data, error } = await query
+    if (error) throwDatabaseError(error)
+    return (data || []).map(normalizeCashTransaction).filter((transaction): transaction is CashTransaction => transaction !== null)
+  },
+
+  async addCashTransaction(payload: { type: CashTransaction['type']; amount: number; note?: string }): Promise<CashTransaction> {
+    const { data, error } = await supabase.from('cash_transactions').insert({ type: payload.type, amount: asNumber(payload.amount), note: payload.note?.trim() || '' }).select('id,type,amount,note,created_at,created_by').single()
+    if (error) throwDatabaseError(error)
+    const transaction = normalizeCashTransaction(data)
+    if (!transaction) throw new Error(localizedError('The cash transaction response was invalid.', 'ငွေစာရင်းအဖြေ မမှန်ကန်ပါ။'))
+    return transaction
+  },
+
+  async updateCashTransaction(payload: { id: string; type: CashTransaction['type']; amount: number; note?: string }): Promise<CashTransaction> {
+    const { data, error } = await supabase.from('cash_transactions').update({ type: payload.type, amount: asNumber(payload.amount), note: payload.note?.trim() || '' }).eq('id', payload.id).select('id,type,amount,note,created_at,created_by').single()
+    if (error) throwDatabaseError(error)
+    const transaction = normalizeCashTransaction(data)
+    if (!transaction) throw new Error(localizedError('The cash transaction response was invalid.', 'ငွေစာရင်းအဖြေ မမှန်ကန်ပါ။'))
+    return transaction
+  },
+
+  async deleteCashTransaction(id: string): Promise<void> {
+    const { error } = await supabase.from('cash_transactions').delete().eq('id', id)
+    if (error) throwDatabaseError(error)
   },
 
   async getCurrentUser(): Promise<User | null> {

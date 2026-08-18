@@ -28,8 +28,10 @@ export default function AdminCredits() {
     try {
       const result = await api.getSalesStaleFirst(undefined, undefined, (fresh) => setSales(fresh))
       setSales(result.sales)
+      return true
     } catch (err) {
       setError(err instanceof Error ? err.message : t('creditLoadError'))
+      return false
     } finally {
       if (!quiet) setLoading(false)
     }
@@ -42,6 +44,11 @@ export default function AdminCredits() {
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(true) }, 60000)
     return () => { document.removeEventListener('visibilitychange', refreshWhenReturning); window.clearInterval(timer) }
   }, [load])
+
+  const handleRefresh = async () => {
+    const success = await load()
+    if (success) showToast(`${t('refresh')} ${t('done')}`, 'success')
+  }
 
   const credits = useMemo(() => sales.filter((sale) => sale.isCredit), [sales])
   const unpaid = credits.filter((sale) => sale.balanceDue > 0)
@@ -72,7 +79,7 @@ export default function AdminCredits() {
   return <div className="min-h-screen bg-slate-50">
     <AppHeader />
     <main className="mx-auto max-w-5xl p-4 lg:p-6">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><h1 className="text-2xl font-bold text-slate-950">{t('credits')}</h1><button onClick={() => void load()} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50">{t('refresh')}</button></div>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><h1 className="text-2xl font-bold text-slate-950">{t('credits')}</h1><button onClick={() => void handleRefresh()} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50">{t('refresh')}</button></div>
       {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <section className="surface-card p-5"><p className="text-sm text-slate-500">{t('creditReceipts')}</p><p className="mt-2 text-2xl font-bold text-amber-700">{credits.length}</p></section>

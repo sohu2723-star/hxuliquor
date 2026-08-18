@@ -63,6 +63,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
   const inventoryCostPreview = stockQtyValue * costPriceValue
   const packProfitPreview = formData.saleType === 'both' ? packPriceValue - (costPriceValue * unitsPerPackValue) : formData.saleType === 'pack' ? unitPriceValue - costPriceValue : 0
   const unitProfitPreview = formData.saleType !== 'pack' ? unitPriceValue - costPriceValue : 0
+  const packCountPreview = formData.saleType === 'both' ? Math.floor(stockQtyValue / unitsPerPackValue) : 0
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
@@ -288,6 +289,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 <label className="flex h-14 flex-col text-sm font-medium leading-5 text-gray-700">{t('packSalePrice')}
                   <input type="number" name="packPrice" value={formData.packPrice} onChange={handleChange} required step="0.01" className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </label>
+                <p className="mt-2 rounded-lg bg-white/80 px-3 py-2 text-sm font-semibold text-violet-800">{t('packCountPreview')}: {packCountPreview} {t('pack')}</p>
               </div>}
             </div>}
 
@@ -351,7 +353,6 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 onChange={handleImageChange}
                 className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
               />
-              <p className="mt-1.5 text-xs text-gray-500">{t('imageCompressionHint')}</p>
               {imagePreview && (
                 <img
                   src={imagePreview}

@@ -179,12 +179,12 @@ export default function POS() {
   const visibleProducts = useMemo(() => products.filter((product) => productMatchesGroup(product, productGroup) && matchesCategoryFilter(product)), [products, productGroup, matchesCategoryFilter])
   const filteredSearchResults = useMemo(() => {
     const normalized = searchQuery.trim().toLowerCase()
-    if (normalized.length < 2) return []
+    if (normalized.length < 1) return []
     return products.filter((product) => {
       const searchable = [product.name, product.barcode, product.category, product.productColor, product.productSize].join(' ').toLowerCase()
-      return searchable.includes(normalized) && matchesCategoryFilter(product)
+      return searchable.includes(normalized) && productMatchesGroup(product, productGroup) && matchesCategoryFilter(product)
     })
-  }, [products, searchQuery, matchesCategoryFilter])
+  }, [products, searchQuery, productGroup, matchesCategoryFilter])
 
   const requiresAgeCheck = cart.some((item) => item.product.requiresAgeCheck)
 
@@ -272,7 +272,7 @@ export default function POS() {
                 ))}
               </div>
             )}
-            {searchQuery.trim().length >= 2 && filteredSearchResults.length === 0 && (
+            {searchQuery.trim().length >= 1 && filteredSearchResults.length === 0 && (
               <p className="mt-3 text-sm text-gray-500">{t('noProductsFound')}</p>
             )}
           </div>

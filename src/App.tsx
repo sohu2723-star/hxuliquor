@@ -8,6 +8,7 @@ import AdminDashboard from './pages/AdminDashboard'
 import AdminCredits from './pages/AdminCredits'
 import AdminSalesHistory from './pages/AdminSalesHistory'
 import AdminWarnings from './pages/AdminWarnings'
+import AdminFinance from './pages/AdminFinance'
 import LoadingSpinner from './components/LoadingSpinner'
 import { ToastProvider } from './contexts/ToastContext'
 
@@ -57,6 +58,10 @@ function App() {
       <Route
         path="/admin/warnings"
         element={<ProtectedRoute adminOnly><AdminWarnings /></ProtectedRoute>}
+      />
+      <Route
+        path="/admin/finance"
+        element={<ProtectedRoute adminOnly><AdminFinance /></ProtectedRoute>}
       />
       <Route
         path="/pos"

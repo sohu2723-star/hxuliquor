@@ -37,6 +37,7 @@ export default function AppHeader() {
           {user?.role === 'admin' && <Link className={linkClass('/admin/credits')} to="/admin/credits"><Icon name="box" className="h-4 w-4" />{t('credits')}</Link>}
           {user?.role === 'admin' && <Link className={linkClass('/admin/sales-history')} to="/admin/sales-history"><Icon name="chart" className="h-4 w-4" />{t('history')}</Link>}
           {user?.role === 'admin' && <Link className={linkClass('/admin/warnings')} to="/admin/warnings"><Icon name="warning" className="h-4 w-4" />{t('warnings')}</Link>}
+          {user?.role === 'admin' && <Link className={linkClass('/admin/finance')} to="/admin/finance"><Icon name="chart" className="h-4 w-4" />{t('finance')}</Link>}
         </nav>
         <button onClick={() => setLanguage(language === 'my' ? 'en' : 'my')} className="whitespace-nowrap rounded-xl bg-amber-50 px-3.5 py-2 text-sm font-semibold text-amber-800 ring-1 ring-amber-200">{language === 'my' ? 'EN' : 'မြန်မာ'}</button>
         <div ref={profileRef} className="relative shrink-0">
