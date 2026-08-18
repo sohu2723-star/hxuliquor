@@ -20,7 +20,8 @@ export default function Login() {
     if (!authError) return
     setError(authError)
     setIsSubmitting(false)
-  }, [authError])
+    showToast(authError, 'error')
+  }, [authError, showToast])
 
   useEffect(() => {
     if (!user) return
@@ -39,14 +40,17 @@ export default function Login() {
       const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/pos'
       navigate(destination)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google login failed')
+      const message = err instanceof Error ? err.message : 'Google login failed'
+      setError(message)
       setIsSubmitting(false)
+      showToast(message, 'error')
     }
   }
 
   const handleGoogleError = (message: string) => {
     setError(message)
     setIsSubmitting(false)
+    showToast(message, 'error')
   }
 
   if (isLoading) {

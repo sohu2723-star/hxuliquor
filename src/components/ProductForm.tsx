@@ -255,7 +255,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
             </div>
 
-            {formData.saleType !== 'unit' && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
+            {formData.saleType === 'both' && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
               <h3 className="font-semibold text-slate-900">ပါကင် Product အချက်အလက်</h3>
               <div className="flex flex-col">
                 <label className="flex h-14 flex-col text-sm font-medium leading-5 text-gray-700">တစ်ပါကင်ပါဝင်မှု

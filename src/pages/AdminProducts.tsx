@@ -21,15 +21,16 @@ export default function AdminProducts() {
   const { showToast } = useToast()
   const { runWithLoading } = useActionLoading()
 
-  const refreshProducts = useCallback(async (force = false) => {
-    if (!force) setIsLoading(true)
+  const refreshProducts = useCallback(async (force = false, notify = false) => {
+    if (notify || !force) setIsLoading(true)
     try {
       const all = force ? await api.getProducts(true) : (await api.getProductsStaleFirst((fresh) => setProducts(fresh))).products
       setProducts(all)
+      if (notify) showToast('Product update ပြီးပါပြီ။', 'success')
     } catch (error) {
       showToast(getErrorMessage(error, 'Product data ဆွဲမရပါ။'), 'error')
     } finally {
-      setIsLoading(false)
+      if (notify || !force) setIsLoading(false)
     }
   }, [showToast])
 
@@ -130,7 +131,7 @@ export default function AdminProducts() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-2xl font-bold">Product Management</h1>
           <div className="flex gap-2">
-            <button onClick={() => void refreshProducts()} disabled={isLoading} className="border border-gray-300 px-4 py-2 rounded-md disabled:opacity-50">
+            <button onClick={() => void refreshProducts(true, true)} disabled={isLoading} className="border border-gray-300 px-4 py-2 rounded-md disabled:opacity-50">
               {isLoading ? 'Loading...' : 'Refresh'}
             </button>
             <button onClick={() => { setEditingProduct(null); setShowForm(true) }} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">

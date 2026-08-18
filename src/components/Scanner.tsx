@@ -60,8 +60,8 @@ export default function Scanner({ onScan }: ScannerProps) {
       const available = cameras.length ? cameras : await Html5Qrcode.getCameras()
       if (!available.length) throw new Error('Camera မတွေ့ပါ')
       setCameras(available)
-      const rear = available.find((camera) => /back|rear|environment|world/i.test(camera.label))
-      const selected = requestedCameraId || cameraId || rear?.id || available[0].id
+      const front = available.find((camera) => /front|user|fac(e|ing)/i.test(camera.label))
+      const selected = requestedCameraId || cameraId || front?.id || available[0].id
       setCameraId(selected)
 
       const scanner = new Html5Qrcode(readerId, { formatsToSupport: FORMATS, verbose: false })
@@ -71,7 +71,7 @@ export default function Scanner({ onScan }: ScannerProps) {
         {
           fps: 24,
           aspectRatio: 1.333334,
-          videoConstraints: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 960 } },
+          videoConstraints: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 960 } },
         },
         (rawCode) => {
           const code = rawCode.trim()
