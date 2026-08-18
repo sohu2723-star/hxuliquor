@@ -206,7 +206,6 @@ export default function POS() {
 
           <div className="surface-card p-4 sm:p-5">
             <h2 className="text-lg font-semibold">Scan Product / Barcode ဖတ်ရန်</h2>
-            <p className="text-sm text-gray-500 mb-3">Admin နှင့် Employee နှစ်ဦးလုံး အရောင်းအတွက် tablet နောက် camera ဖြင့် scan ဖတ်နိုင်သည်။</p>
             <Scanner onScan={handleScan} />
           </div>
 

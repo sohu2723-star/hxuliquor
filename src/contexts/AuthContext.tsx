@@ -14,6 +14,14 @@ interface AuthContextType {
 const USER_KEY = 'minimart-pos-user'
 const AUTH_LOAD_TIMEOUT_MS = 15000
 
+function readStoredUser(): User | null {
+  try {
+    const stored = JSON.parse(localStorage.getItem(USER_KEY) || 'null') as Partial<User> | null
+    if (!stored?.id || !stored.email) return null
+    return { id: String(stored.id), name: String(stored.name || stored.email.split('@')[0]), email: String(stored.email).toLowerCase(), role: String(stored.role || 'employee').toLowerCase(), sessionToken: stored.sessionToken }
+  } catch { return null }
+}
+
 function clearStoredUser() {
   try { localStorage.removeItem(USER_KEY) } catch { /* storage unavailable */ }
 }
@@ -31,8 +39,8 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<User | null>(() => readStoredUser())
+  const [isLoading, setIsLoading] = useState(() => !readStoredUser())
   const [authError, setAuthError] = useState('')
 
   useEffect(() => {
@@ -50,9 +58,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         else clearStoredUser()
       } catch (error) {
         if (!mounted || requestId !== loadRequest) return
-        setUser(null)
-        clearStoredUser()
-        setAuthError(error instanceof Error ? error.message : 'Unable to finish login. Please try again.')
+        const message = error instanceof Error ? error.message : 'Unable to finish login. Please try again.'
+        if (/Employee Accounts|Gmail/i.test(message)) {
+          setUser(null)
+          clearStoredUser()
+        }
+        // Keep a cached user visible during temporary network/proxy delays.
+        // The next auth event or successful request will replace it with fresh data.
+        setAuthError(message)
       } finally {
         if (mounted && requestId === loadRequest) setIsLoading(false)
       }
@@ -61,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void loadUser()
     // Defer database/profile work until Supabase has released its auth lock.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!mounted) return
+      if (!mounted || event === 'INITIAL_SESSION') return
       if (event === 'SIGNED_OUT' || !session) {
         loadRequest += 1
         setUser(null)
@@ -70,7 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false)
         return
       }
-      setIsLoading(true)
+      // SIGNED_IN / TOKEN_REFRESHED should refresh quietly when a user is already cached.
+      if (event === 'SIGNED_IN') setIsLoading(true)
       window.setTimeout(() => { if (mounted) void loadUser() }, 0)
     })
     return () => {
@@ -90,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!year || !month) return
       const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()
       void api.getSales(`${year}-${month}-01`, `${year}-${month}-${String(lastDay).padStart(2, '0')}`, true).catch(() => {})
-    }, 800)
+    }, 1500)
     return () => window.clearTimeout(timer)
   }, [user])
 

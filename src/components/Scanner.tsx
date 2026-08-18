@@ -71,7 +71,7 @@ export default function Scanner({ onScan }: ScannerProps) {
         {
           fps: 24,
           aspectRatio: 1.333334,
-          videoConstraints: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 960 } },
+          videoConstraints: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 960 } },
         },
         (rawCode) => {
           const code = rawCode.trim()
@@ -134,7 +134,6 @@ export default function Scanner({ onScan }: ScannerProps) {
       <button type="button" onClick={() => void stopScanning()} className="bg-red-600 text-white py-2 px-4 rounded-md">Camera ပိတ်မည်</button>
     </div>}
     {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">{error}</div>}
-    {isScanning && <p className="my-2 text-center text-sm text-gray-600">Default အရှေ့ camera ဖြင့်ဖွင့်ထားသည်။ Barcode/QR ကို preview အလယ်ဘက်ထားပါ—အဖြူ box ထဲ တိတိကျကျထည့်စရာမလိုဘဲ full preview ကို scan ဖမ်းပါမည်။</p>}
     {isScanning && <div className="flex flex-wrap items-center gap-2 mb-2">
       <button type="button" onClick={() => void applyCameraControl({ focusMode: 'single-shot' })} className="inline-flex items-center gap-1.5 rounded-md border bg-white px-3 py-2 text-sm"><Icon name="target" className="h-4 w-4" /> ပြန် Focus</button>
       {canTorch && <button type="button" onClick={() => { const next = !torchOn; setTorchOn(next); void applyCameraControl({ torch: next }) }} className="inline-flex items-center gap-1.5 rounded-md border bg-white px-3 py-2 text-sm"><Icon name="flash" className="h-4 w-4" />{torchOn ? 'မီးပိတ်' : 'မီးဖွင့်'}</button>}
@@ -144,7 +143,6 @@ export default function Scanner({ onScan }: ScannerProps) {
     </div>}
     <div className={`relative mx-auto aspect-[4/3] max-h-[360px] w-full max-w-md overflow-hidden rounded-2xl bg-black ${isScanning ? '' : 'hidden'}`}>
       <div id={readerId} />
-      <div className="pointer-events-none absolute inset-4 rounded-2xl border border-white/35" />
       <div className="pointer-events-none absolute left-6 top-6 h-8 w-8 border-l-4 border-t-4 border-green-300" />
       <div className="pointer-events-none absolute right-6 top-6 h-8 w-8 border-r-4 border-t-4 border-green-300" />
       <div className="pointer-events-none absolute bottom-6 left-6 h-8 w-8 border-b-4 border-l-4 border-green-300" />

@@ -21,13 +21,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: { componentStack: string }) {
+    // Do not force a reload automatically: on mobile browsers this can loop
+    // every time the app is reopened while an old PWA asset is still cached.
     console.error('ErrorBoundary caught an error:', error, errorInfo)
-    try {
-      if (/dynamically imported module|failed to fetch/i.test(error.message) && !sessionStorage.getItem('asset-recovery-attempted')) {
-        sessionStorage.setItem('asset-recovery-attempted', '1')
-        void this.clearOldAppAndReload()
-      }
-    } catch { /* Manual recovery button remains available when storage is blocked. */ }
   }
 
   private clearOldAppAndReload = async () => {
@@ -41,7 +37,7 @@ export class ErrorBoundary extends Component<Props, State> {
         await Promise.all(registrations.map((registration) => registration.unregister()))
       }
     } finally {
-      window.location.replace(`/?refresh=${Date.now()}`)
+      window.location.replace(`${window.location.pathname}?refresh=${Date.now()}${window.location.hash}`)
     }
   }
 

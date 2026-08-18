@@ -57,7 +57,6 @@ export default function AdminEmployees() {
 
   return <div className="min-h-screen bg-gray-100"><AppHeader /><main className="max-w-3xl mx-auto p-4 lg:p-6">
     <h1 className="text-2xl font-bold">Employee Accounts</h1>
-    <p className="text-gray-600 mt-1 mb-5">ဝန်ထမ်း၏ Google email ကို အရင်ထည့်ပါ။ Employee သည် အဲဒီ account ဖြင့် login ဝင်ပြီး Scan / Sale သာလုပ်နိုင်မည်။</p>
     <form onSubmit={add} className="bg-white shadow rounded-lg p-4 grid sm:grid-cols-3 gap-3 mb-5">
       <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Employee name" className="border rounded px-3 py-2" />
       <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Google email" className="border rounded px-3 py-2" />

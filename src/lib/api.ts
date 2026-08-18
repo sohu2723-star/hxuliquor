@@ -361,7 +361,7 @@ export const api = {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     if (sessionError) throwDatabaseError(sessionError)
     if (!session?.user) return null
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
+    const { data, error } = await supabase.from('profiles').select('id,name,email,role,is_authorized').eq('id', session.user.id).maybeSingle()
     if (error) throwDatabaseError(error)
     if (!data || data.is_authorized === false) {
       await supabase.auth.signOut()
