@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
+import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import type { User } from '../lib/api'
@@ -42,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => readStoredUser())
   const [isLoading, setIsLoading] = useState(() => !readStoredUser())
   const [authError, setAuthError] = useState('')
+  const signInInFlightRef = useRef(false)
 
   useEffect(() => {
     let mounted = true
@@ -83,7 +84,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsLoading(false)
         return
       }
-      // SIGNED_IN / TOKEN_REFRESHED should refresh quietly when a user is already cached.
+      // The explicit sign-in flow validates the allowlist before Login navigates.
+      // Avoid a second competing profile request while that validation is in flight.
+      if (event === 'SIGNED_IN' && signInInFlightRef.current) return
       if (event === 'SIGNED_IN') setIsLoading(true)
       window.setTimeout(() => { if (mounted) void loadUser() }, 0)
     })
@@ -109,8 +112,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const signInWithGoogle = async (idToken: string) => {
+    signInInFlightRef.current = true
     setAuthError('')
-    await api.signInWithGoogle(idToken)
+    setIsLoading(true)
+    try {
+      await api.signInWithGoogle(idToken)
+      const currentUser = await withTimeout(api.getCurrentUser(), AUTH_LOAD_TIMEOUT_MS)
+      if (!currentUser) throw new Error('Login session မရှိပါ။ Login ပြန်လုပ်ပါ။')
+      setUser(currentUser)
+      localStorage.setItem(USER_KEY, JSON.stringify(currentUser))
+      setAuthError('')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Google login failed'
+      setUser(null)
+      clearStoredUser()
+      setAuthError(message)
+      throw error instanceof Error ? error : new Error(message)
+    } finally {
+      signInInFlightRef.current = false
+      setIsLoading(false)
+    }
   }
 
   const logout = async () => {

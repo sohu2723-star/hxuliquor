@@ -17,11 +17,11 @@ export default function Login() {
   const location = useLocation()
 
   useEffect(() => {
-    if (!authError) return
+    if (!authError || authError === error) return
     setError(authError)
     setIsSubmitting(false)
     showToast(authError, 'error')
-  }, [authError, showToast])
+  }, [authError, error, showToast])
 
   useEffect(() => {
     if (!user) return
