@@ -4,6 +4,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { api, type User } from '../lib/api'
 import { useToast } from '../contexts/ToastContext'
 import { useActionLoading } from '../contexts/ActionLoadingContext'
+import { useLanguage } from '../contexts/LanguageContext'
 
 const EMPLOYEE_FORM_DRAFT_KEY = 'hxu-employee-form-draft'
 
@@ -20,12 +21,13 @@ export default function AdminEmployees() {
 
   const { showToast } = useToast()
   const { runWithLoading } = useActionLoading()
+  const { t } = useLanguage()
 
   useEffect(() => {
     try { localStorage.setItem(EMPLOYEE_FORM_DRAFT_KEY, JSON.stringify({ name, email })) } catch { /* storage unavailable */ }
   }, [name, email])
 
-  const load = useCallback((force = false) => api.getEmployees(force).then((fresh) => setEmployees((current) => JSON.stringify(current) === JSON.stringify(fresh) ? current : fresh)).catch((e: unknown) => { if (!force) showToast(e instanceof Error ? e.message : 'Employee data ဆွဲမရပါ။', 'error') }), [showToast])
+  const load = useCallback((force = false) => api.getEmployees(force).then((fresh) => setEmployees((current) => JSON.stringify(current) === JSON.stringify(fresh) ? current : fresh)).catch((e: unknown) => { if (!force) showToast(e instanceof Error ? e.message : t('employeeLoadError'), 'error') }), [showToast, t])
 
   useEffect(() => {
     void load()
@@ -43,9 +45,9 @@ export default function AdminEmployees() {
       setName('')
       setEmail('')
       try { localStorage.removeItem(EMPLOYEE_FORM_DRAFT_KEY) } catch { /* storage unavailable */ }
-      showToast('Employee account ထည့်ပြီးပါပြီ။', 'success')
+      showToast(t('employeeAdded'), 'success')
       void load(true)
-    } catch (error) { showToast(error instanceof Error ? error.message : 'Employee add failed', 'error') }
+    } catch (error) { showToast(error instanceof Error ? error.message : t('employeeAddError'), 'error') }
     finally { setIsSaving(false) }
   }
 
@@ -58,27 +60,27 @@ export default function AdminEmployees() {
     void runWithLoading(async () => {
       try {
         await api.deleteEmployee(employee.id)
-        showToast('Employee ဖယ်ရှားပြီးပါပြီ။', 'success')
+        showToast(t('employeeRemoved'), 'success')
         await load(true)
       } catch (error) {
         setEmployees(previous)
-        showToast(error instanceof Error ? error.message : 'Remove failed', 'error')
+        showToast(error instanceof Error ? error.message : t('employeeRemoveError'), 'error')
       }
     })
   }
 
   return <div className="min-h-screen bg-gray-100"><AppHeader /><main className="max-w-3xl mx-auto p-4 lg:p-6">
-    <h1 className="text-2xl font-bold">Employee Accounts</h1>
+    <h1 className="text-2xl font-bold">{t('employeeAccounts')}</h1>
     <form onSubmit={add} className="bg-white shadow rounded-lg p-4 grid sm:grid-cols-3 gap-3 mb-5">
-      <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Employee name" className="border rounded px-3 py-2" />
-      <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Google email" className="border rounded px-3 py-2" />
-      <button disabled={isSaving} className="bg-primary text-white rounded px-4 py-2 disabled:opacity-50">{isSaving ? 'Saving...' : 'Add Employee'}</button>
+      <input required value={name} onChange={(e) => setName(e.target.value)} placeholder={t('employeeName')} className="border rounded px-3 py-2" />
+      <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('googleEmail')} className="border rounded px-3 py-2" />
+      <button disabled={isSaving} className="bg-primary text-white rounded px-4 py-2 disabled:opacity-50">{isSaving ? t('saving') : t('addEmployee')}</button>
     </form>
     <div className="bg-white shadow rounded-lg divide-y">{employees.map((employee) => <div key={employee.id} className="p-4 flex items-center gap-3">
       <div className="flex-1"><p className="font-medium">{employee.name}</p><p className="text-sm text-gray-500">{employee.email} · {employee.role}</p></div>
-      {employee.role !== 'admin' && <button onClick={() => setRemoveEmployee(employee)} className="text-red-700 px-3 py-2">Remove</button>}
+      {employee.role !== 'admin' && <button onClick={() => setRemoveEmployee(employee)} className="text-red-700 px-3 py-2">{t('remove')}</button>}
     </div>)}</div>
   </main>
-  {removeEmployee && <ConfirmDialog title="Remove employee?" message={`${removeEmployee.name} (${removeEmployee.email}) ကို ဖယ်ရှားရန် သေချာပါသလား။`} confirmLabel="Remove" onCancel={() => setRemoveEmployee(null)} onConfirm={confirmRemove} />}
+  {removeEmployee && <ConfirmDialog title={t('removeEmployee')} message={`${removeEmployee.name} (${removeEmployee.email}) ${t('removeEmployeeQuestion')}`} confirmLabel={t('remove')} onCancel={() => setRemoveEmployee(null)} onConfirm={confirmRemove} />}
   </div>
 }

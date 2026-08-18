@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { ActionLoadingProvider } from './contexts/ActionLoadingContext'
+import { LanguageProvider } from './contexts/LanguageContext'
 import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import './index.css'
@@ -19,11 +20,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <ActionLoadingProvider>
-          <ErrorBoundary>
-            <App />
-          </ErrorBoundary>
-        </ActionLoadingProvider>
+        <LanguageProvider>
+          <ActionLoadingProvider>
+            <ErrorBoundary>
+              <App />
+            </ErrorBoundary>
+          </ActionLoadingProvider>
+        </LanguageProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,

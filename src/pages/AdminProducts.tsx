@@ -7,6 +7,7 @@ import AppHeader from '../components/AppHeader'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useToast } from '../contexts/ToastContext'
 import { useActionLoading } from '../contexts/ActionLoadingContext'
+import { useLanguage } from '../contexts/LanguageContext'
 
 const ADMIN_PRODUCTS_VIEW_KEY = 'hxu-admin-products-view'
 const PRODUCT_FORM_DRAFT_KEY = 'hxu-product-form-draft:new'
@@ -27,6 +28,7 @@ export default function AdminProducts() {
 
   const { showToast } = useToast()
   const { runWithLoading } = useActionLoading()
+  const { t } = useLanguage()
 
   useEffect(() => {
     try { localStorage.setItem(ADMIN_PRODUCTS_VIEW_KEY, JSON.stringify({ searchQuery, categoryFilter, productGroup })) } catch { /* storage unavailable */ }
@@ -37,13 +39,13 @@ export default function AdminProducts() {
     try {
       const all = force ? await api.getProducts(true) : (await api.getProductsStaleFirst((fresh) => setProducts(fresh))).products
       setProducts(all)
-      if (notify) showToast('Product update ပြီးပါပြီ။', 'success')
+      if (notify) showToast(t('productUpdated'), 'success')
     } catch (error) {
-      showToast(getErrorMessage(error, 'Product data ဆွဲမရပါ။'), 'error')
+      showToast(getErrorMessage(error, t('productLoadError')), 'error')
     } finally {
       if (notify || !force) setIsLoading(false)
     }
-  }, [showToast])
+  }, [showToast, t])
 
   useEffect(() => {
     void refreshProducts()
@@ -70,7 +72,7 @@ export default function AdminProducts() {
       let imageFileName: string | undefined
 
       if (productData.imageFile) {
-        imageBase64 = await fileToBase64(productData.imageFile)
+        imageBase64 = await fileToBase64(productData.imageFile, t)
         imageFileName = productData.imageFile.name
       }
 
@@ -94,16 +96,16 @@ export default function AdminProducts() {
       if (savingProduct) {
         const updated = await api.updateProduct({ id: savingProduct.id, ...payload })
         setProducts((current) => current.map((item) => item.id === updated.id ? updated : item))
-        showToast('Product updated အောင်မြင်ပါသည်', 'success')
+        showToast(t('productUpdated'), 'success')
       } else {
         const added = await api.addProduct(payload)
         setProducts((current) => [added, ...current.filter((item) => item.id !== added.id)])
-        showToast('Product added အောင်မြင်ပါသည်', 'success')
+        showToast(t('productAdded'), 'success')
       }
 
       })
     } catch (error) {
-      showToast(getErrorMessage(error, 'Product သိမ်းမရပါ။ နာမည်၊ category၊ ဈေး၊ ပုံဖိုင်အရွယ်အစားနှင့် internet connection ကို စစ်ပြီး ထပ်ကြိုးစားပါ။'), 'error')
+      showToast(getErrorMessage(error, t('productSaveError')), 'error')
     }
   }
 
@@ -120,11 +122,11 @@ export default function AdminProducts() {
     void runWithLoading(async () => {
       try {
         await api.deleteProduct(id)
-        showToast('Product deleted', 'success')
+        showToast(t('productDeleted'), 'success')
         await refreshProducts()
       } catch (error) {
         setProducts(previous)
-        showToast(error instanceof Error ? error.message : 'Failed to delete product', 'error')
+        showToast(error instanceof Error ? error.message : t('productDeleteError'), 'error')
       }
     })
   }
@@ -149,13 +151,13 @@ export default function AdminProducts() {
       <main className="p-4 lg:p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl font-bold">Product Management</h1>
+          <h1 className="text-2xl font-bold">{t('productManagement')}</h1>
           <div className="flex gap-2">
             <button onClick={() => void refreshProducts(true, true)} disabled={isLoading} className="border border-gray-300 px-4 py-2 rounded-md disabled:opacity-50">
-              {isLoading ? 'Loading...' : 'Refresh'}
+              {isLoading ? t('loading') : t('refresh')}
             </button>
             <button onClick={() => { setEditingProduct(null); setShowForm(true) }} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">
-              Add Product
+              {t('addProduct')}
             </button>
           </div>
         </div>
@@ -163,14 +165,14 @@ export default function AdminProducts() {
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
           {PRODUCT_GROUPS.map((group) => {
             const count = products.filter((product) => productMatchesGroup(product, group.id)).length
-            return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{group.label} ({count})</button>
+            return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{t(group.id === 'all' ? 'groupAll' : group.id === 'barcode' ? 'groupBarcode' : group.id === 'noBarcode' ? 'groupNoBarcode' : group.id === 'pack' ? 'groupPack' : 'groupBoth')} ({count})</button>
           })}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <input
             type="text"
-            placeholder="Search by name or barcode..."
+            placeholder={`${t('searchProduct')} / ${t('barcode')}`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
@@ -180,7 +182,7 @@ export default function AdminProducts() {
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
           >
-            <option value="">All Categories</option>
+            <option value="">{t('allCategoriesShort')}</option>
             {categories.map((cat) => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
@@ -195,9 +197,9 @@ export default function AdminProducts() {
 
         {deleteProductId && (
           <ConfirmDialog
-            title="Delete product?"
-            message="ဒီ product ကို ဖျက်ရန် သေချာပါသလား။ ဖျက်ပြီးလျှင် dashboard data ကို ချက်ချင်း refresh လုပ်ပါမည်။"
-            confirmLabel="Delete"
+            title={t('deleteProduct') + '?'}
+            message={t('deleteProductQuestion')}
+            confirmLabel={t('delete')}
             onCancel={() => setDeleteProductId(null)}
             onConfirm={confirmDelete}
           />
@@ -220,7 +222,7 @@ export default function AdminProducts() {
   )
 }
 
-function fileToBase64(file: File): Promise<string> {
+function fileToBase64(file: File, translate: (key: string) => string): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
@@ -231,7 +233,7 @@ function fileToBase64(file: File): Promise<string> {
         canvas.width = Math.round(image.width * scale)
         canvas.height = Math.round(image.height * scale)
         const context = canvas.getContext('2d')
-        if (!context) return reject(new Error('ပုံကို ပြင်ဆင်၍မရပါ။ အခြားပုံရွေးပါ။'))
+        if (!context) return reject(new Error(translate('imageProcessError')))
         context.drawImage(image, 0, 0, canvas.width, canvas.height)
         let quality = .76
         let result = canvas.toDataURL('image/jpeg', quality)
@@ -240,11 +242,11 @@ function fileToBase64(file: File): Promise<string> {
           result = canvas.toDataURL('image/jpeg', quality)
         }
         if (result.length > 48000) {
-          return reject(new Error('ပုံဖိုင်ကို ချုံ့၍မရပါ။ ပိုသေးသောပုံကို ရွေးပါ။'))
+          return reject(new Error(translate('imageCompressError')))
         }
         resolve(result)
       }
-      image.onerror = () => reject(new Error('ပုံဖိုင်ကို ဖတ်၍မရပါ။ JPG/PNG ပုံရွေးပါ။'))
+      image.onerror = () => reject(new Error(translate('imageReadError')))
       image.src = String(reader.result)
     }
     reader.onerror = (error) => reject(error)

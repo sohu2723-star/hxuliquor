@@ -3,6 +3,7 @@ import { api } from '../lib/api'
 import type { Product, Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import { useActionLoading } from '../contexts/ActionLoadingContext'
+import { useLanguage } from '../contexts/LanguageContext'
 
 interface CheckoutProps {
   cart: { product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]
@@ -32,6 +33,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
     try { return String(JSON.parse(localStorage.getItem(CHECKOUT_DRAFT_KEY) || 'null')?.customerName || '') } catch { return '' }
   })
   const { runWithLoading } = useActionLoading()
+  const { t } = useLanguage()
 
   useEffect(() => {
     try { localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({ ageVerified, paymentMethod, customerName })) } catch { /* storage unavailable */ }
@@ -44,7 +46,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
 
   const handleSubmit = async () => {
     if (requiresAgeCheck && !ageVerified) {
-      setError('Age verification is required')
+      setError(t('ageError'))
       return
     }
 
@@ -53,7 +55,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
 
     const user = JSON.parse(localStorage.getItem('minimart-pos-user') || '{}')
     if (paymentMethod === 'Credit' && !customerName.trim()) {
-      setError('အကြွေးရောင်းရန် Customer Name ထည့်ပါ။')
+      setError(t('creditCustomerRequired'))
       setIsSubmitting(false)
       return
     }
@@ -78,7 +80,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
       try { localStorage.removeItem(CHECKOUT_DRAFT_KEY) } catch { /* storage unavailable */ }
       onClose()
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Checkout failed'
+      const message = err instanceof Error ? err.message : t('checkoutFailed')
       setError(message)
       onError?.(message)
     } finally {
@@ -91,7 +93,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Checkout</h2>
+            <h2 className="text-xl font-bold">{t('checkout')}</h2>
             <button
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700 text-2xl"
@@ -102,17 +104,17 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
 
           <div className="space-y-4">
             <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="font-semibold mb-2">Items</h3>
+              <h3 className="font-semibold mb-2">{t('items')}</h3>
               {cart.map(({ product, quantity, saleUnit }) => (
                 <div key={`${product.id}-${saleUnit}`} className="flex justify-between text-sm mb-1">
                   <span>
-                    {product.name} ({saleUnit === 'pack' ? (product.saleType === 'pack' ? 'တစ်ပါကင်' : `ပါကင် × ${product.unitsPerPack}`) : 'ဘူး/ခု'}) × {quantity}
+                    {product.name} ({saleUnit === 'pack' ? (product.saleType === 'pack' ? t('pack') : `${t('pack')} × ${product.unitsPerPack}`) : t('unit')}) × {quantity}
                   </span>
                   <span>{formatCurrency((saleUnit === 'pack' ? product.packPrice : product.price) * quantity)}</span>
                 </div>
               ))}
               <div className="border-t mt-2 pt-2 flex justify-between font-bold">
-                <span>Total</span>
+                <span>{t('total')}</span>
                 <span>{formatCurrency(total)}</span>
               </div>
             </div>
@@ -120,7 +122,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
             {requiresAgeCheck && (
               <div className="border border-yellow-200 bg-yellow-50 p-4 rounded-md">
                 <label className="block text-sm font-medium text-yellow-800 mb-2">
-                  Age Verified?
+                  {t('ageVerified')}
                 </label>
                 <div className="flex gap-2">
                   <button
@@ -131,7 +133,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    Yes
+                    {t('yes')}
                   </button>
                   <button
                     onClick={() => setAgeVerified(false)}
@@ -141,7 +143,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    No
+                    {t('no')}
                   </button>
                 </div>
               </div>
@@ -149,22 +151,22 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Payment Method
+                {t('paymentMethod')}
               </label>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               >
-                <option value="Cash">Cash</option>
-                <option value="Card">Card</option>
-                <option value="Mobile Wallet">Mobile Wallet</option>
-                <option value="Credit">အကြွေး</option>
+                <option value="Cash">{t('cash')}</option>
+                <option value="Card">{t('card')}</option>
+                <option value="Mobile Wallet">{t('mobileWallet')}</option>
+                <option value="Credit">{t('credit')}</option>
               </select>
             </div>
-            {paymentMethod === 'Credit' && <label className="block text-sm font-medium text-gray-700">Customer Name
-              <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="အကြွေးယူသူအမည်" className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
-              <span className="mt-1 block text-xs text-amber-700">အကြွေးမဆပ်မချင်း Daily / Monthly income ထဲ မပေါင်းပါ။</span>
+            {paymentMethod === 'Credit' && <label className="block text-sm font-medium text-gray-700">{t('customerName')}
+              <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder={t('customerNamePlaceholder')} className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2" />
+              <span className="mt-1 block text-xs text-amber-700">{t('creditIncomeExclusion')}</span>
             </label>}
 
             {error && (
@@ -178,7 +180,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
               disabled={isSubmitting}
               className="w-full bg-primary text-white py-3 px-4 rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
-              {isSubmitting ? 'Processing...' : `Pay ${formatCurrency(total)}`}
+              {isSubmitting ? t('processing') : `${t('pay')} ${formatCurrency(total)}`}
             </button>
           </div>
         </div>

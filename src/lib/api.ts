@@ -69,11 +69,11 @@ export type User = {
 export type ProductGroup = 'all' | 'barcode' | 'noBarcode' | 'pack' | 'both'
 
 export const PRODUCT_GROUPS: { id: ProductGroup; label: string; description: string }[] = [
-  { id: 'all', label: 'အားလုံး', description: 'Product အားလုံး' },
-  { id: 'barcode', label: 'Barcode ရှိ', description: 'Scan ဖတ်ရောင်းမည့် product' },
-  { id: 'noBarcode', label: 'Barcode မရှိ', description: 'ပုံနှိပ်ပြီး manual ရောင်းမည့် product' },
-  { id: 'pack', label: 'ပါကင်လိုက်', description: 'ပါကင် stock သီးသန့်ထားမည့် product' },
-  { id: 'both', label: 'ပါကင် + တစ်ခုချင်း', description: 'stock တစ်ခုတည်းမှ ပါကင်လိုက်/တစ်ခုချင်း နှစ်မျိုးရောင်းမည့် product' },
+  { id: 'all', label: 'အားလုံး', description: 'ပစ္စည်းအားလုံး' },
+  { id: 'barcode', label: 'ကုဒ်ရှိ', description: 'ကုဒ်ဖတ်ပြီး ရောင်းမည့်ပစ္စည်း' },
+  { id: 'noBarcode', label: 'ကုဒ်မရှိ', description: 'ပုံဖြင့် လက်ဖြင့်ရောင်းမည့်ပစ္စည်း' },
+  { id: 'pack', label: 'ပါကင်လိုက်', description: 'ပါကင်လက်ကျန် သီးသန့်ထားမည့်ပစ္စည်း' },
+  { id: 'both', label: 'ပါကင် + တစ်ခုချင်း', description: 'လက်ကျန်တစ်မျိုးတည်းမှ ပါကင်နှင့် တစ်ခုချင်း နှစ်မျိုးရောင်းမည့်ပစ္စည်း' },
 ]
 
 export function productMatchesGroup(product: Product, group: ProductGroup): boolean {
@@ -240,8 +240,16 @@ export function barcodeMatches(savedValue: string, scannedValue: string): boolea
   })
 }
 
+function isEnglishLanguage() {
+  return typeof window !== 'undefined' && window.localStorage.getItem('hxu-language') === 'en'
+}
+
+function localizedError(english: string, myanmar: string) {
+  return isEnglishLanguage() ? english : myanmar
+}
+
 function throwDatabaseError(error: { message?: string } | null): never {
-  throw new Error(error?.message || 'Supabase request failed. Please try again.')
+  throw new Error(error?.message || localizedError('The data request failed. Please try again.', 'ဒေတာတောင်းဆိုမှု မအောင်မြင်ပါ။ ထပ်မံကြိုးစားပါ။'))
 }
 
 function productPayload(payload: Record<string, unknown>) {
@@ -365,7 +373,7 @@ export const api = {
     if (error) throwDatabaseError(error)
     if (!data || data.is_authorized === false) {
       await supabase.auth.signOut()
-      throw new Error('ဒီ Google Gmail ကို Admin က Employee Accounts ထဲ အရင်ထည့်ပေးရပါမယ်။')
+      throw new Error(localizedError('An administrator must add this Google account to Employee Accounts before sign-in.', 'ဤဂူဂယ်အကောင့်ကို ဝင်ရောက်နိုင်ရန် အက်ဒမင်က ဝန်ထမ်းအကောင့်များထဲသို့ အရင်ထည့်ပေးရပါမည်။'))
     }
     return normalizeUser(data)
   },
@@ -391,7 +399,7 @@ export const api = {
     const { data, error } = await supabase.functions.invoke('invite-employee', { body: { name: payload.name, email: payload.email } })
     if (error) throwDatabaseError(error)
     const user = normalizeUser(data?.user || data)
-    if (!user) throw new Error('Employee invitation response မမှန်ပါ။')
+    if (!user) throw new Error(localizedError('The employee invitation response was invalid.', 'ဝန်ထမ်းဖိတ်ကြားမှုအဖြေ မမှန်ကန်ပါ။'))
     saveEmployeeCache([...(readEmployeeCache() || []).filter((item) => item.id !== user.id), user])
     return user
   },
@@ -407,7 +415,7 @@ export const api = {
     if (error) throwDatabaseError(error)
     clearProductCache(); clearSalesCache()
     const sale = normalizeSale((data as Record<string, unknown> | null)?.sale || data)
-    if (!sale) throw new Error('Sale response မမှန်ပါ။')
+    if (!sale) throw new Error(localizedError('The sale response was invalid.', 'အရောင်းအဖြေ မမှန်ကန်ပါ။'))
     return sale
   },
 
@@ -416,7 +424,7 @@ export const api = {
     if (error) throwDatabaseError(error)
     clearSalesCache()
     const sale = normalizeSale((data as Record<string, unknown> | null)?.sale || data)
-    if (!sale) throw new Error('အကြွေးငွေပေးချေမှု response မမှန်ပါ။')
+    if (!sale) throw new Error(localizedError('The credit payment response was invalid.', 'အကြွေးငွေပေးချေမှုအဖြေ မမှန်ကန်ပါ။'))
     return sale
   },
 
@@ -426,7 +434,7 @@ export const api = {
     const { data, error } = await supabase.from('products').insert({ id, ...productPayload(payload), image_url: imageUrl }).select().single()
     if (error) throwDatabaseError(error)
     const product = normalizeProduct(data)
-    if (!product) throw new Error('Product response မမှန်ပါ။')
+    if (!product) throw new Error(localizedError('The product response was invalid.', 'ပစ္စည်းအဖြေ မမှန်ကန်ပါ။'))
     clearProductCache()
     return product
   },
@@ -437,7 +445,7 @@ export const api = {
     const { data, error } = await supabase.from('products').update(updates).eq('id', payload.id).select().single()
     if (error) throwDatabaseError(error)
     const product = normalizeProduct(data)
-    if (!product) throw new Error('Product response မမှန်ပါ။')
+    if (!product) throw new Error(localizedError('The product response was invalid.', 'ပစ္စည်းအဖြေ မမှန်ကန်ပါ။'))
     clearProductCache()
     return product
   },

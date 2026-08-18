@@ -9,6 +9,7 @@ import Scanner from '../components/Scanner'
 import Icon from '../components/Icon'
 import ReceiptLogo from '../components/ReceiptLogo'
 import { useToast } from '../contexts/ToastContext'
+import { useLanguage } from '../contexts/LanguageContext'
 
 const WELCOME_SESSION_KEY = 'hxu_show_welcome'
 const POS_DRAFT_KEY = 'hxu-pos-draft'
@@ -35,6 +36,7 @@ export default function POS() {
   const cartHydrated = useRef(false)
   const savedCartDraft = useRef(readPosDraft().cart || [])
   const { showToast } = useToast()
+  const { t, language } = useLanguage()
 
   useEffect(() => {
     if (!welcomeOpen) return
@@ -52,7 +54,7 @@ export default function POS() {
         const all = await api.getProducts(true)
         setProducts((current) => JSON.stringify(current) === JSON.stringify(all) ? current : all)
       } catch (error) {
-        if (!quiet) showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
+        if (!quiet) showToast(error instanceof Error ? error.message : t('productLoadError'), 'error')
       } finally {
         if (!quiet) setIsLoading(false)
         productsRefreshing.current = false
@@ -63,12 +65,12 @@ export default function POS() {
       const { products: all } = await api.getProductsStaleFirst((fresh) => setProducts(fresh))
       setProducts(all)
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Product data ဆွဲမရပါ။', 'error')
+      showToast(error instanceof Error ? error.message : t('productLoadError'), 'error')
     } finally {
       setIsLoading(false)
       productsRefreshing.current = false
     }
-  }, [showToast])
+  }, [showToast, t])
 
   useEffect(() => {
     void loadProducts()
@@ -116,7 +118,7 @@ export default function POS() {
   const addToCart = useCallback((product: Product, saleUnit: 'unit' | 'pack' = 'unit') => {
     const stockUnits = saleUnit === 'pack' && product.saleType !== 'pack' ? product.unitsPerPack : 1
     if (product.stockQty <= 0) {
-      showToast(`${product.name} stock ကုန်နေပါသည်`, 'error')
+      showToast(t('productStockOut', { name: product.name }), 'error')
       return
     }
     setCart((prev) => {
@@ -124,7 +126,7 @@ export default function POS() {
         .reduce((sum, item) => sum + item.quantity * (item.saleUnit === 'pack' && product.saleType !== 'pack' ? product.unitsPerPack : 1), 0)
       const existing = prev.find((item) => item.product.id === product.id && item.saleUnit === saleUnit)
       if (reservedStock + stockUnits > product.stockQty) {
-        showToast('ရောင်းရန် stock မလုံလောက်ပါ', 'error')
+        showToast(t('stockLow'), 'error')
         return prev
       }
       if (existing) {
@@ -136,8 +138,8 @@ export default function POS() {
       }
       return [...prev, { product, quantity: 1, saleUnit }]
     })
-    showToast(`${product.name} — ${saleUnit === 'pack' ? 'တစ်ပါကင်' : 'တစ်ဘူး/တစ်ခု'} Cart ထဲထည့်ပြီးပါပြီ`, 'success')
-  }, [showToast])
+    showToast(t('addedToCart', { name: product.name, unit: saleUnit === 'pack' ? t('pack') : t('unit') }), 'success')
+  }, [showToast, t])
 
   const removeFromCart = (productId: string, saleUnit: 'unit' | 'pack') => {
     setCart((prev) => prev.filter((item) => item.product.id !== productId || item.saleUnit !== saleUnit))
@@ -166,7 +168,7 @@ export default function POS() {
       addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit')
     } else {
       playScanSound(false)
-      showToast(`Code/Text ${code} ကို product စာရင်းတွင် မတွေ့ပါ။ Product name/color/size သို့မဟုတ် QR code ကို စစ်ပါ။`, 'error')
+      showToast(t('scanProductNotFound', { code }), 'error')
     }
   }
 
@@ -191,7 +193,7 @@ export default function POS() {
     setShowCheckout(false)
     setCompletedSale(sale)
     if (sale.id.startsWith('local-')) setProducts((current) => reduceSoldStock(current, sale))
-    showToast('Checkout အောင်မြင်ပါသည်။ Slip ထုတ်နိုင်ပါပြီ။', 'success')
+    showToast(t('checkoutSuccess'), 'success')
     void loadProducts(false, true)
   }
 
@@ -207,56 +209,41 @@ export default function POS() {
     }
     return (
       <div className="h-10 w-10 bg-gray-200 rounded-md flex items-center justify-center text-gray-400 text-xs">
-        No img
+        {t('noImage')}
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {welcomeOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-live="polite" aria-modal="true" aria-label="Welcome">
+      {welcomeOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/35 p-4" role="dialog" aria-live="polite" aria-modal="true" aria-label={t('welcome')}>
         <div className="relative w-full max-w-sm rounded-3xl bg-white px-8 py-10 text-center shadow-2xl ring-1 ring-white/70">
-          <button type="button" onClick={() => setWelcomeOpen(false)} className="absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Close"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" /></svg></button>
+          <button type="button" onClick={() => setWelcomeOpen(false)} className="absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={t('close')}><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" /></svg></button>
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><svg viewBox="0 0 24 24" className="h-12 w-12" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path strokeLinecap="round" strokeLinejoin="round" d="m8 12 2.5 2.5L16.5 9" /></svg></div>
-          <h2 className="mt-5 text-2xl font-extrabold text-slate-950">Welcome</h2>
+          <h2 className="mt-5 text-2xl font-extrabold text-slate-950">{t('welcome')}</h2>
         </div>
       </div>}
       <AppHeader />
-      {(() => {
-        const lowStock = products.filter((p) => p.stockQty <= p.lowStockThreshold)
-        if (lowStock.length === 0) return null
-        const visible = lowStock.slice(0, 5)
-        const remaining = lowStock.length - visible.length
-        return (
-          <div className="bg-red-50 border-b border-red-200 text-red-800 px-4 py-2 text-sm font-medium">
-            <p className="flex items-center gap-2"><Icon name="warning" className="h-4 w-4 shrink-0" /> ကုန်တော့မည့်ပစ္စည်း {lowStock.length} မျိုးရှိသည်။ Admin Income dashboard တွင်ကြည့်ပါ။</p>
-            <p className="mt-1 text-xs text-red-600">
-              {visible.map((p) => p.name).join('၊ ')}
-              {remaining > 0 && ` နှင့် အခြား ${remaining} မျိုး`}
-            </p>
-          </div>
-        )
-      })()}
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
 
           <div className="surface-card p-4 sm:p-5">
-            <h2 className="text-lg font-semibold">Scan Product / Barcode ဖတ်ရန်</h2>
+            <h2 className="text-lg font-semibold">{t('scanProduct')}</h2>
             <Scanner onScan={handleScan} />
           </div>
 
           <div className="surface-card p-4 sm:p-5">
-            <h2 className="text-lg font-semibold mb-3">Search Product</h2>
+            <h2 className="text-lg font-semibold mb-3">{t('searchProduct')}</h2>
             <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
               <input
                 type="text"
-                placeholder="Search by name..."
+                placeholder={t('searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               />
               <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="min-w-40 rounded-md border border-gray-300 px-3 py-2 font-semibold text-violet-700 focus:outline-none focus:ring-2 focus:ring-primary">
-                <option value="">Category အားလုံး</option>
+                <option value="">{t('allCategories')}</option>
                 {productCategories.map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
             </div>
@@ -286,21 +273,21 @@ export default function POS() {
               </div>
             )}
             {searchQuery.trim().length >= 2 && filteredSearchResults.length === 0 && (
-              <p className="mt-3 text-sm text-gray-500">No products found</p>
+              <p className="mt-3 text-sm text-gray-500">{t('noProductsFound')}</p>
             )}
           </div>
 
           <div className="surface-card p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3 mb-3">
-              <h2 className="text-lg font-semibold">Products ({visibleProducts.length}/{products.length})</h2>
+              <h2 className="text-lg font-semibold">{t('products')} ({visibleProducts.length}/{products.length})</h2>
               <button onClick={() => void loadProducts(true)} disabled={isLoading} className="text-sm border border-gray-300 rounded px-3 py-1 disabled:opacity-50">
-                {isLoading ? 'Loading...' : 'Refresh'}
+                {isLoading ? t('loading') : t('refresh')}
               </button>
             </div>
             {!isLoading && products.length > 0 && <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
               {PRODUCT_GROUPS.map((group) => {
                 const count = products.filter((product) => productMatchesGroup(product, group.id)).length
-                return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-3 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{group.label} ({count})</button>
+                return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-3 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{t(group.id === 'all' ? 'groupAll' : group.id === 'barcode' ? 'groupBarcode' : group.id === 'noBarcode' ? 'groupNoBarcode' : group.id === 'pack' ? 'groupPack' : 'groupBoth')} ({count})</button>
               })}
             </div>}
             {isLoading ? (
@@ -316,12 +303,12 @@ export default function POS() {
               </div>
             ) : products.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">No products available</p>
+                <p className="text-gray-500 mb-4">{t('noProducts')}</p>
                 <button
                   onClick={() => loadProducts(true)}
                   className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
                 >
-                  Retry
+                  {t('retry')}
                 </button>
               </div>
             ) : (
@@ -334,17 +321,17 @@ export default function POS() {
                     </div>
                     <p className="truncate font-bold">{product.name}</p>
                     <p className="text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
-                    <p className={`mt-1 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${product.stockQty <= product.lowStockThreshold ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>Stock: {product.stockQty} {product.saleType === 'pack' ? 'ပါကင်' : 'ခု/ဘူး'}</p>
+                    <p className={`mt-1 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${product.stockQty <= product.lowStockThreshold ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{t('stock')}: {product.stockQty} {product.saleType === 'pack' ? t('pack') : t('unitCount')}</p>
                   </div>
                   <div className="mt-3 grid gap-2">
                     {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} disabled={product.stockQty <= 0} className="w-full rounded-xl bg-primary disabled:cursor-not-allowed disabled:bg-slate-300 px-3 py-2.5 text-left text-white shadow-sm">
-                      <span className="flex items-center gap-1 text-[11px] font-medium text-white/80"><Icon name="bottle" className="h-4 w-4" />တစ်ဘူး / တစ်ခု ဈေး</span><strong className="block text-base">{formatCurrency(product.price)}</strong>
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-white/80"><Icon name="bottle" className="h-4 w-4" />{t('unitPriceLabel')}</span><strong className="block text-base">{formatCurrency(product.price)}</strong>
                     </button>}
                     {product.saleType !== 'unit' && (product.saleType === 'pack' || product.unitsPerPack > 1) && product.packPrice > 0 && <button onClick={() => addToCart(product, 'pack')} disabled={product.stockQty < (product.saleType === 'pack' ? 1 : product.unitsPerPack)} className="w-full rounded-xl border-2 border-violet-400 bg-violet-50 px-3 py-2.5 text-left text-violet-950 shadow-sm disabled:opacity-40">
-                      <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-700"><Icon name="box" className="h-4 w-4" />{product.saleType === 'pack' ? 'တစ်ပါကင် ဈေး' : `တစ်ပါကင် (${product.unitsPerPack} ခု) ဈေး`}</span><strong className="block text-base">{formatCurrency(product.packPrice)}</strong>
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-700"><Icon name="box" className="h-4 w-4" />{product.saleType === 'pack' ? t('packPriceLabel') : t('packPriceWithUnits', { count: product.unitsPerPack })}</span><strong className="block text-base">{formatCurrency(product.packPrice)}</strong>
                     </button>}
                   </div>
-                  {!product.barcode && <span className="mt-2 text-center text-[11px] font-medium text-slate-500">Manual sale · Barcode မရှိ</span>}
+                  {!product.barcode && <span className="mt-2 text-center text-[11px] font-medium text-slate-500">{t('manualSale')}</span>}
                   </div>
                 ))}
               </div>
@@ -386,7 +373,7 @@ export default function POS() {
             <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setIsMobileCartOpen(false)} />
             <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-xl shadow-xl max-h-[85vh] flex flex-col">
               <div className="p-4 border-b flex justify-between items-center">
-                <h2 className="text-xl font-bold">Cart ({cart.length})</h2>
+                <h2 className="text-xl font-bold">{t('cart')} ({cart.length})</h2>
                 <button
                   onClick={() => setIsMobileCartOpen(false)}
                   className="text-gray-500 hover:text-gray-700 text-2xl"
@@ -425,18 +412,18 @@ export default function POS() {
           <div className="text-center">
             <ReceiptLogo className="mx-auto mb-2 h-16 w-16 print:h-12 print:w-12" />
             <h2 className="text-2xl font-extrabold tracking-tight print:text-lg">HXU Liquor</h2>
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700 print:text-[10px]">Sale Receipt</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700 print:text-[10px]">{t('saleReceipt')}</p>
           </div>
           <div className="my-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600 print:my-2 print:rounded-none print:border-x-0 print:bg-white print:px-0">
-            <p>{new Date(completedSale.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Yangon' })}</p>
-            <p>Cashier: {completedSale.cashierName}</p>
-            <p>Payment: {completedSale.paymentMethod}</p>
-            <p>Slip ID: {formatSlipId(completedSale)}</p>
+            <p>{new Date(completedSale.createdAt).toLocaleString(language === 'my' ? 'my-MM' : 'en-GB', { timeZone: 'Asia/Yangon' })}</p>
+            <p>{t('cashier')}: {completedSale.cashierName}</p>
+            <p>{t('payment')}: {completedSale.paymentMethod === 'Cash' ? t('cash') : completedSale.paymentMethod === 'Card' ? t('card') : completedSale.paymentMethod === 'Mobile Wallet' ? t('mobileWallet') : t('credit')}</p>
+            <p>{t('slipId')}: {formatSlipId(completedSale)}</p>
           </div>
           <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm print:text-xs"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
-          <div className="mt-4 border-t pt-3 print:mt-2 print:pt-2"><div className="flex justify-between text-lg font-bold print:text-sm"><span>Total</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800 print:text-xs">အကြွေး · {completedSale.customerName} · ကျန်ငွေ {formatCurrency(completedSale.balanceDue)}</p>}</div>
-          <p className="mt-4 text-center text-xs text-slate-500 print:mt-2">Thank you for shopping with HXU Liquor</p>
-          <div className="mt-5 grid grid-cols-2 gap-2 print:hidden"><button onClick={() => window.print()} className="rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-800 shadow-sm">Print Slip</button><button onClick={() => setCompletedSale(null)} className="rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm">ပြီးပါပြီ</button></div>
+          <div className="mt-4 border-t pt-3 print:mt-2 print:pt-2"><div className="flex justify-between text-lg font-bold print:text-sm"><span>{t('total')}</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800 print:text-xs">{t('credit')} · {completedSale.customerName} · {t('creditBalance')} {formatCurrency(completedSale.balanceDue)}</p>}</div>
+          <p className="mt-4 text-center text-xs text-slate-500 print:mt-2">{t('thankYou')}</p>
+          <div className="mt-5 grid grid-cols-2 gap-2 print:hidden"><button onClick={() => window.print()} className="rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-800 shadow-sm">{t('printSlip')}</button><button onClick={() => setCompletedSale(null)} className="rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm">{t('done')}</button></div>
         </div>
       </div>}
     </div>

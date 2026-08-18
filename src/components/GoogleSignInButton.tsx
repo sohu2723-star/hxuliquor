@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import LoadingSpinner from './LoadingSpinner'
+import { useLanguage } from '../contexts/LanguageContext'
 
 declare global {
   interface Window {
@@ -56,6 +57,7 @@ function loadGoogleIdentityScript(): Promise<void> {
 
 export default function GoogleSignInButton({ clientId, onSuccess, onError }: GoogleSignInButtonProps) {
   const buttonRef = useRef<HTMLDivElement>(null)
+  const { t } = useLanguage()
   const onSuccessRef = useRef(onSuccess)
   const onErrorRef = useRef(onError)
   const [isScriptLoaded, setIsScriptLoaded] = useState(Boolean(window.google?.accounts?.id))
@@ -71,11 +73,11 @@ export default function GoogleSignInButton({ clientId, onSuccess, onError }: Goo
       .then(() => {
         if (!cancelled) setIsScriptLoaded(true)
       })
-      .catch((error: unknown) => {
-        if (!cancelled) onErrorRef.current?.(error instanceof Error ? error.message : 'Google Sign-In failed')
+      .catch(() => {
+        if (!cancelled) onErrorRef.current?.(t('loginScriptError'))
       })
     return () => { cancelled = true }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     if (!isScriptLoaded || !buttonRef.current || !window.google?.accounts?.id) return
@@ -86,7 +88,7 @@ export default function GoogleSignInButton({ clientId, onSuccess, onError }: Goo
       client_id: clientId,
       callback: (response) => {
         if (response.credential) onSuccessRef.current(response.credential)
-        else onErrorRef.current?.('Google Sign-In failed')
+        else onErrorRef.current?.(t('loginScriptError'))
       },
       auto_select: false,
       cancel_on_tap_outside: true,
@@ -100,7 +102,7 @@ export default function GoogleSignInButton({ clientId, onSuccess, onError }: Goo
       shape: 'pill',
       text: 'signin_with',
     })
-  }, [isScriptLoaded, clientId])
+  }, [isScriptLoaded, clientId, t])
 
   if (!isScriptLoaded) {
     return <div className="flex justify-center"><LoadingSpinner className="h-9 w-9" /></div>

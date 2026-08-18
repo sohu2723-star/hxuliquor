@@ -120,12 +120,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.signInWithGoogle(idToken)
       const currentUser = await withTimeout(api.getCurrentUser(), AUTH_LOAD_TIMEOUT_MS)
-      if (!currentUser) throw new Error('Login session မရှိပါ။ Login ပြန်လုပ်ပါ။')
+      if (!currentUser) throw new Error(localStorage.getItem('hxu-language') === 'en' ? 'No login session was found. Please sign in again.' : 'ဝင်ရောက်မှုအခြေအနေ မတွေ့ပါ။ ပြန်လည်ဝင်ရောက်ပါ။')
       setUser(currentUser)
       localStorage.setItem(USER_KEY, JSON.stringify(currentUser))
       setAuthError('')
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Google login failed'
+      const message = error instanceof Error ? error.message : (localStorage.getItem('hxu-language') === 'en' ? 'Google sign-in failed.' : 'ဂူဂယ်အကောင့်ဖြင့် ဝင်ရောက်မှု မအောင်မြင်ပါ။')
       setUser(null)
       clearStoredUser()
       setAuthError(message)

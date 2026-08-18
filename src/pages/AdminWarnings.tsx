@@ -1,0 +1,56 @@
+import { useCallback, useEffect, useState } from 'react'
+import AppHeader from '../components/AppHeader'
+import Icon from '../components/Icon'
+import { api, type Product } from '../lib/api'
+import { useLanguage } from '../contexts/LanguageContext'
+
+export default function AdminWarnings() {
+  const { t } = useLanguage()
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true)
+    try {
+      const result = await api.getProductsStaleFirst((fresh) => setProducts(fresh))
+      setProducts(result.products)
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('lowStockLoadError'))
+    } finally {
+      if (!quiet) setLoading(false)
+    }
+  }, [t])
+
+  useEffect(() => {
+    void load()
+    const refresh = () => { if (document.visibilityState === 'visible') void load(true) }
+    document.addEventListener('visibilitychange', refresh)
+    const timer = window.setInterval(refresh, 60000)
+    return () => { document.removeEventListener('visibilitychange', refresh); window.clearInterval(timer) }
+  }, [load])
+
+  const lowStock = products.filter((product) => product.stockQty <= product.lowStockThreshold)
+
+  return <div className="min-h-screen bg-slate-50">
+    <AppHeader />
+    <main className="mx-auto max-w-5xl p-4 lg:p-6">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-red-700"><Icon name="warning" className="h-7 w-7" />{t('warningPage')}</h1>
+          <p className="mt-1 text-sm text-slate-500">{t('warningCount', { count: lowStock.length })}</p>
+        </div>
+        <button type="button" onClick={() => void load()} disabled={loading} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 disabled:opacity-60"><Icon name="refresh" className="mr-1 inline h-4 w-4" />{t('refresh')}</button>
+      </div>
+      {error && <div className="mb-4 flex items-center gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700"><Icon name="warning" className="h-5 w-5 shrink-0" />{error}</div>}
+      {loading ? <div className="surface-card p-8 text-center text-slate-500">{t('loading')}</div> : lowStock.length === 0 ? <div className="surface-card flex flex-col items-center justify-center gap-3 p-12 text-center text-emerald-700"><Icon name="check" className="h-12 w-12" /><p className="font-semibold">{t('warningEmpty')}</p></div> : <div className="grid gap-3 sm:grid-cols-2">
+        {lowStock.map((product) => <article key={product.id} className="surface-card flex items-center gap-4 border-l-4 border-red-500 p-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-700"><Icon name="warning" className="h-7 w-7" /></div>
+          <div className="min-w-0 flex-1"><h2 className="truncate font-bold text-slate-950">{product.name}</h2><p className="mt-1 text-sm text-slate-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ') || t('categoryUnknown')}</p></div>
+          <div className="text-right"><p className="text-xs font-semibold text-slate-500">{t('warningStock')}</p><p className="text-lg font-extrabold text-red-700">{product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</p><p className="text-xs text-slate-400">{t('threshold')}: {product.lowStockThreshold}</p></div>
+        </article>)}
+      </div>}
+    </main>
+  </div>
+}

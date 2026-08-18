@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Product } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import Icon from './Icon'
+import { useLanguage } from '../contexts/LanguageContext'
 
 interface CartProps {
   items: { product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]
@@ -19,6 +20,7 @@ export default function Cart({
   requiresAgeCheck,
 }: CartProps) {
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
+  const { t } = useLanguage()
 
   const total = items.reduce(
     (sum, item) => sum + (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity,
@@ -27,11 +29,11 @@ export default function Cart({
 
   return (
     <div className="h-full flex flex-col">
-      <h2 className="text-xl font-bold mb-4">Cart ({items.length})</h2>
+      <h2 className="text-xl font-bold mb-4">{t('cart')} ({items.length})</h2>
 
       <div className="flex-1 overflow-y-auto space-y-3 mb-4">
         {items.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">Cart is empty</p>
+          <p className="text-gray-500 text-center py-8">{t('cartEmpty')}</p>
         ) : (
           items.map(({ product, quantity, saleUnit }) => {
             const lineId = `${product.id}-${saleUnit}`
@@ -43,7 +45,7 @@ export default function Cart({
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <p className="font-medium">{product.name}</p>
-                  <p className="flex items-center gap-1 text-sm font-medium text-gray-500"><Icon name={saleUnit === 'pack' ? 'box' : 'bottle'} className="h-4 w-4" />{saleUnit === 'pack' ? (product.saleType === 'pack' ? 'တစ်ပါကင်' : `ပါကင် (${product.unitsPerPack} ခု)`) : 'တစ်ဘူး / တစ်ခု'}</p>
+                  <p className="flex items-center gap-1 text-sm font-medium text-gray-500"><Icon name={saleUnit === 'pack' ? 'box' : 'bottle'} className="h-4 w-4" />{saleUnit === 'pack' ? (product.saleType === 'pack' ? t('pack') : `${t('pack')} (${product.unitsPerPack} ${t('unitCount')})`) : t('unit')}</p>
                   <p className="font-semibold text-primary mt-1">
                     {formatCurrency(saleUnit === 'pack' ? product.packPrice : product.price)}
                   </p>
@@ -57,13 +59,13 @@ export default function Cart({
                       }}
                       className="text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
                     >
-                      Remove
+                      {t('remove')}
                     </button>
                     <button
                       onClick={() => setPendingRemoveId(null)}
                       className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300"
                     >
-                      Cancel
+                      {t('cancel')}
                     </button>
                   </div>
                 ) : (
@@ -104,13 +106,13 @@ export default function Cart({
 
       {requiresAgeCheck && (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-md text-sm mb-4">
-          Age verification required for restricted items
+          {t('ageRequired')}
         </div>
       )}
 
       <div className="border-t pt-4">
         <div className="flex justify-between text-lg font-bold mb-4">
-          <span>Total</span>
+          <span>{t('total')}</span>
           <span>{formatCurrency(total)}</span>
         </div>
         <button
@@ -118,7 +120,7 @@ export default function Cart({
           disabled={items.length === 0}
           className="w-full bg-primary text-white py-3 px-4 rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
         >
-          Checkout
+          {t('checkout')}
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import type { Product } from '../lib/api'
 import Scanner from './Scanner'
+import { useLanguage } from '../contexts/LanguageContext'
 
 const PRODUCT_FORM_DRAFT_PREFIX = 'hxu-product-form-draft:'
 
@@ -12,6 +13,7 @@ interface ProductFormProps {
 }
 
 export default function ProductForm({ product, categories, onSave, onClose }: ProductFormProps) {
+  const { t } = useLanguage()
   const draftKey = `${PRODUCT_FORM_DRAFT_PREFIX}${product?.id || 'new'}`
   const initialFormData = {
     barcode: product?.barcode || '',
@@ -56,8 +58,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
   const costPriceValue = parseFloat(formData.costPrice) || 0
   const packPriceValue = parseFloat(formData.packPrice) || 0
   const unitPriceValue = parseFloat(formData.price) || 0
-  const stockUnitLabel = formData.saleType === 'pack' ? 'ပါကင်' : 'အသေးဆုံး unit (ခု/ဘူး)'
-  const costUnitLabel = formData.saleType === 'pack' ? 'တစ်ပါကင် ဝယ်ရင်းဈေး' : 'တစ်ခု/တစ်ဘူး ဝယ်ရင်းဈေး'
+  const stockUnitLabel = formData.saleType === 'pack' ? t('pack') : t('unitCount')
+  const costUnitLabel = formData.saleType === 'pack' ? t('packSalePrice') : t('unitCostPrice')
   const inventoryCostPreview = stockQtyValue * costPriceValue
   const packProfitPreview = formData.saleType === 'both' ? packPriceValue - (costPriceValue * unitsPerPackValue) : formData.saleType === 'pack' ? unitPriceValue - costPriceValue : 0
   const unitProfitPreview = formData.saleType !== 'pack' ? unitPriceValue - costPriceValue : 0
@@ -86,7 +88,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        alert('ပုံဖိုင် 10MB ထက်ငယ်ရပါမည်။')
+        alert(t('imageTooLarge'))
         return
       }
       setImageFile(file)
@@ -147,7 +149,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">{product ? 'Edit Product' : 'Add Product'}</h2>
+            <h2 className="text-xl font-bold">{product ? t('productEditTitle') : t('productAddTitle')}</h2>
             <button
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700 text-2xl"
@@ -158,12 +160,12 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <fieldset className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <legend className="px-1 text-sm font-semibold">Product အမျိုးအစား</legend>
+              <legend className="px-1 text-sm font-semibold">{t('productType')}</legend>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
-                <button type="button" onClick={() => selectProductKind('barcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'barcode' ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><span className="block font-semibold">Barcode ရှိ Product</span><small>Barcode ထည့်ပြီး scan ရောင်းရန်</small></button>
-                <button type="button" onClick={() => selectProductKind('noBarcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'noBarcode' ? 'border-slate-500 bg-slate-50 text-slate-800' : 'bg-white'}`}><span className="block font-semibold">Barcode မရှိ Product</span><small>Barcode ကို ကွက်လပ်ထားပါ</small></button>
-                <button type="button" onClick={() => selectProductKind('pack')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><span className="block font-semibold">ပါကင် သီးသန့်</span><small>Stock ကို ပါကင်ဖြင့်ထည့်ပါ</small></button>
-                <button type="button" onClick={() => selectProductKind('both')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'both' ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'bg-white'}`}><span className="block font-semibold">ပါကင် + တစ်ခုချင်း</span><small>Stock ကို တစ်ခုချင်းစုစုပေါင်းထည့်ပါ</small></button>
+                <button type="button" onClick={() => selectProductKind('barcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'barcode' ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><span className="block font-semibold">{t('barcodeProduct')}</span><small>{t('barcodeProductHint')}</small></button>
+                <button type="button" onClick={() => selectProductKind('noBarcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'noBarcode' ? 'border-slate-500 bg-slate-50 text-slate-800' : 'bg-white'}`}><span className="block font-semibold">{t('noBarcodeProduct')}</span><small>{t('noBarcodeProductHint')}</small></button>
+                <button type="button" onClick={() => selectProductKind('pack')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><span className="block font-semibold">{t('packOnlyProduct')}</span><small>{t('packOnlyProductHint')}</small></button>
+                <button type="button" onClick={() => selectProductKind('both')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'both' ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'bg-white'}`}><span className="block font-semibold">{t('packBothProduct')}</span><small>{t('packBothProductHint')}</small></button>
               </div>
             </fieldset>
             <div>
@@ -177,14 +179,14 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   value={formData.barcode}
                   onChange={handleChange}
                   className="h-11 flex-1 rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Codes များလျှင် comma ခြားထည့်ပါ"
+                  placeholder={t('barcodeCodesPlaceholder')}
                 />
                 <button
                   type="button"
                   onClick={() => setIsScanning(!isScanning)}
                   className="px-3 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
                 >
-                  {isScanning ? 'Cancel' : 'Scan'}
+                  {isScanning ? t('cancel') : t('scan')}
                 </button>
               </div>
               {isScanning && (
@@ -196,7 +198,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Product Name
+                {t('productName')}
               </label>
               <input
                 type="text"
@@ -218,14 +220,14 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 onChange={handleChange}
                 className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
               >
-                <option value="">Select category</option>
+                <option value="">{t('selectCategory')}</option>
                 {categories.map((cat) => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
               <input
                 type="text"
-                placeholder="Or type new category"
+                placeholder={t('newCategoryPlaceholder')}
                 value={formData.category}
                 required
                 onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
@@ -235,19 +237,19 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
-                <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">Product Color / အရောင်</label>
-                <input type="text" name="productColor" value={formData.productColor} onChange={handleChange} placeholder="ဥပမာ Red, Blue, Gold" className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
+                <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">{t('color')}</label>
+                <input type="text" name="productColor" value={formData.productColor} onChange={handleChange} placeholder={t('colorPlaceholder')} className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
               <div className="flex flex-col">
-                <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">Product Size / အရွယ်အစား</label>
-                <input type="text" name="productSize" value={formData.productSize} onChange={handleChange} placeholder="ဥပမာ 500ml, 1L, Small" className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
+                <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">{t('size')}</label>
+                <input type="text" name="productSize" value={formData.productSize} onChange={handleChange} placeholder={t('sizePlaceholder')} className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">
-                  {formData.saleType === 'pack' ? 'တစ်ပါကင် ရောင်းဈေး (Ks)' : 'တစ်ဘူး / တစ်ခု ရောင်းဈေး (Ks)'}
+                  {formData.saleType === 'pack' ? t('packSalePrice') : t('unitSalePrice')}
                 </label>
                 <input
                   type="number"
@@ -261,7 +263,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
               <div className="flex flex-col">
                 <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">
-                  {costUnitLabel} (Ks)
+                  {costUnitLabel}
                 </label>
                 <input
                   type="number"
@@ -276,14 +278,14 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             </div>
 
             {formData.saleType === 'both' && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
-              <h3 className="font-semibold text-slate-900">ပါကင် Product အချက်အလက်</h3>
+              <h3 className="font-semibold text-slate-900">{t('packInfo')}</h3>
               <div className="flex flex-col">
-                <label className="flex h-14 flex-col text-sm font-medium leading-5 text-gray-700">တစ်ပါကင်ပါဝင်မှု
+                <label className="flex h-14 flex-col text-sm font-medium leading-5 text-gray-700">{t('unitsPerPack')}
                   <input type="number" name="unitsPerPack" min="2" value={formData.unitsPerPack} onChange={handleChange} required className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </label>
               </div>
               {formData.saleType === 'both' && <div className="mt-3 flex flex-col">
-                <label className="flex h-14 flex-col text-sm font-medium leading-5 text-gray-700">တစ်ပါကင် ရောင်းဈေး (Ks)
+                <label className="flex h-14 flex-col text-sm font-medium leading-5 text-gray-700">{t('packSalePrice')}
                   <input type="number" name="packPrice" value={formData.packPrice} onChange={handleChange} required step="0.01" className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </label>
               </div>}
@@ -292,7 +294,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">
-                  Stock Quantity ({stockUnitLabel})
+                  {t('stockQuantity')} ({stockUnitLabel})
                 </label>
                 <input
                   type="number"
@@ -305,7 +307,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
               <div className="flex flex-col">
                 <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">
-                  Low Stock Threshold
+                  {t('lowStockThreshold')}
                 </label>
                 <input
                   type="number"
@@ -318,10 +320,10 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             </div>
 
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
-              <p className="font-semibold">Stock / Profit preview</p>
-              <p>ရင်းနှီးမှု ခန့်မှန်းချက်: {stockQtyValue} × {costPriceValue.toLocaleString()} = {inventoryCostPreview.toLocaleString()} Ks</p>
-              {formData.saleType !== 'pack' && <p>တစ်ခုချင်း အမြတ်: {(unitProfitPreview || 0).toLocaleString()} Ks / unit</p>}
-              {formData.saleType !== 'unit' && <p>ပါကင် အမြတ်: {(packProfitPreview || 0).toLocaleString()} Ks / pack</p>}
+              <p className="font-semibold">{t('stockProfitPreview')}</p>
+              <p>{t('investmentPreview')}: {stockQtyValue} × {costPriceValue.toLocaleString()} = {inventoryCostPreview.toLocaleString()} Ks</p>
+              {formData.saleType !== 'pack' && <p>{t('unitProfit')}: {(unitProfitPreview || 0).toLocaleString()} Ks</p>}
+              {formData.saleType !== 'unit' && <p>{t('packProfit')}: {(packProfitPreview || 0).toLocaleString()} Ks</p>}
             </div>
 
             <div className="flex items-center">
@@ -334,13 +336,13 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
               />
               <label htmlFor="requiresAgeCheck" className="ml-2 block text-sm text-gray-700">
-                Requires age check (cigarettes/alcohol)
+                {t('ageCheckRequired')}
               </label>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Product Image
+                {t('productImage')}
               </label>
               <input
                 ref={fileInputRef}
@@ -349,11 +351,11 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 onChange={handleImageChange}
                 className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
               />
-              <p className="mt-1.5 text-xs text-gray-500">ပုံကို upload မတင်မီ အလိုအလျောက် ချုံ့ပေးပါမည် (JPG, PNG, WebP)။</p>
+              <p className="mt-1.5 text-xs text-gray-500">{t('imageCompressionHint')}</p>
               {imagePreview && (
                 <img
                   src={imagePreview}
-                  alt="Preview"
+                  alt={t('preview')}
                   className="mt-2 h-32 w-32 object-cover rounded-md"
                 />
               )}
@@ -365,14 +367,14 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 onClick={onClose}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
               >
-                Cancel
+                {t('cancel')}
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
                 className="flex-1 bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 disabled:opacity-50"
               >
-                {isSubmitting ? 'Saving...' : product ? 'Update' : 'Add Product'}
+                {isSubmitting ? t('saving') : product ? t('updateProduct') : t('addProduct')}
               </button>
             </div>
           </form>
