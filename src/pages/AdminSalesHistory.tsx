@@ -4,6 +4,7 @@ import { api, type Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useToast } from '../contexts/ToastContext'
+import { useActionLoading } from '../contexts/ActionLoadingContext'
 
 const MYANMAR_TIME_ZONE = 'Asia/Yangon'
 
@@ -26,6 +27,7 @@ export default function AdminSalesHistory() {
   const [error, setError] = useState('')
   const { t } = useLanguage()
   const { showToast } = useToast()
+  const { isLoading: isActionLoading, runWithLoading } = useActionLoading()
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true)
@@ -65,7 +67,7 @@ export default function AdminSalesHistory() {
   }, [load])
 
   const handleRefresh = async () => {
-    const success = await load()
+    const success = await runWithLoading(() => load())
     if (success) showToast(`${t('refresh')} ${t('done')}`, 'success')
   }
 
@@ -80,7 +82,7 @@ export default function AdminSalesHistory() {
         <div><h1 className="text-2xl font-bold text-slate-950">{t('salesHistory')}</h1></div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <label className="text-sm font-semibold text-slate-700">{t('chooseMonth')}<input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2" /></label>
-          <button onClick={() => void handleRefresh()} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50">{t('refresh')}</button>
+          <button onClick={() => void handleRefresh()} disabled={loading || isActionLoading} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50">{t('refresh')}</button>
         </div>
       </div>
       {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}

@@ -10,6 +10,7 @@ import Icon from '../components/Icon'
 import ReceiptLogo from '../components/ReceiptLogo'
 import { useToast } from '../contexts/ToastContext'
 import { useLanguage } from '../contexts/LanguageContext'
+import { useActionLoading } from '../contexts/ActionLoadingContext'
 
 const WELCOME_SESSION_KEY = 'hxu_show_welcome'
 const POS_DRAFT_KEY = 'hxu-pos-draft'
@@ -39,6 +40,7 @@ export default function POS() {
   const savedCartDraft = useRef(readPosDraft().cart || [])
   const { showToast } = useToast()
   const { t, language } = useLanguage()
+  const { isLoading: isActionLoading, runWithLoading } = useActionLoading()
 
   useEffect(() => {
     if (!welcomeOpen) return
@@ -206,7 +208,7 @@ export default function POS() {
   const requiresAgeCheck = cart.some((item) => item.product.requiresAgeCheck)
 
   const handleProductRefresh = async () => {
-    const success = await loadProducts(true)
+    const success = await runWithLoading(() => loadProducts(true))
     if (success) showToast(`${t('refresh')} ${t('done')}`, 'success')
   }
 
@@ -265,7 +267,7 @@ export default function POS() {
             <div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-100 text-red-700"><Icon name="warning" className="h-6 w-6" /></div><div><h2 className="text-lg font-extrabold text-red-700">{t('warningPage')}</h2><p className="text-sm text-slate-500">{t('warningCount', { count: lowStockProducts.length })}</p></div></div>
             <button type="button" onClick={() => setLowStockOpen(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100" aria-label={t('close')}><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" /></svg></button>
           </div>
-          <div className="mt-4 space-y-2">{lowStockProducts.map((product) => <div key={product.id} className="flex items-center justify-between gap-3 rounded-2xl border border-red-100 bg-red-50/60 p-3"><div className="min-w-0"><p className="truncate font-bold text-slate-950">{product.name}</p><p className="truncate text-xs text-slate-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ') || t('categoryUnknown')}</p></div><div className="shrink-0 text-right"><p className="text-xs text-slate-500">{t('warningStock')}</p><p className="font-extrabold text-red-700">{product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</p></div></div>)}</div>
+          <div className="mt-4 space-y-2">{lowStockProducts.map((product) => <div key={product.id} className="flex items-center justify-between gap-3 rounded-2xl border border-red-100 bg-red-50/60 p-3"><div className="min-w-0"><p className="truncate font-bold text-slate-950">{product.name}</p><p className="truncate text-xs text-slate-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ') || t('categoryUnknown')}</p></div><div className="shrink-0 text-right"><p className="text-xs text-slate-500">{t('warningStock')}</p>{product.saleType === 'both' ? <><p className="font-extrabold text-red-700">{Math.floor(product.stockQty / Math.max(2, product.unitsPerPack || 2))} {t('pack')}</p><p className="text-xs text-red-700">{t('looseUnits')}: {product.stockQty % Math.max(2, product.unitsPerPack || 2)} · {t('totalUnitStock')}: {product.stockQty}</p></> : <p className="font-extrabold text-red-700">{product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</p>}</div></div>)}</div>
           <button type="button" onClick={() => setLowStockOpen(false)} className="mt-5 w-full rounded-xl bg-primary px-4 py-3 font-semibold text-white">{t('done')}</button>
         </div>
       </div>}
@@ -326,7 +328,7 @@ export default function POS() {
           <div className="surface-card p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3 mb-3">
               <h2 className="text-lg font-semibold">{t('products')} ({visibleProducts.length}/{products.length})</h2>
-              <button onClick={() => void handleProductRefresh()} disabled={isLoading} className="text-sm border border-gray-300 rounded px-3 py-1 disabled:opacity-50">
+              <button onClick={() => void handleProductRefresh()} disabled={isLoading || isActionLoading} className="text-sm border border-gray-300 rounded px-3 py-1 disabled:opacity-50">
                 {isLoading ? t('loading') : t('refresh')}
               </button>
             </div>
@@ -350,10 +352,11 @@ export default function POS() {
             ) : products.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-500 mb-4">{t('noProducts')}</p>
-                <button
-                  onClick={() => void handleProductRefresh()}
-                  className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
-                >
+                  <button
+                   onClick={() => void handleProductRefresh()}
+                   disabled={isLoading || isActionLoading}
+                   className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
+                 >
                   {t('retry')}
                 </button>
               </div>
@@ -367,7 +370,7 @@ export default function POS() {
                     </div>
                     <p className="truncate font-bold">{product.name}</p>
                     <p className="text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
-                    <p className={`mt-1 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${product.stockQty <= product.lowStockThreshold ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{t('stock')}: {product.stockQty} {product.saleType === 'pack' ? t('pack') : t('unitCount')}</p>
+                    <div className={`mt-1 inline-flex flex-col rounded-full px-2 py-1 text-xs font-semibold ${product.stockQty <= product.lowStockThreshold ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{product.saleType === 'both' ? <><span>{t('pack')}: {Math.floor(product.stockQty / Math.max(2, product.unitsPerPack || 2))}</span><span>{t('looseUnits')}: {product.stockQty % Math.max(2, product.unitsPerPack || 2)} · {t('totalUnitStock')}: {product.stockQty}</span></> : <span>{t('stock')}: {product.stockQty} {product.saleType === 'pack' ? t('pack') : t('unitCount')}</span>}</div>
                   </div>
                   <div className="mt-3 grid gap-2">
                     {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} disabled={product.stockQty <= 0} className="w-full rounded-xl bg-primary disabled:cursor-not-allowed disabled:bg-slate-300 px-3 py-2.5 text-left text-white shadow-sm">

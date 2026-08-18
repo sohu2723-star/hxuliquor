@@ -24,6 +24,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     price: product?.price?.toString() || '',
     costPrice: product?.costPrice?.toString() || '',
     stockQty: product?.stockQty?.toString() || '',
+    fullPacks: product?.saleType === 'both' ? Math.floor((product?.stockQty || 0) / Math.max(2, product?.unitsPerPack || 2)).toString() : '',
+    looseUnits: product?.saleType === 'both' ? ((product?.stockQty || 0) % Math.max(2, product?.unitsPerPack || 2)).toString() : '',
     lowStockThreshold: product?.lowStockThreshold?.toString() || '5',
     unitsPerPack: product?.unitsPerPack?.toString() || '1',
     packPrice: product?.packPrice?.toString() || '',
@@ -53,23 +55,35 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     try { localStorage.setItem(draftKey, JSON.stringify({ formData, productKind })) } catch { /* storage unavailable */ }
   }, [draftKey, formData, productKind])
 
-  const unitsPerPackValue = Math.max(1, parseInt(formData.unitsPerPack) || 1)
-  const stockQtyValue = parseInt(formData.stockQty) || 0
+  const unitsPerPackValue = formData.saleType === 'both' ? Math.max(2, parseInt(formData.unitsPerPack) || 2) : Math.max(1, parseInt(formData.unitsPerPack) || 1)
+  const stockQtyValue = formData.saleType === 'both'
+    ? Math.max(0, parseInt(formData.fullPacks) || 0) * unitsPerPackValue + Math.min(unitsPerPackValue - 1, Math.max(0, parseInt(formData.looseUnits) || 0))
+    : Math.max(0, parseInt(formData.stockQty) || 0)
   const costPriceValue = parseFloat(formData.costPrice) || 0
   const packPriceValue = parseFloat(formData.packPrice) || 0
   const unitPriceValue = parseFloat(formData.price) || 0
   const stockUnitLabel = formData.saleType === 'pack' ? t('pack') : t('unitCount')
-  const costUnitLabel = formData.saleType === 'pack' ? t('packSalePrice') : t('unitCostPrice')
+  const costUnitLabel = formData.saleType === 'pack' ? t('packCostPrice') : t('unitCostPrice')
   const inventoryCostPreview = stockQtyValue * costPriceValue
   const packProfitPreview = formData.saleType === 'both' ? packPriceValue - (costPriceValue * unitsPerPackValue) : formData.saleType === 'pack' ? unitPriceValue - costPriceValue : 0
   const unitProfitPreview = formData.saleType !== 'pack' ? unitPriceValue - costPriceValue : 0
   const packCountPreview = formData.saleType === 'both' ? Math.floor(stockQtyValue / unitsPerPackValue) : 0
+  const looseUnitPreview = formData.saleType === 'both' ? stockQtyValue % unitsPerPackValue : 0
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     if (name === 'barcode') setProductKind(value.trim() ? 'barcode' : 'noBarcode')
     if (name === 'saleType' && value === 'pack') setProductKind('pack')
     if (name === 'saleType' && value === 'both') setProductKind('both')
+    if (name === 'unitsPerPack') {
+      const nextUnits = Math.max(2, parseInt(value) || 2)
+      setFormData((prev) => {
+        const previousUnits = Math.max(2, parseInt(prev.unitsPerPack) || 2)
+        const totalUnits = Math.max(0, parseInt(prev.fullPacks) || 0) * previousUnits + Math.min(previousUnits - 1, Math.max(0, parseInt(prev.looseUnits) || 0))
+        return { ...prev, unitsPerPack: value, fullPacks: Math.floor(totalUnits / nextUnits).toString(), looseUnits: (totalUnits % nextUnits).toString() }
+      })
+      return
+    }
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
@@ -78,11 +92,17 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
   const selectProductKind = (kind: 'barcode' | 'noBarcode' | 'pack' | 'both') => {
     setProductKind(kind)
-    setFormData((prev) => ({
-      ...prev,
-      saleType: kind === 'pack' ? 'pack' : kind === 'both' ? 'both' : 'unit',
-      ...(kind === 'noBarcode' ? { barcode: '' } : {}),
-    }))
+    setFormData((prev) => {
+      const nextSaleType = kind === 'pack' ? 'pack' : kind === 'both' ? 'both' : 'unit'
+      if (kind === 'both') {
+        const nextUnits = Math.max(2, parseInt(prev.unitsPerPack) || 2)
+        const currentTotal = prev.saleType === 'both'
+          ? Math.max(0, parseInt(prev.fullPacks) || 0) * Math.max(2, parseInt(prev.unitsPerPack) || 2) + Math.min(Math.max(2, parseInt(prev.unitsPerPack) || 2) - 1, Math.max(0, parseInt(prev.looseUnits) || 0))
+          : Math.max(0, parseInt(prev.stockQty) || 0)
+        return { ...prev, saleType: nextSaleType, unitsPerPack: nextUnits.toString(), fullPacks: Math.floor(currentTotal / nextUnits).toString(), looseUnits: (currentTotal % nextUnits).toString() }
+      }
+      return { ...prev, saleType: nextSaleType, ...(kind === 'noBarcode' ? { barcode: '' } : {}) }
+    })
   }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,9 +147,9 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       productSize: formData.productSize,
       price: parseFloat(formData.price) || 0,
       costPrice: parseFloat(formData.costPrice) || 0,
-      stockQty: parseInt(formData.stockQty) || 0,
+      stockQty: stockQtyValue,
       lowStockThreshold: parseInt(formData.lowStockThreshold) || 0,
-      unitsPerPack: Math.max(1, parseInt(formData.unitsPerPack) || 1),
+      unitsPerPack: formData.saleType === 'both' ? Math.max(2, parseInt(formData.unitsPerPack) || 2) : Math.max(1, parseInt(formData.unitsPerPack) || 1),
       packPrice: formData.saleType === 'both' ? (parseFloat(formData.packPrice) || 0) : formData.saleType === 'pack' ? (parseFloat(formData.price) || 0) : 0,
       saleType: formData.saleType as 'unit' | 'pack' | 'both',
       requiresAgeCheck: formData.requiresAgeCheck,
@@ -278,7 +298,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
             </div>
 
-            {formData.saleType === 'both' && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
+              {formData.saleType === 'both' && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
               <h3 className="font-semibold text-slate-900">{t('packInfo')}</h3>
               <div className="flex flex-col">
                 <label className="flex h-14 flex-col text-sm font-medium leading-5 text-gray-700">{t('unitsPerPack')}
@@ -289,37 +309,39 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 <label className="flex h-14 flex-col text-sm font-medium leading-5 text-gray-700">{t('packSalePrice')}
                   <input type="number" name="packPrice" value={formData.packPrice} onChange={handleChange} required step="0.01" className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </label>
-                <p className="mt-2 rounded-lg bg-white/80 px-3 py-2 text-sm font-semibold text-violet-800">{t('packCountPreview')}: {packCountPreview} {t('pack')}</p>
+                <p className="mt-2 rounded-lg bg-white/80 px-3 py-2 text-sm font-semibold text-violet-800">{t('packCountPreview')}: {packCountPreview} {t('pack')} · {t('looseUnits')}: {looseUnitPreview} {t('unitCount')}</p>
+                <p className="mt-2 rounded-lg bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700">{t('packPurchasePriceShort')}: {(costPriceValue * unitsPerPackValue).toLocaleString()} Ks</p>
               </div>}
             </div>}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col">
-                <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">
-                  {t('stockQuantity')} ({stockUnitLabel})
-                </label>
-                <input
-                  type="number"
-                  name="stockQty"
-                  value={formData.stockQty}
-                  onChange={handleChange}
-                  required
-                  className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+            {formData.saleType === 'both' ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col">
+                  <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{t('fullPacks')}</label>
+                  <input type="number" name="fullPacks" min="0" value={formData.fullPacks} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
+                </div>
+                <div className="flex flex-col">
+                  <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{t('looseUnits')}</label>
+                  <input type="number" name="looseUnits" min="0" max={Math.max(0, unitsPerPackValue - 1)} value={formData.looseUnits} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
+                </div>
+                <div className="col-span-2 rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">{t('totalUnitStock')}: {stockQtyValue} {t('unitCount')} · {t('packCountPreview')}: {packCountPreview} {t('pack')}</div>
+                <div className="col-span-2 flex flex-col">
+                  <label className="mb-1 flex h-10 items-end text-sm font-medium leading-5 text-gray-700">{t('lowStockThreshold')}</label>
+                  <input type="number" name="lowStockThreshold" value={formData.lowStockThreshold} onChange={handleChange} className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
+                </div>
               </div>
-              <div className="flex flex-col">
-                <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">
-                  {t('lowStockThreshold')}
-                </label>
-                <input
-                  type="number"
-                  name="lowStockThreshold"
-                  value={formData.lowStockThreshold}
-                  onChange={handleChange}
-                  className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col">
+                  <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{t('stockQuantity')} ({stockUnitLabel})</label>
+                  <input type="number" name="stockQty" value={formData.stockQty} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
+                </div>
+                <div className="flex flex-col">
+                  <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{t('lowStockThreshold')}</label>
+                  <input type="number" name="lowStockThreshold" value={formData.lowStockThreshold} onChange={handleChange} className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
               <p className="font-semibold">{t('stockProfitPreview')}</p>

@@ -19,7 +19,7 @@ export default function AdminCredits() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const { showToast } = useToast()
-  const { runWithLoading } = useActionLoading()
+  const { isLoading: isActionLoading, runWithLoading } = useActionLoading()
   const { t } = useLanguage()
 
   const load = useCallback(async (quiet = false) => {
@@ -46,7 +46,7 @@ export default function AdminCredits() {
   }, [load])
 
   const handleRefresh = async () => {
-    const success = await load()
+    const success = await runWithLoading(() => load())
     if (success) showToast(`${t('refresh')} ${t('done')}`, 'success')
   }
 
@@ -79,7 +79,7 @@ export default function AdminCredits() {
   return <div className="min-h-screen bg-slate-50">
     <AppHeader />
     <main className="mx-auto max-w-5xl p-4 lg:p-6">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><h1 className="text-2xl font-bold text-slate-950">{t('credits')}</h1><button onClick={() => void handleRefresh()} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50">{t('refresh')}</button></div>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><h1 className="text-2xl font-bold text-slate-950">{t('credits')}</h1><button onClick={() => void handleRefresh()} disabled={loading || isActionLoading} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50">{t('refresh')}</button></div>
       {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <section className="surface-card p-5"><p className="text-sm text-slate-500">{t('creditReceipts')}</p><p className="mt-2 text-2xl font-bold text-amber-700">{credits.length}</p></section>

@@ -27,7 +27,7 @@ export default function AdminProducts() {
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null)
 
   const { showToast } = useToast()
-  const { runWithLoading } = useActionLoading()
+  const { isLoading: isActionLoading, runWithLoading } = useActionLoading()
   const { t } = useLanguage()
 
   useEffect(() => {
@@ -39,9 +39,10 @@ export default function AdminProducts() {
     try {
       const all = force ? await api.getProducts(true) : (await api.getProductsStaleFirst((fresh) => setProducts(fresh))).products
       setProducts(all)
-      if (notify) showToast(t('productUpdated'), 'success')
+      return true
     } catch (error) {
       showToast(getErrorMessage(error, t('productLoadError')), 'error')
+      return false
     } finally {
       if (notify || !force) setIsLoading(false)
     }
@@ -153,7 +154,7 @@ export default function AdminProducts() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-2xl font-bold">{t('productManagement')}</h1>
           <div className="flex gap-2">
-            <button onClick={() => void refreshProducts(true, true)} disabled={isLoading} className="border border-gray-300 px-4 py-2 rounded-md disabled:opacity-50">
+            <button onClick={() => void (async () => { const success = await runWithLoading(() => refreshProducts(true, false)); if (success !== false) showToast(`${t('refresh')} ${t('done')}`, 'success') })()} disabled={isLoading || isActionLoading} className="border border-gray-300 px-4 py-2 rounded-md disabled:opacity-50">
               {isLoading ? t('loading') : t('refresh')}
             </button>
             <button onClick={() => { setEditingProduct(null); setShowForm(true) }} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">

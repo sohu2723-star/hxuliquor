@@ -4,6 +4,7 @@ import { api, type CashTransaction, type Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useToast } from '../contexts/ToastContext'
+import { useActionLoading } from '../contexts/ActionLoadingContext'
 
 const MYANMAR_TIME_ZONE = 'Asia/Yangon'
 
@@ -38,6 +39,7 @@ export default function AdminFinance() {
   const [note, setNote] = useState('')
   const { t } = useLanguage()
   const { showToast } = useToast()
+  const { isLoading: isActionLoading, runWithLoading } = useActionLoading()
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true)
@@ -50,8 +52,10 @@ export default function AdminFinance() {
       ])
       setSales(salesResult.sales)
       setTransactions(transactionResult)
+      return true
     } catch (err) {
       setError(err instanceof Error ? err.message : t('financeLoadError'))
+      return false
     } finally {
       setLoading(false)
     }
@@ -68,6 +72,11 @@ export default function AdminFinance() {
     const expenses = transactions.filter((item) => item.type === 'expense').reduce((sum, item) => sum + item.amount, 0)
     return { cashReceived, shopProfit, outsideIncome, expenses, balance: cashReceived + outsideIncome - expenses }
   }, [sales, transactions])
+
+  const handleRefresh = async () => {
+    const success = await runWithLoading(() => load())
+    if (success) showToast(`${t('refresh')} ${t('done')}`, 'success')
+  }
 
   const resetForm = () => {
     setEditingId(null)
@@ -134,9 +143,12 @@ export default function AdminFinance() {
           <h1 className="text-2xl font-bold text-slate-950">{t('financeTitle')}</h1>
           <p className="mt-1 text-sm text-slate-500">{t('financeDescription')}</p>
         </div>
-        <label className="text-sm font-semibold text-slate-700">{t('chooseMonth')}
-          <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2" />
-        </label>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-sm font-semibold text-slate-700">{t('chooseMonth')}
+            <input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} className="mt-1 block rounded-xl border border-slate-300 bg-white px-3 py-2" />
+          </label>
+          <button type="button" onClick={() => void handleRefresh()} disabled={loading || isActionLoading} className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50">{t('refresh')}</button>
+        </div>
       </div>
 
       {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
