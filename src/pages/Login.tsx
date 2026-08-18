@@ -6,6 +6,8 @@ import ReceiptLogo from '../components/ReceiptLogo'
 import GoogleSignInButton from '../components/GoogleSignInButton'
 import { useToast } from '../contexts/ToastContext'
 
+const WELCOME_SESSION_KEY = 'hxu_show_welcome'
+
 export default function Login() {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -33,6 +35,7 @@ export default function Login() {
     setIsSubmitting(true)
     try {
       await signInWithGoogle(idToken)
+      window.sessionStorage.setItem(WELCOME_SESSION_KEY, '1')
       const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/pos'
       navigate(destination)
     } catch (err) {

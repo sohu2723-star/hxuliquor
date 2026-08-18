@@ -4,6 +4,7 @@ import { api, type Product, type Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 
 const MYANMAR_TIME_ZONE = 'Asia/Yangon'
+const WELCOME_SESSION_KEY = 'hxu_show_welcome'
 
 function myanmarDate(date: Date | string) {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -29,8 +30,12 @@ export default function AdminDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(currentMyanmarMonth)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
-  const [welcomeOpen, setWelcomeOpen] = useState(true)
+  const [welcomeOpen, setWelcomeOpen] = useState(() => window.sessionStorage.getItem(WELCOME_SESSION_KEY) === '1')
   const loadingRef = useRef(false)
+
+  useEffect(() => {
+    window.sessionStorage.removeItem(WELCOME_SESSION_KEY)
+  }, [])
 
   const loadDashboard = useCallback(async (quiet = false) => {
     if (loadingRef.current || document.visibilityState === 'hidden') return
