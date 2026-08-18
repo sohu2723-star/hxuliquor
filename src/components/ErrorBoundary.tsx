@@ -44,8 +44,8 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     const isEnglish = typeof window !== 'undefined' && window.localStorage.getItem('hxu-language') === 'en'
     const copy = isEnglish
-      ? { title: 'A new app version is required', message: 'An old page cache is still present. Reload to open the latest version.', reload: 'Clear cache and reload' }
-      : { title: 'App version အသစ်ရယူရန်လိုပါသည်', message: 'Page အဟောင်း cache ကျန်နေပါသည်။ Reload လုပ်ပြီး version အသစ်ကို ပြန်ဖွင့်ပါ။', reload: 'Cache ရှင်းပြီး Reload လုပ်မည်' }
+      ? { title: 'Something went wrong', message: 'An unexpected error occurred. Reload the app to try again.', reload: 'Reload app' }
+      : { title: 'စနစ်တွင် အမှားတစ်ခု ဖြစ်နေပါသည်', message: 'မမျှော်လင့်ထားသော အမှားတစ်ခု ဖြစ်နေပါသည်။ App ကို ပြန်ဖွင့်ပြီး ထပ်ကြိုးစားပါ။', reload: 'App ကို ပြန်ဖွင့်မည်' }
 
     if (this.state.hasError) {
       if (this.props.fallback) {

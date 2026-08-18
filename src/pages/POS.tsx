@@ -70,7 +70,7 @@ export default function POS() {
       const { products: all } = await api.getProductsStaleFirst((fresh) => setProducts(fresh))
       setProducts(all)
     } catch (error) {
-      showToast(error instanceof Error ? error.message : t('productLoadError'), 'error')
+      if (!quiet) showToast(error instanceof Error ? error.message : t('productLoadError'), 'error')
       return false
     } finally {
       setIsLoading(false)
@@ -339,7 +339,7 @@ export default function POS() {
             {!isLoading && products.length > 0 && <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
               {PRODUCT_GROUPS.map((group) => {
                 const count = products.filter((product) => productMatchesGroup(product, group.id)).length
-                return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-3 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{t(group.id === 'all' ? 'groupAll' : group.id === 'barcode' ? 'groupBarcode' : group.id === 'noBarcode' ? 'groupNoBarcode' : group.id === 'pack' ? 'groupPack' : 'groupBoth')} ({count})</button>
+                return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-3 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{t(group.id === 'all' ? 'groupAll' : group.id === 'barcode' ? 'groupBarcode' : group.id === 'noBarcode' ? 'groupNoBarcode' : 'groupBoth')} ({count})</button>
               })}
             </div>}
             {isLoading ? (
@@ -464,14 +464,13 @@ export default function POS() {
         <div className="receipt-slip max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl print:max-h-none print:w-[80mm] print:overflow-visible print:rounded-none print:p-3 print:shadow-none">
           <div className="text-center">
             <ReceiptLogo className="mx-auto mb-2 h-16 w-16 print:h-12 print:w-12" />
-            <h2 className="text-2xl font-extrabold tracking-tight print:text-lg">HXU Liquor</h2>
+            <h2 className="text-2xl font-extrabold tracking-tight print:text-lg">HXU Liquor Mini Store</h2>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700 print:text-[10px]">{t('saleReceipt')}</p>
           </div>
           <div className="my-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600 print:my-2 print:rounded-none print:border-x-0 print:bg-white print:px-0">
             <p>{new Date(completedSale.createdAt).toLocaleString(language === 'my' ? 'my-MM' : 'en-GB', { timeZone: 'Asia/Yangon' })}</p>
-            <p>{t('cashier')}: {completedSale.cashierName}</p>
+            <p>{t('customerId')}: {formatSlipId(completedSale)}</p>
             <p>{t('payment')}: {completedSale.paymentMethod === 'Cash' ? t('cash') : completedSale.paymentMethod === 'Card' ? t('card') : completedSale.paymentMethod === 'Mobile Wallet' ? t('mobileWallet') : t('credit')}</p>
-            <p>{t('slipId')}: {formatSlipId(completedSale)}</p>
           </div>
           <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm print:text-xs"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
           <div className="mt-4 border-t pt-3 print:mt-2 print:pt-2"><div className="flex justify-between text-lg font-bold print:text-sm"><span>{t('total')}</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800 print:text-xs">{t('credit')} · {completedSale.customerName} · {t('creditBalance')} {formatCurrency(completedSale.balanceDue)}</p>}</div>

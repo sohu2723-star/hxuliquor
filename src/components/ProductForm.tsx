@@ -29,20 +29,20 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     lowStockThreshold: product?.lowStockThreshold?.toString() || '5',
     unitsPerPack: product?.unitsPerPack?.toString() || '1',
     packPrice: product?.packPrice?.toString() || '',
-    saleType: product?.saleType || 'unit',
+    saleType: product?.saleType === 'both' ? 'both' : 'unit',
     requiresAgeCheck: product?.requiresAgeCheck || false,
   }
-  const initialProductKind = product?.saleType === 'pack' ? 'pack' : product?.saleType === 'both' ? 'both' : product?.barcode ? 'barcode' : 'noBarcode'
+  const initialProductKind = product?.saleType === 'both' ? 'both' : product?.barcode ? 'barcode' : 'noBarcode'
   const [formData, setFormData] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(draftKey) || 'null') as { formData?: Partial<typeof initialFormData> } | null
       return saved?.formData ? { ...initialFormData, ...saved.formData } : initialFormData
     } catch { return initialFormData }
   })
-  const [productKind, setProductKind] = useState<'barcode' | 'noBarcode' | 'pack' | 'both'>(() => {
+  const [productKind, setProductKind] = useState<'barcode' | 'noBarcode' | 'both'>(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(draftKey) || 'null') as { productKind?: 'barcode' | 'noBarcode' | 'pack' | 'both' } | null
-      return saved?.productKind || initialProductKind
+      const saved = JSON.parse(localStorage.getItem(draftKey) || 'null') as { productKind?: string } | null
+      return saved?.productKind === 'barcode' || saved?.productKind === 'noBarcode' || saved?.productKind === 'both' ? saved.productKind : initialProductKind
     } catch { return initialProductKind }
   })
   const [imageFile, setImageFile] = useState<File | undefined>()
@@ -62,18 +62,15 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
   const costPriceValue = parseFloat(formData.costPrice) || 0
   const packPriceValue = parseFloat(formData.packPrice) || 0
   const unitPriceValue = parseFloat(formData.price) || 0
-  const stockUnitLabel = formData.saleType === 'pack' ? t('pack') : t('unitCount')
-  const costUnitLabel = formData.saleType === 'pack' ? t('packCostPrice') : t('unitCostPrice')
   const inventoryCostPreview = stockQtyValue * costPriceValue
-  const packProfitPreview = formData.saleType === 'both' ? packPriceValue - (costPriceValue * unitsPerPackValue) : formData.saleType === 'pack' ? unitPriceValue - costPriceValue : 0
-  const unitProfitPreview = formData.saleType !== 'pack' ? unitPriceValue - costPriceValue : 0
+  const packProfitPreview = formData.saleType === 'both' ? packPriceValue - (costPriceValue * unitsPerPackValue) : 0
+  const unitProfitPreview = unitPriceValue - costPriceValue
   const packCountPreview = formData.saleType === 'both' ? Math.floor(stockQtyValue / unitsPerPackValue) : 0
   const looseUnitPreview = formData.saleType === 'both' ? stockQtyValue % unitsPerPackValue : 0
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     if (name === 'barcode') setProductKind(value.trim() ? 'barcode' : 'noBarcode')
-    if (name === 'saleType' && value === 'pack') setProductKind('pack')
     if (name === 'saleType' && value === 'both') setProductKind('both')
     if (name === 'unitsPerPack') {
       const nextUnits = Math.max(2, parseInt(value) || 2)
@@ -90,10 +87,10 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     }))
   }
 
-  const selectProductKind = (kind: 'barcode' | 'noBarcode' | 'pack' | 'both') => {
+  const selectProductKind = (kind: 'barcode' | 'noBarcode' | 'both') => {
     setProductKind(kind)
     setFormData((prev) => {
-      const nextSaleType = kind === 'pack' ? 'pack' : kind === 'both' ? 'both' : 'unit'
+      const nextSaleType = kind === 'both' ? 'both' : 'unit'
       if (kind === 'both') {
         const nextUnits = Math.max(2, parseInt(prev.unitsPerPack) || 2)
         const currentTotal = prev.saleType === 'both'
@@ -150,8 +147,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       stockQty: stockQtyValue,
       lowStockThreshold: parseInt(formData.lowStockThreshold) || 0,
       unitsPerPack: formData.saleType === 'both' ? Math.max(2, parseInt(formData.unitsPerPack) || 2) : Math.max(1, parseInt(formData.unitsPerPack) || 1),
-      packPrice: formData.saleType === 'both' ? (parseFloat(formData.packPrice) || 0) : formData.saleType === 'pack' ? (parseFloat(formData.price) || 0) : 0,
-      saleType: formData.saleType as 'unit' | 'pack' | 'both',
+      packPrice: formData.saleType === 'both' ? (parseFloat(formData.packPrice) || 0) : 0,
+      saleType: formData.saleType as 'unit' | 'both',
       requiresAgeCheck: formData.requiresAgeCheck,
     }
 
@@ -182,10 +179,9 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
           <form onSubmit={handleSubmit} className="space-y-4">
             <fieldset className="rounded-xl border border-slate-200 bg-slate-50 p-3">
               <legend className="px-1 text-sm font-semibold">{t('productType')}</legend>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <button type="button" onClick={() => selectProductKind('barcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'barcode' ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><span className="block font-semibold">{t('barcodeProduct')}</span><small>{t('barcodeProductHint')}</small></button>
                 <button type="button" onClick={() => selectProductKind('noBarcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'noBarcode' ? 'border-slate-500 bg-slate-50 text-slate-800' : 'bg-white'}`}><span className="block font-semibold">{t('noBarcodeProduct')}</span><small>{t('noBarcodeProductHint')}</small></button>
-                <button type="button" onClick={() => selectProductKind('pack')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'pack' ? 'border-violet-600 bg-violet-50 text-violet-800' : 'bg-white'}`}><span className="block font-semibold">{t('packOnlyProduct')}</span><small>{t('packOnlyProductHint')}</small></button>
                 <button type="button" onClick={() => selectProductKind('both')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'both' ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'bg-white'}`}><span className="block font-semibold">{t('packBothProduct')}</span><small>{t('packBothProductHint')}</small></button>
               </div>
             </fieldset>
@@ -270,7 +266,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">
-                  {formData.saleType === 'pack' ? t('packSalePrice') : t('unitSalePrice')}
+                  {t('unitSalePrice')}
                 </label>
                 <input
                   type="number"
@@ -284,7 +280,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
               <div className="flex flex-col">
                 <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">
-                  {costUnitLabel}
+                  {t('unitCostPrice')}
                 </label>
                 <input
                   type="number"
@@ -333,7 +329,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col">
-                  <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{t('stockQuantity')} ({stockUnitLabel})</label>
+                  <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{t('stockQuantity')} ({t('unitCount')})</label>
                   <input type="number" name="stockQty" value={formData.stockQty} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div className="flex flex-col">
@@ -346,8 +342,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
               <p className="font-semibold">{t('stockProfitPreview')}</p>
               <p>{t('investmentPreview')}: {stockQtyValue} × {costPriceValue.toLocaleString()} = {inventoryCostPreview.toLocaleString()} Ks</p>
-              {formData.saleType !== 'pack' && <p>{t('unitProfit')}: {(unitProfitPreview || 0).toLocaleString()} Ks</p>}
-              {formData.saleType !== 'unit' && <p>{t('packProfit')}: {(packProfitPreview || 0).toLocaleString()} Ks</p>}
+              <p>{t('unitProfit')}: {(unitProfitPreview || 0).toLocaleString()} Ks</p>
+              {formData.saleType === 'both' && <p>{t('packProfit')}: {(packProfitPreview || 0).toLocaleString()} Ks</p>}
             </div>
 
             <div className="flex items-center">
