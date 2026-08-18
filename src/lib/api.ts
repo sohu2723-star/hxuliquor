@@ -464,6 +464,19 @@ export const api = {
     saveEmployeeCache((readEmployeeCache() || []).filter((user) => user.id !== id))
   },
 
+  async recordPrintedReceipt(sale: Sale): Promise<void> {
+    if (!sale.id || sale.id.startsWith('local-')) return
+    const { error } = await supabase.from('printed_receipts').upsert({ sale_id: sale.id, printed_at: new Date().toISOString(), receipt_data: sale }, { onConflict: 'sale_id' })
+    if (error) throwDatabaseError(error)
+  },
+
+  async getPrintedReceiptIds(saleIds: string[]): Promise<string[]> {
+    if (!saleIds.length) return []
+    const { data, error } = await supabase.from('printed_receipts').select('sale_id').in('sale_id', saleIds)
+    if (error) throwDatabaseError(error)
+    return ((data || []) as { sale_id: string }[]).map((row) => row.sale_id)
+  },
+
   async createSale(payload: { cashierId: string; cashierName: string; items: { productId: string; quantity: number; saleUnit: 'unit' | 'pack' }[]; ageVerified: boolean; paymentMethod: string; customerName?: string; isCredit?: boolean }): Promise<Sale> {
     const { data, error } = await supabase.rpc('create_sale', { p_items: payload.items, p_age_verified: payload.ageVerified, p_payment_method: payload.paymentMethod, p_customer_name: payload.customerName || '', p_is_credit: payload.isCredit || false })
     if (error) throwDatabaseError(error)

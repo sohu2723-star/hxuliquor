@@ -30,6 +30,8 @@ export default function POS() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
+  const [lowStockOpen, setLowStockOpen] = useState(false)
+  const [receiptSaving, setReceiptSaving] = useState(false)
   const [welcomeOpen, setWelcomeOpen] = useState(() => window.sessionStorage.getItem(WELCOME_SESSION_KEY) === '1')
   const lastHandledScan = useRef({ code: '', time: 0 })
   const productsRefreshing = useRef(false)
@@ -45,31 +47,34 @@ export default function POS() {
     return () => window.clearTimeout(timer)
   }, [welcomeOpen])
 
-  const loadProducts = useCallback(async (forceRefresh = false, quiet = false) => {
-    if (productsRefreshing.current) return
+  const loadProducts = useCallback(async (forceRefresh = false, quiet = false): Promise<boolean> => {
+    if (productsRefreshing.current) return false
     productsRefreshing.current = true
     if (forceRefresh) {
       if (!quiet) setIsLoading(true)
       try {
         const all = await api.getProducts(true)
         setProducts((current) => JSON.stringify(current) === JSON.stringify(all) ? current : all)
+        return true
       } catch (error) {
         if (!quiet) showToast(error instanceof Error ? error.message : t('productLoadError'), 'error')
+        return false
       } finally {
         if (!quiet) setIsLoading(false)
         productsRefreshing.current = false
       }
-      return
     }
     try {
       const { products: all } = await api.getProductsStaleFirst((fresh) => setProducts(fresh))
       setProducts(all)
     } catch (error) {
       showToast(error instanceof Error ? error.message : t('productLoadError'), 'error')
+      return false
     } finally {
       setIsLoading(false)
       productsRefreshing.current = false
     }
+    return true
   }, [showToast, t])
 
   useEffect(() => {
@@ -86,6 +91,18 @@ export default function POS() {
       window.clearInterval(timer)
     }
   }, [loadProducts])
+
+  const lowStockProducts = useMemo(() => products.filter((product) => product.stockQty <= product.lowStockThreshold), [products])
+  const lowStockSignature = useMemo(() => lowStockProducts.map((product) => `${product.id}:${product.stockQty}:${product.lowStockThreshold}`).sort().join('|'), [lowStockProducts])
+  const lastLowStockSignature = useRef('')
+  const lowStockInitialized = useRef(false)
+
+  useEffect(() => {
+    if (!products.length) return
+    if (lowStockSignature && (!lowStockInitialized.current || lastLowStockSignature.current !== lowStockSignature)) setLowStockOpen(true)
+    lastLowStockSignature.current = lowStockSignature
+    lowStockInitialized.current = true
+  }, [products.length, lowStockSignature])
 
   useEffect(() => {
     if (!products.length) return
@@ -188,6 +205,25 @@ export default function POS() {
 
   const requiresAgeCheck = cart.some((item) => item.product.requiresAgeCheck)
 
+  const handleProductRefresh = async () => {
+    const success = await loadProducts(true)
+    if (success) showToast(`${t('refresh')} ${t('done')}`, 'success')
+  }
+
+  const handlePrintReceipt = async () => {
+    if (!completedSale || receiptSaving) return
+    setReceiptSaving(true)
+    try {
+      await api.recordPrintedReceipt(completedSale)
+      showToast(t('receiptSaved'), 'success')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t('receiptSaveError'), 'error')
+    } finally {
+      setReceiptSaving(false)
+      window.print()
+    }
+  }
+
   const handleCheckoutSuccess = (sale: Sale) => {
     setCart([])
     setShowCheckout(false)
@@ -221,6 +257,16 @@ export default function POS() {
           <button type="button" onClick={() => setWelcomeOpen(false)} className="absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label={t('close')}><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" /></svg></button>
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><svg viewBox="0 0 24 24" className="h-12 w-12" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path strokeLinecap="round" strokeLinejoin="round" d="m8 12 2.5 2.5L16.5 9" /></svg></div>
           <h2 className="mt-5 text-2xl font-extrabold text-slate-950">{t('welcome')}</h2>
+        </div>
+      </div>}
+      {lowStockOpen && lowStockProducts.length > 0 && <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/45 p-4" role="dialog" aria-modal="true" aria-label={t('warningPage')}>
+        <div className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl ring-1 ring-red-100">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-100 text-red-700"><Icon name="warning" className="h-6 w-6" /></div><div><h2 className="text-lg font-extrabold text-red-700">{t('warningPage')}</h2><p className="text-sm text-slate-500">{t('warningCount', { count: lowStockProducts.length })}</p></div></div>
+            <button type="button" onClick={() => setLowStockOpen(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100" aria-label={t('close')}><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M6 6l12 12M18 6 6 18" /></svg></button>
+          </div>
+          <div className="mt-4 space-y-2">{lowStockProducts.map((product) => <div key={product.id} className="flex items-center justify-between gap-3 rounded-2xl border border-red-100 bg-red-50/60 p-3"><div className="min-w-0"><p className="truncate font-bold text-slate-950">{product.name}</p><p className="truncate text-xs text-slate-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ') || t('categoryUnknown')}</p></div><div className="shrink-0 text-right"><p className="text-xs text-slate-500">{t('warningStock')}</p><p className="font-extrabold text-red-700">{product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</p></div></div>)}</div>
+          <button type="button" onClick={() => setLowStockOpen(false)} className="mt-5 w-full rounded-xl bg-primary px-4 py-3 font-semibold text-white">{t('done')}</button>
         </div>
       </div>}
       <AppHeader />
@@ -280,7 +326,7 @@ export default function POS() {
           <div className="surface-card p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3 mb-3">
               <h2 className="text-lg font-semibold">{t('products')} ({visibleProducts.length}/{products.length})</h2>
-              <button onClick={() => void loadProducts(true)} disabled={isLoading} className="text-sm border border-gray-300 rounded px-3 py-1 disabled:opacity-50">
+              <button onClick={() => void handleProductRefresh()} disabled={isLoading} className="text-sm border border-gray-300 rounded px-3 py-1 disabled:opacity-50">
                 {isLoading ? t('loading') : t('refresh')}
               </button>
             </div>
@@ -305,7 +351,7 @@ export default function POS() {
               <div className="text-center py-8">
                 <p className="text-gray-500 mb-4">{t('noProducts')}</p>
                 <button
-                  onClick={() => loadProducts(true)}
+                  onClick={() => void handleProductRefresh()}
                   className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
                 >
                   {t('retry')}
@@ -423,7 +469,7 @@ export default function POS() {
           <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm print:text-xs"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
           <div className="mt-4 border-t pt-3 print:mt-2 print:pt-2"><div className="flex justify-between text-lg font-bold print:text-sm"><span>{t('total')}</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800 print:text-xs">{t('credit')} · {completedSale.customerName} · {t('creditBalance')} {formatCurrency(completedSale.balanceDue)}</p>}</div>
           <p className="mt-4 text-center text-xs text-slate-500 print:mt-2">{t('thankYou')}</p>
-          <div className="mt-5 grid grid-cols-2 gap-2 print:hidden"><button onClick={() => window.print()} className="rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-800 shadow-sm">{t('printSlip')}</button><button onClick={() => setCompletedSale(null)} className="rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm">{t('done')}</button></div>
+          <div className="mt-5 grid grid-cols-2 gap-2 print:hidden"><button onClick={() => void handlePrintReceipt()} disabled={receiptSaving} className="rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-800 shadow-sm disabled:opacity-60">{receiptSaving ? t('saving') : t('printSlip')}</button><button onClick={() => setCompletedSale(null)} className="rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm">{t('done')}</button></div>
         </div>
       </div>}
     </div>

@@ -21,6 +21,7 @@ function monthRange(month: string) {
 export default function AdminSalesHistory() {
   const [selectedMonth, setSelectedMonth] = useState(currentMyanmarMonth)
   const [sales, setSales] = useState<Sale[]>([])
+  const [printedReceiptIds, setPrintedReceiptIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const { t } = useLanguage()
@@ -33,6 +34,12 @@ export default function AdminSalesHistory() {
       const { start, end } = monthRange(selectedMonth)
       const result = await api.getSalesStaleFirst(start, end, (fresh) => setSales(fresh))
       setSales(result.sales)
+      try {
+        const printedIds = await api.getPrintedReceiptIds(result.sales.map((sale) => sale.id))
+        setPrintedReceiptIds(new Set(printedIds))
+      } catch {
+        setPrintedReceiptIds(new Set())
+      }
       return true
     } catch (err) {
       setError(err instanceof Error ? err.message : t('salesLoadError'))
@@ -84,7 +91,7 @@ export default function AdminSalesHistory() {
       </div>
       {loading ? <div className="surface-card p-8 text-center text-slate-500">{t('loading')}</div> : <section className="surface-card p-5">
         <div className="divide-y">{sales.length ? sales.map((sale) => <details key={sale.id} className="py-4 first:pt-0 last:pb-0">
-          <summary className="flex cursor-pointer list-none flex-wrap justify-between gap-3"><span><b>{new Date(sale.createdAt).toLocaleString('en-GB', { timeZone: MYANMAR_TIME_ZONE })}</b><small className="mt-1 block text-slate-500">{sale.cashierName} · {sale.cashierEmail}{sale.customerName ? ` · ${t('customer')}: ${sale.customerName}` : ''}</small></span><span className="text-right"><b>{formatCurrency(sale.totalAmount)}</b><small className={`mt-1 block ${sale.balanceDue ? 'text-amber-700' : 'text-emerald-700'}`}>{sale.balanceDue ? `${t('outstanding')} ${formatCurrency(sale.balanceDue)}` : t('paid')}</small></span></summary>
+          <summary className="flex cursor-pointer list-none flex-wrap justify-between gap-3"><span><b>{new Date(sale.createdAt).toLocaleString('en-GB', { timeZone: MYANMAR_TIME_ZONE })}</b><small className="mt-1 block text-slate-500">{sale.cashierName} · {sale.cashierEmail}{sale.customerName ? ` · ${t('customer')}: ${sale.customerName}` : ''}{printedReceiptIds.has(sale.id) ? ` · ${t('printedReceipt')}` : ''}</small></span><span className="text-right"><b>{formatCurrency(sale.totalAmount)}</b><small className={`mt-1 block ${sale.balanceDue ? 'text-amber-700' : 'text-emerald-700'}`}>{sale.balanceDue ? `${t('outstanding')} ${formatCurrency(sale.balanceDue)}` : t('paid')}</small></span></summary>
           <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm">{sale.items.map((item) => <div key={item.id} className="flex justify-between gap-3 border-b border-slate-200 py-2 last:border-0"><span>{item.productName} · {item.saleUnit === 'pack' ? t('pack') : t('unit')} × {item.saleQuantity}</span><span className="shrink-0 font-semibold">{formatCurrency(item.subtotal)}</span></div>)}</div>
         </details>) : <p className="py-6 text-center text-slate-500">{t('noSalesThisMonth')}</p>}</div>
       </section>}
