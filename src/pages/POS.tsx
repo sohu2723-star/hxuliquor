@@ -182,7 +182,10 @@ export default function POS() {
     const product = products.find((p) => barcodeMatches(p.barcode, code)) || findProductByVisualFallback(products, code)
     if (product) {
       playScanSound(true)
-      addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit')
+      // Cigarette barcodes are printed on the box, so scanning sells one box.
+      // Manual search/buttons can still be used for stick-level sales.
+      const scannedSaleUnit: SaleUnit = isThreeLevelProduct(product) || product.saleType === 'pack' ? 'pack' : 'unit'
+      addToCart(product, scannedSaleUnit)
     } else {
       playScanSound(false)
       showToast(t('scanProductNotFound', { code }), 'error')
