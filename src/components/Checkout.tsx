@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../lib/api'
-import type { Product, Sale } from '../lib/api'
+import type { CustomerBalance, Product, Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import { useActionLoading } from '../contexts/ActionLoadingContext'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -42,6 +42,9 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
   const submittingRef = useRef(false)
   const [error, setError] = useState('')
   const [customerName, setCustomerName] = useState(String(draft.customerName || ''))
+  const [customerMode, setCustomerMode] = useState<'existing' | 'new'>(() => draft.customerMode === 'existing' ? 'existing' : 'new')
+  const [customerBalances, setCustomerBalances] = useState<CustomerBalance[]>([])
+  const [customerBalancesLoading, setCustomerBalancesLoading] = useState(false)
   const [initialPaidAmount, setInitialPaidAmount] = useState(String(draft.initialPaidAmount || '0'))
   const [depositBalance, setDepositBalance] = useState(0)
   const [depositLoading, setDepositLoading] = useState(false)
@@ -50,44 +53,52 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
 
   useEffect(() => {
     try {
-      localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({ ageVerified, paymentMethod, customerName, initialPaidAmount }))
+      localStorage.setItem(CHECKOUT_DRAFT_KEY, JSON.stringify({ ageVerified, paymentMethod, customerName, customerMode, initialPaidAmount }))
     } catch { /* storage unavailable */ }
-  }, [ageVerified, paymentMethod, customerName, initialPaidAmount])
+  }, [ageVerified, paymentMethod, customerName, customerMode, initialPaidAmount])
 
   const saleUnitPrice = (product: Product, saleUnit: 'unit' | 'pack' | 'case') => saleUnit === 'case' ? product.casePrice : saleUnit === 'pack' ? product.packPrice : product.price
   const total = useMemo(() => cart.reduce((sum, item) => sum + saleUnitPrice(item.product, item.saleUnit) * item.quantity, 0), [cart])
   const paidNow = numericValue(initialPaidAmount)
   const depositApplied = Math.min(depositBalance, Math.max(total - paidNow, 0))
   const balanceDue = Math.max(total - paidNow - depositApplied, 0)
+  const selectedCustomer = customerBalances.find((item) => item.customerName.trim().toLocaleLowerCase() === customerName.trim().toLocaleLowerCase())
 
   useEffect(() => {
-    if (paymentMethod !== 'Credit' || !customerName.trim()) {
+    if (paymentMethod !== 'Credit') {
+      setCustomerBalances([])
+      setCustomerBalancesLoading(false)
       setDepositBalance(0)
       setDepositLoading(false)
       return
     }
 
     let cancelled = false
-    const timer = window.setTimeout(async () => {
-      setDepositLoading(true)
-      try {
-        const balances = await api.getCustomerBalances()
-        if (cancelled) return
-        const normalized = customerName.trim().toLocaleLowerCase()
-        const customer = balances.find((item) => item.customerName.trim().toLocaleLowerCase() === normalized)
-        setDepositBalance(customer?.depositBalance || 0)
-      } catch {
-        if (!cancelled) setDepositBalance(0)
-      } finally {
-        if (!cancelled) setDepositLoading(false)
+    setCustomerBalancesLoading(true)
+    setDepositLoading(true)
+    api.getCustomerBalances().then((balances) => {
+      if (!cancelled) setCustomerBalances(balances)
+    }).catch(() => {
+      if (!cancelled) setCustomerBalances([])
+    }).finally(() => {
+      if (!cancelled) {
+        setCustomerBalancesLoading(false)
+        setDepositLoading(false)
       }
-    }, 350)
+    })
 
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
+    return () => { cancelled = true }
+  }, [paymentMethod])
+
+  useEffect(() => {
+    if (paymentMethod !== 'Credit' || customerMode !== 'existing' || !customerName.trim()) {
+      setDepositBalance(0)
+      return
     }
-  }, [customerName, paymentMethod])
+    const normalized = customerName.trim().toLocaleLowerCase()
+    const customer = customerBalances.find((item) => item.customerName.trim().toLocaleLowerCase() === normalized)
+    setDepositBalance(customer?.depositBalance || 0)
+  }, [customerBalances, customerName, customerMode, paymentMethod])
 
   const handleSubmit = async () => {
     if (submittingRef.current) return
@@ -181,14 +192,42 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
             {paymentMethod === 'Credit' && (
               <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-4">
                 <label className="block text-sm font-medium text-gray-700">
-                  {t('customerName')}
-                  <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder={t('customerNamePlaceholder')} className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2" />
+                  {t('customerMode')}
+                  <select
+                    value={customerMode === 'existing' ? customerName : '__new__'}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      if (value === '__new__') {
+                        setCustomerMode('new')
+                        setCustomerName('')
+                      } else {
+                        setCustomerMode('existing')
+                        setCustomerName(value)
+                      }
+                    }}
+                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2"
+                  >
+                    <option value="" disabled>{t('selectCustomer')}</option>
+                    {customerBalances.length > 0 ? customerBalances.map((customer) => (
+                      <option key={customer.customerName} value={customer.customerName}>
+                        {customer.customerName} — {t('creditDue')}: {formatCurrency(customer.creditDue)} · {t('depositBalance')}: {formatCurrency(customer.depositBalance)}
+                      </option>
+                    )) : <option value="" disabled>{customerBalancesLoading ? t('loading') : t('noCustomerBalances')}</option>}
+                    <option value="__new__">{t('newCustomer')}</option>
+                  </select>
                 </label>
+                {customerMode === 'new' && (
+                  <label className="block text-sm font-medium text-gray-700">
+                    {t('customerName')}
+                    <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder={t('customerNamePlaceholder')} className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2" />
+                  </label>
+                )}
                 <label className="block text-sm font-medium text-gray-700">
                   {t('partialPayment')}
                   <input type="number" min="0" step="1" inputMode="decimal" value={initialPaidAmount} onChange={(event) => setInitialPaidAmount(event.target.value)} className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2" />
                 </label>
                 <div className="space-y-1 text-sm">
+                  {customerMode === 'existing' && selectedCustomer && <div className="flex justify-between"><span>{t('creditDue')}</span><span className="font-semibold text-amber-700">{formatCurrency(selectedCustomer.creditDue)}</span></div>}
                   <div className="flex justify-between"><span>{t('depositBalance')}</span><span className="font-semibold text-emerald-700">{depositLoading ? t('loading') : formatCurrency(depositBalance)}</span></div>
                   <div className="flex justify-between"><span>{t('depositApplied')}</span><span className="font-semibold text-emerald-700">{formatCurrency(depositApplied)}</span></div>
                   <div className="flex justify-between border-t border-amber-200 pt-1 font-bold"><span>{t('balanceDue')}</span><span className={balanceDue > 0 ? 'text-red-700' : 'text-emerald-700'}>{formatCurrency(balanceDue)}</span></div>

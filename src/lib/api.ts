@@ -5,8 +5,10 @@ export const AUTH_TOKEN_KEY = 'supabase-auth-session'
 const PRODUCT_CACHE_KEY = 'hxu-products-v3'
 const EMPLOYEE_CACHE_KEY = 'hxu-employees-v1'
 const SALES_CACHE_PREFIX = 'hxu-sales-v1:'
+const CUSTOMER_BALANCE_CACHE_KEY = 'hxu-customer-balances-v1'
 const PRODUCT_CACHE_MS = 15 * 60 * 1000
 const EMPLOYEE_CACHE_MS = 10 * 60 * 1000
+const CUSTOMER_BALANCE_CACHE_MS = 30 * 1000
 
 export type Product = {
   id: string
@@ -287,9 +289,26 @@ function saveEmployeeCache(users: User[]) {
   try { localStorage.setItem(EMPLOYEE_CACHE_KEY, JSON.stringify({ users, savedAt: Date.now() })) } catch { /* storage unavailable */ }
 }
 
+function readCustomerBalanceCache(): CustomerBalance[] | null {
+  try {
+    const stored = JSON.parse(localStorage.getItem(CUSTOMER_BALANCE_CACHE_KEY) || 'null') as { balances?: unknown; savedAt?: number } | null
+    if (!stored || !Array.isArray(stored.balances) || !stored.savedAt || Date.now() - stored.savedAt >= CUSTOMER_BALANCE_CACHE_MS) return null
+    return stored.balances.map(normalizeCustomerBalance).filter((item): item is CustomerBalance => item !== null)
+  } catch { return null }
+}
+
+function saveCustomerBalanceCache(balances: CustomerBalance[]) {
+  try { localStorage.setItem(CUSTOMER_BALANCE_CACHE_KEY, JSON.stringify({ balances, savedAt: Date.now() })) } catch { /* storage unavailable */ }
+}
+
+function clearCustomerBalanceCache() {
+  try { localStorage.removeItem(CUSTOMER_BALANCE_CACHE_KEY) } catch { /* storage unavailable */ }
+}
+
 function salesCacheKey(startDate?: string, endDate?: string) { return `${SALES_CACHE_PREFIX}${startDate || ''}:${endDate || ''}` }
 
 let productsFetchInFlight: Promise<Product[]> | null = null
+let customerBalancesFetchInFlight: Promise<CustomerBalance[]> | null = null
 const salesFetchInFlight = new Map<string, Promise<Sale[]>>()
 
 function readSalesCache(key: string): Sale[] | null {
@@ -553,7 +572,7 @@ export const api = {
     }
     const { data, error } = await supabase.rpc(rpcName, rpcArgs)
     if (error) throwDatabaseError(error)
-    clearProductCache(); clearSalesCache()
+    clearProductCache(); clearSalesCache(); clearCustomerBalanceCache()
     const sale = normalizeSale((data as Record<string, unknown> | null)?.sale || data)
     if (!sale) throw new Error(localizedError('The sale response was invalid.', 'အရောင်းအဖြေ မမှန်ကန်ပါ။'))
     return sale
@@ -576,7 +595,7 @@ export const api = {
       p_note: payload.note?.trim() || '',
     })
     if (error) throwDatabaseError(error)
-    clearSalesCache()
+    clearSalesCache(); clearCustomerBalanceCache()
     const result = isRecord(data) ? data : {}
     return { applied: asNumber(result.applied), depositAdded: asNumber(result.depositAdded ?? result.deposit_added), balanceDue: asNumber(result.balanceDue ?? result.balance_due) }
   },
@@ -588,7 +607,7 @@ export const api = {
       p_note: payload.note?.trim() || '',
     })
     if (error) throwDatabaseError(error)
-    clearSalesCache()
+    clearSalesCache(); clearCustomerBalanceCache()
     const result = isRecord(data) ? data : {}
     return { applied: asNumber(result.applied), depositAdded: asNumber(result.depositAdded ?? result.deposit_added), balanceDue: asNumber(result.balanceDue ?? result.balance_due) }
   },
@@ -596,13 +615,24 @@ export const api = {
   async deleteCustomerLedger(customerName: string): Promise<void> {
     const { error } = await supabase.rpc('delete_customer_ledger', { p_customer_name: customerName.trim() })
     if (error) throwDatabaseError(error)
-    clearSalesCache()
+    clearSalesCache(); clearCustomerBalanceCache()
   },
 
-  async getCustomerBalances(): Promise<CustomerBalance[]> {
-    const { data, error } = await supabase.rpc('get_customer_balances')
-    if (error) throwDatabaseError(error)
-    return (Array.isArray(data) ? data : []).map(normalizeCustomerBalance).filter((item): item is CustomerBalance => item !== null)
+  async getCustomerBalances(forceRefresh = false): Promise<CustomerBalance[]> {
+    if (!forceRefresh) {
+      const cached = readCustomerBalanceCache()
+      if (cached) return cached
+    }
+    if (!customerBalancesFetchInFlight) {
+      customerBalancesFetchInFlight = (async () => {
+        const { data, error } = await supabase.rpc('get_customer_balances')
+        if (error) throwDatabaseError(error)
+        const balances = (Array.isArray(data) ? data : []).map(normalizeCustomerBalance).filter((item): item is CustomerBalance => item !== null)
+        saveCustomerBalanceCache(balances)
+        return balances
+      })().finally(() => { customerBalancesFetchInFlight = null })
+    }
+    return customerBalancesFetchInFlight!
   },
 
   async getCustomerLedger(customerName: string): Promise<CustomerLedgerEntry[]> {

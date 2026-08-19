@@ -66,9 +66,8 @@ export default function Scanner({ onScan }: ScannerProps) {
       setCameras(available)
       const rear = available.find((camera) => /back|rear|environment|world/i.test(camera.label))
       const front = available.find((camera) => /front|user|fac(e|ing)/i.test(camera.label))
-      // Rear camera gives barcodes more light and a more stable working distance.
-      // The camera selector still lets the user switch whenever needed.
-      const selected = requestedCameraId || cameraId || rear?.id || front?.id || available[0].id
+      // Default to the front camera as requested. The camera selector still lets the user switch whenever needed.
+      const selected = requestedCameraId || cameraId || front?.id || rear?.id || available[0].id
       setCameraId(selected)
 
       const scanner = new Html5Qrcode(readerId, { formatsToSupport: FORMATS, verbose: false })
@@ -76,7 +75,7 @@ export default function Scanner({ onScan }: ScannerProps) {
       const hasExplicitCamera = Boolean(requestedCameraId || cameraId)
       const videoConstraints: MediaTrackConstraints = hasExplicitCamera
         ? { deviceId: { exact: selected }, width: { ideal: 1280 }, height: { ideal: 960 } }
-        : { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 960 } }
+        : { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 960 } }
       await scanner.start(
         selected,
         {
