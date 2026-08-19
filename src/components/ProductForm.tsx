@@ -88,9 +88,9 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
   const unitsPerPackValue = isPackAndUnit || formData.purchaseUnit === 'pack' ? Math.max(2, parseInt(formData.unitsPerPack) || 2) : Math.max(1, parseInt(formData.unitsPerPack) || 1)
   const packsPerCaseValue = hasCaseLevel ? Math.max(2, parseInt(formData.packsPerCase) || 2) : 1
   const fullCasesValue = hasCaseLevel ? Math.max(0, parseInt(formData.fullCases) || 0) : 0
-  const loosePacksValue = hasCaseLevel ? Math.min(packsPerCaseValue - 1, Math.max(0, parseInt(formData.loosePacks) || 0)) : 0
+  const loosePacksValue = hasCaseLevel ? Math.max(0, parseInt(formData.loosePacks) || 0) : 0
   const fullPacksValue = isPackAndUnit && !hasCaseLevel ? Math.max(0, parseInt(formData.fullPacks) || 0) : 0
-  const looseUnitsValue = isPackAndUnit ? Math.min(unitsPerPackValue - 1, Math.max(0, parseInt(formData.looseUnits) || 0)) : 0
+  const looseUnitsValue = isPackAndUnit ? Math.max(0, parseInt(formData.looseUnits) || 0) : 0
   const stockQtyValue = hasCaseLevel
     ? (fullCasesValue * packsPerCaseValue + loosePacksValue) * unitsPerPackValue + looseUnitsValue
     : isPackAndUnit
@@ -153,9 +153,9 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
         const previousFullCases = Math.max(0, parseInt(prev.fullCases) || 0)
         const previousLoosePacks = Math.max(0, parseInt(prev.loosePacks) || 0)
         const previousFullPacks = Math.max(0, parseInt(prev.fullPacks) || 0)
-        const previousLooseUnits = Math.min(previousUnits - 1, Math.max(0, parseInt(prev.looseUnits) || 0))
+        const previousLooseUnits = Math.max(0, parseInt(prev.looseUnits) || 0)
         const totalUnits = prev.hasCaseLevel
-          ? (previousFullCases * previousPacksPerCase + Math.min(previousPacksPerCase - 1, previousLoosePacks)) * previousUnits + previousLooseUnits
+          ? (previousFullCases * previousPacksPerCase + previousLoosePacks) * previousUnits + previousLooseUnits
           : previousFullPacks * previousUnits + previousLooseUnits
         const nextUnits = name === 'unitsPerPack' ? Math.max(2, parseInt(value) || 2) : previousUnits
         const nextPacksPerCase = name === 'packsPerCase' ? Math.max(2, parseInt(value) || 2) : previousPacksPerCase
@@ -185,7 +185,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
         const nextUnits = Math.max(2, parseInt(prev.unitsPerPack) || 2)
         const previousPacksPerCase = Math.max(1, parseInt(prev.packsPerCase) || 1)
         const currentTotal = prev.saleType === 'both'
-          ? (Math.max(0, parseInt(prev.fullCases) || 0) * previousPacksPerCase + Math.min(previousPacksPerCase - 1, Math.max(0, parseInt(prev.loosePacks) || 0))) * Math.max(2, parseInt(prev.unitsPerPack) || 2) + Math.min(Math.max(2, parseInt(prev.unitsPerPack) || 2) - 1, Math.max(0, parseInt(prev.looseUnits) || 0))
+          ? (Math.max(0, parseInt(prev.fullCases) || 0) * previousPacksPerCase + Math.max(0, parseInt(prev.loosePacks) || 0)) * Math.max(2, parseInt(prev.unitsPerPack) || 2) + Math.max(0, parseInt(prev.looseUnits) || 0)
           : Math.max(0, parseInt(prev.stockQty) || 0)
         const totalPacks = Math.floor(currentTotal / nextUnits)
         return { ...prev, saleType: nextSaleType, hasCaseLevel: false, unitsPerPack: nextUnits.toString(), packsPerCase: '1', fullCases: '', loosePacks: '', fullPacks: totalPacks.toString(), looseUnits: (currentTotal % nextUnits).toString() }
@@ -444,7 +444,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   </div>
                   <div className="flex flex-col">
                     <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{t('loosePacks')}</label>
-                    <input type="number" name="loosePacks" min="0" max={Math.max(0, packsPerCaseValue - 1)} value={formData.loosePacks} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
+                    <input type="number" name="loosePacks" min="0" value={formData.loosePacks} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                   </div>
                 </> : <div className="col-span-2 flex flex-col">
                   <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{fullPacksLabel}</label>
@@ -452,7 +452,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 </div>}
                 <div className="col-span-2 flex flex-col">
                   <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{looseUnitsLabel}</label>
-                  <input type="number" name="looseUnits" min="0" max={Math.max(0, unitsPerPackValue - 1)} value={formData.looseUnits} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
+                  <input type="number" name="looseUnits" min="0" value={formData.looseUnits} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div className="col-span-2 space-y-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700"><p>• {totalUnitStockLabel} - {stockQtyValue} {stockUnitCountLabel}</p>{hasCaseLevel && <p>• {t('caseCountPreview')} - {caseCountPreview} {t('case')}</p>}<p>• {packCountLabel} - {packCountPreview} {packCountUnitLabel}</p></div>
                 <div className="col-span-2 flex flex-col">
