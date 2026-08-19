@@ -664,8 +664,17 @@ export const api = {
   },
 
   async deleteProduct(id: string): Promise<void> {
-    const { error } = await supabase.from('products').update({ is_active: false }).eq('id', id)
-    if (error) throwDatabaseError(error)
+    const { error } = await supabase.from('products').delete().eq('id', id)
+    if (error) {
+      const errorCode = typeof error === 'object' && error !== null && 'code' in error ? String((error as { code?: unknown }).code || '') : ''
+      const errorMessage = String(error.message || '').toLowerCase()
+      const productIsReferencedBySale = errorCode === '23503' || errorMessage.includes('sale_items') || errorMessage.includes('foreign key')
+      if (!productIsReferencedBySale) throwDatabaseError(error)
+
+      // Preserve sales history when sale_items still references this product.
+      const { error: archiveError } = await supabase.from('products').update({ is_active: false }).eq('id', id)
+      if (archiveError) throwDatabaseError(archiveError)
+    }
     clearProductCache()
   },
 }
