@@ -36,6 +36,7 @@ export default function Scanner({ onScan }: ScannerProps) {
   const onScanRef = useRef(onScan)
   const scanLockedUntil = useRef(0)
   const focusTimer = useRef<number | null>(null)
+  const focusModeRef = useRef<'continuous' | 'single-shot' | undefined>(undefined)
 
   useEffect(() => { onScanRef.current = onScan }, [onScan])
 
@@ -50,6 +51,7 @@ export default function Scanner({ onScan }: ScannerProps) {
     setCanTorch(false)
     setTorchOn(false)
     setZoomRange(null)
+    focusModeRef.current = undefined
     if (focusTimer.current) { window.clearInterval(focusTimer.current); focusTimer.current = null }
   }
 
@@ -62,8 +64,11 @@ export default function Scanner({ onScan }: ScannerProps) {
       const available = cameras.length ? cameras : await Html5Qrcode.getCameras()
       if (!available.length) throw new Error(t('cameraNotFound'))
       setCameras(available)
+      const rear = available.find((camera) => /back|rear|environment|world/i.test(camera.label))
       const front = available.find((camera) => /front|user|fac(e|ing)/i.test(camera.label))
-      const selected = requestedCameraId || cameraId || front?.id || available[0].id
+      // Rear camera gives barcodes more light and a more stable working distance.
+      // The camera selector still lets the user switch whenever needed.
+      const selected = requestedCameraId || cameraId || rear?.id || front?.id || available[0].id
       setCameraId(selected)
 
       const scanner = new Html5Qrcode(readerId, { formatsToSupport: FORMATS, verbose: false })
@@ -71,7 +76,7 @@ export default function Scanner({ onScan }: ScannerProps) {
       const hasExplicitCamera = Boolean(requestedCameraId || cameraId)
       const videoConstraints: MediaTrackConstraints = hasExplicitCamera
         ? { deviceId: { exact: selected }, width: { ideal: 1280 }, height: { ideal: 960 } }
-        : { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 960 } }
+        : { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 960 } }
       await scanner.start(
         selected,
         {
@@ -88,8 +93,9 @@ export default function Scanner({ onScan }: ScannerProps) {
             // A decoder reports the same visible barcode on many consecutive
             // video frames. Lock briefly so one physical scan adds exactly once.
             scanLockedUntil.current = now + 650
-            // Re-focus immediately after a valid detection so the next barcode starts sharp.
-            void applyCameraControl({ focusMode: 'single-shot' }, true)
+            // Keep the lens continuously focused after detection so the barcode stays sharp
+            // while the user moves the next item into the center guide.
+            if (focusModeRef.current) void applyCameraControl({ focusMode: focusModeRef.current }, true)
             onScanRef.current(code)
           }
         },
@@ -97,18 +103,25 @@ export default function Scanner({ onScan }: ScannerProps) {
       )
       const capabilities = scanner.getRunningTrackCapabilities() as ExtendedCapabilities
       const focusMode = capabilities.focusMode?.includes('continuous') ? 'continuous' : capabilities.focusMode?.includes('single-shot') ? 'single-shot' : undefined
+      focusModeRef.current = focusMode
       const zoomCapability = capabilities.zoom
-      const initialZoom = zoomCapability ? zoomCapability.min : undefined
+      // A small initial optical zoom makes narrow barcodes occupy more pixels without
+      // forcing the user to use the slider on every scan. Keep enough room for close items.
+      const initialZoom = zoomCapability
+        ? Math.min(zoomCapability.max, Math.max(zoomCapability.min, zoomCapability.min + Math.max(zoomCapability.step || 0.1, (zoomCapability.max - zoomCapability.min) * 0.15)))
+        : undefined
       const advanced = [{ ...(focusMode && { focusMode }), ...(initialZoom !== undefined && { zoom: initialZoom }) }]
       try {
         await scanner.applyVideoConstraints({
           ...(advanced[0].focusMode || advanced[0].zoom !== undefined ? { advanced } : {}),
         } as ExtendedConstraints)
       } catch { /* Some browsers report capabilities but reject constraints. */ }
-      if (capabilities.focusMode?.includes('single-shot')) {
+      if (focusMode === 'continuous') {
+        void applyCameraControl({ focusMode: 'continuous' }, true)
+      } else if (focusMode === 'single-shot') {
         focusTimer.current = window.setInterval(() => {
           void applyCameraControl({ focusMode: 'single-shot' }, true)
-        }, 1800)
+        }, 1200)
       }
       setCanTorch(capabilities.torch === true)
       if (zoomCapability) {
@@ -155,7 +168,9 @@ export default function Scanner({ onScan }: ScannerProps) {
       <div className="pointer-events-none absolute right-6 top-6 h-8 w-8 border-r-4 border-t-4 border-green-300" />
       <div className="pointer-events-none absolute bottom-6 left-6 h-8 w-8 border-b-4 border-l-4 border-green-300" />
       <div className="pointer-events-none absolute bottom-6 right-6 h-8 w-8 border-b-4 border-r-4 border-green-300" />
-      <div className="pointer-events-none absolute inset-x-8 top-1/2 h-0.5 -translate-y-1/2 bg-gradient-to-r from-transparent via-green-300 to-transparent shadow-[0_0_18px_rgba(134,239,172,0.95)]" />
+      <div className="pointer-events-none absolute left-[9%] right-[9%] top-1/2 aspect-[3/1] -translate-y-1/2 rounded-lg border-2 border-green-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.16),0_0_18px_rgba(134,239,172,0.95)]">
+        <div className="absolute inset-x-2 top-1/2 h-0.5 -translate-y-1/2 bg-gradient-to-r from-transparent via-green-200 to-transparent shadow-[0_0_18px_rgba(134,239,172,0.95)]" />
+      </div>
     </div>
   </div>
 }
