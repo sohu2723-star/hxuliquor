@@ -48,14 +48,14 @@ export default function ProductList({ products, onEdit, onDelete }: ProductListP
                   <div className="font-semibold text-emerald-700">{t('packSalePrice')}: {formatCurrency(product.packPrice || product.price)}</div>
                   <div className="mt-1 text-gray-500">{t('packCostPrice')}: {formatCurrency(product.costPrice)}</div>
                 </> : product.saleType === 'both' ? <>
-                  <div className="font-semibold text-emerald-700">{t('unitSalePrice')}: {formatCurrency(product.price)}</div>
-                  <div className="mt-1 text-gray-500">{t('unitCostPrice')}: {formatCurrency(product.costPrice)}</div>
-                  <div className="mt-1 font-semibold text-violet-700">{t('packSalePrice')}: {formatCurrency(product.packPrice)}</div>
-                  <div className="mt-1 text-slate-500">{t('packPurchasePriceShort')}: {formatCurrency(product.costPrice * unitsPerPack)}</div>
+                  <div className="font-semibold text-emerald-700">{t(isThreeLevel ? 'stickSalePrice' : 'unitSalePrice')}: {formatCurrency(product.price)}</div>
+                  <div className="mt-1 text-gray-500">{t(isThreeLevel ? 'stickCostPrice' : 'unitCostPrice')}: {formatCurrency(product.costPrice)}</div>
+                  <div className="mt-1 font-semibold text-violet-700">{t(isThreeLevel ? 'boxSalePrice' : 'packSalePrice')}: {formatCurrency(product.packPrice)}</div>
+                  <div className="mt-1 text-slate-500">{t(isThreeLevel ? 'boxPurchasePriceShort' : 'packPurchasePriceShort')}: {formatCurrency(product.costPrice * unitsPerPack)}</div>
                   {isThreeLevel && <><div className="mt-1 font-semibold text-amber-700">{t('caseSalePrice')}: {formatCurrency(product.casePrice)}</div><div className="mt-1 text-amber-700">{t('casePurchasePrice')}: {formatCurrency(product.costPrice * caseUnits)}</div></>}
                 </> : <>
-                  <div className="font-semibold text-emerald-700">{t('unitSalePrice')}: {formatCurrency(product.price)}</div>
-                  <div className="mt-1 text-gray-500">{t('unitCostPrice')}: {formatCurrency(product.costPrice)}</div>
+                  <div className="font-semibold text-emerald-700">{t(isThreeLevel ? 'stickSalePrice' : 'unitSalePrice')}: {formatCurrency(product.price)}</div>
+                  <div className="mt-1 text-gray-500">{t(isThreeLevel ? 'stickCostPrice' : 'unitCostPrice')}: {formatCurrency(product.costPrice)}</div>
                 </>}
               </td>
               <td className={`px-4 py-3 whitespace-nowrap font-bold ${isLowStock ? 'text-red-600' : 'text-emerald-700'}`}>

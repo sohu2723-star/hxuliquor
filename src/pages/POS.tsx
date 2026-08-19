@@ -396,13 +396,13 @@ export default function POS() {
                   </div>
                   <div className="mt-3 grid gap-2">
                     {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} disabled={product.stockQty <= 0} className="w-full rounded-xl bg-primary disabled:cursor-not-allowed disabled:bg-slate-300 px-3 py-2.5 text-left text-white shadow-sm">
-                      <span className="flex items-center gap-1 text-[11px] font-medium text-white/80"><Icon name="bottle" className="h-4 w-4" />{t('unitPriceLabel')}</span><strong className="block text-base">{formatCurrency(product.price)}</strong>
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-white/80"><Icon name="bottle" className="h-4 w-4" />{t(isThreeLevelProduct(product) ? 'stickSalePrice' : 'unitPriceLabel')}</span><strong className="block text-base">{formatCurrency(product.price)}</strong>
                     </button>}
                     {product.saleType !== 'unit' && isThreeLevelProduct(product) && product.casePrice > 0 && <button onClick={() => addToCart(product, 'case')} disabled={product.stockQty < saleUnitFactor(product, 'case')} className="w-full rounded-xl border-2 border-amber-400 bg-amber-50 px-3 py-2.5 text-left text-amber-950 shadow-sm disabled:opacity-40">
                       <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-700"><Icon name="box" className="h-4 w-4" />{t('caseSalePrice')}</span><strong className="block text-base">{formatCurrency(product.casePrice)}</strong>
                     </button>}
                     {product.saleType !== 'unit' && (product.saleType === 'pack' || product.unitsPerPack > 1) && product.packPrice > 0 && <button onClick={() => addToCart(product, 'pack')} disabled={product.stockQty < (product.saleType === 'pack' ? 1 : product.unitsPerPack)} className="w-full rounded-xl border-2 border-violet-400 bg-violet-50 px-3 py-2.5 text-left text-violet-950 shadow-sm disabled:opacity-40">
-                      <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-700"><Icon name="box" className="h-4 w-4" />{isThreeLevelProduct(product) ? `${t('innerPack')} (${product.unitsPerPack} ${t('unitCount')})` : product.saleType === 'pack' ? t('packPriceLabel') : t('packPriceWithUnits', { count: product.unitsPerPack })}</span><strong className="block text-base">{formatCurrency(product.packPrice)}</strong>
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-700"><Icon name="box" className="h-4 w-4" />{isThreeLevelProduct(product) ? t('boxPriceWithUnits', { count: product.unitsPerPack }) : product.saleType === 'pack' ? t('packPriceLabel') : t('packPriceWithUnits', { count: product.unitsPerPack })}</span><strong className="block text-base">{formatCurrency(product.packPrice)}</strong>
                     </button>}
                   </div>
 
