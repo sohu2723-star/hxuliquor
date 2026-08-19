@@ -71,7 +71,8 @@ export default function AdminFinance() {
     const cashReceived = sales.reduce((sum, sale) => sum + sale.paidAmount, 0)
     const cashPayment = sales.filter((sale) => sale.paymentMethod === 'Cash').reduce((sum, sale) => sum + sale.paidAmount, 0)
     const mmqrPayment = sales.filter((sale) => sale.paymentMethod === 'MMQR Pay' || sale.paymentMethod === 'Mobile Wallet').reduce((sum, sale) => sum + sale.paidAmount, 0)
-    const creditSalesAmount = sales.filter((sale) => sale.paymentMethod === 'Credit').reduce((sum, sale) => sum + sale.totalAmount, 0)
+    // Show only the currently outstanding credit. A sale can keep paymentMethod="Credit" after it is fully settled, so totalAmount would incorrectly keep showing old credit.
+    const creditSalesAmount = sales.reduce((sum, sale) => sum + Math.max(0, sale.balanceDue), 0)
     const shopProfit = sales.filter((sale) => sale.paidAmount > 0).flatMap((sale) => sale.items).reduce((sum, item) => sum + item.profit, 0)
     const outsideIncome = transactions.filter((item) => item.type === 'outside_income').reduce((sum, item) => sum + item.amount, 0)
     const expenses = transactions.filter((item) => item.type === 'expense').reduce((sum, item) => sum + item.amount, 0)
