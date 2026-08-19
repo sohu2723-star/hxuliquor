@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
 import type { Product, Sale } from '../lib/api'
-import { api, barcodeMatches, isProductLowStock, PRODUCT_GROUPS, productMatchesGroup, type ProductGroup } from '../lib/api'
+import { api, barcodeMatches, PRODUCT_GROUPS, productMatchesGroup, type ProductGroup } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import { downloadReceipt } from '../lib/receiptDownload'
 import AppHeader from '../components/AppHeader'
@@ -103,7 +103,6 @@ export default function POS() {
     }
   }, [loadProducts])
 
-  const lowStockProducts = useMemo(() => products.filter(isProductLowStock), [products])
   useEffect(() => {
     if (!products.length) return
     setCart((current) => {
@@ -279,15 +278,6 @@ export default function POS() {
         </div>
       </div>}
       <AppHeader />
-      {lowStockProducts.length > 0 && <div className="sticky top-0 z-30 border-b border-red-200 bg-red-50 px-4 py-2.5 text-red-900 shadow-sm" role="status" aria-live="polite">
-        <div className="mx-auto flex max-w-5xl items-start gap-2 text-sm">
-          <Icon name="warning" className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
-          <div className="min-w-0 flex-1">
-            <p className="font-bold">{t('warningCount', { count: lowStockProducts.length })}</p>
-            <p className="mt-0.5 truncate text-xs text-red-800">{lowStockProducts.map((product) => product.name).join(' · ')}</p>
-          </div>
-        </div>
-      </div>}
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
 
@@ -377,27 +367,17 @@ export default function POS() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 max-h-[50vh] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 items-stretch gap-3 sm:grid-cols-3 md:grid-cols-4 max-h-[50vh] overflow-y-auto pr-1">
                 {visibleProducts.map((product) => (
-                  <div key={product.id} className={`product-card h-fit p-3 text-left flex flex-col self-start shadow-sm ${product.stockQty <= 0 ? 'opacity-40 grayscale' : ''}`}>
+                  <div key={product.id} className={`product-card h-full p-3 text-left flex flex-col shadow-sm ${product.stockQty <= 0 ? 'opacity-40 grayscale' : ''}`}>
                   <div className="text-left">
                     <div className="flex justify-center mb-2">
                       <ProductImage url={product.imageUrl} name={product.name} />
                     </div>
                     <p className="truncate font-bold">{product.name}</p>
                     <p className="text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
-                    <div className={`mt-1 flex flex-col rounded-xl px-3 py-2 text-xs font-semibold ${isProductLowStock(product) ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                      {isThreeLevelProduct(product) ? (() => {
-                        const caseUnits = product.unitsPerPack * product.packsPerCase
-                        const fullCases = Math.floor(product.stockQty / caseUnits)
-                        const remainder = product.stockQty % caseUnits
-                        const fullPacks = Math.floor(remainder / product.unitsPerPack)
-                        const looseUnits = remainder % product.unitsPerPack
-                        return <><span>• {t('case')} - {fullCases} {t('case')}</span><span>• {t('innerPack')} - {fullPacks} {t('innerPack')}</span><span>• {t('looseUnits')} - {looseUnits} {t('unitCount')}</span><span>• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</span></>
-                      })() : product.saleType === 'both' ? <><span>• {t('genericFullPacks')} - {Math.floor(product.stockQty / Math.max(1, product.unitsPerPack || 1))} {t('pack')}</span><span>• {t('genericLooseUnits')} - {product.stockQty % Math.max(1, product.unitsPerPack || 1)} {t('unitCount')}</span><span>• {t('genericTotalUnitStock')} - {product.stockQty} {t('unitCount')}</span></> : <span>• {t('stock')} - {product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</span>}
-                    </div>
                   </div>
-                  <div className="mt-3 grid gap-2">
+                  <div className="mt-auto pt-3 grid gap-2">
                     {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} disabled={product.stockQty <= 0} className="w-full rounded-xl bg-primary disabled:cursor-not-allowed disabled:bg-slate-300 px-3 py-2.5 text-left text-white shadow-sm">
                       <span className="flex items-center gap-1 text-[11px] font-medium text-white/80"><Icon name="bottle" className="h-4 w-4" />{t(isThreeLevelProduct(product) ? 'stickSalePrice' : 'unitPriceLabel')}</span><strong className="block text-base">{formatCurrency(product.price)}</strong>
                     </button>}

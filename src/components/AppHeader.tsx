@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
+import { api, isProductLowStock } from '../lib/api'
 import Icon from './Icon'
 
 export default function AppHeader() {
@@ -9,8 +10,33 @@ export default function AppHeader() {
   const location = useLocation()
   const { language, setLanguage, t } = useLanguage()
   const [profileOpen, setProfileOpen] = useState(false)
+  const [lowStockCount, setLowStockCount] = useState(0)
   const profileRef = useRef<HTMLDivElement>(null)
   const userAgent = useMemo(() => navigator.userAgent, [])
+
+  useEffect(() => {
+    if (user?.role !== 'admin') {
+      setLowStockCount(0)
+      return
+    }
+    let active = true
+    const refreshCount = () => {
+      void api.getProductsStaleFirst((fresh) => {
+        if (active) setLowStockCount(fresh.filter(isProductLowStock).length)
+      }).then((result) => {
+        if (active) setLowStockCount(result.products.filter(isProductLowStock).length)
+      }).catch(() => {})
+    }
+    refreshCount()
+    const refreshWhenVisible = () => { if (document.visibilityState === 'visible') refreshCount() }
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    const timer = window.setInterval(refreshCount, 60000)
+    return () => {
+      active = false
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      window.clearInterval(timer)
+    }
+  }, [user?.role])
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
@@ -36,7 +62,7 @@ export default function AppHeader() {
           {user?.role === 'admin' && <Link className={linkClass('/admin/dashboard')} to="/admin/dashboard"><Icon name="chart" className="h-4 w-4" />{t('income')}</Link>}
           {user?.role === 'admin' && <Link className={linkClass('/admin/credits')} to="/admin/credits"><Icon name="box" className="h-4 w-4" />{t('credits')}</Link>}
           {user?.role === 'admin' && <Link className={linkClass('/admin/sales-history')} to="/admin/sales-history"><Icon name="chart" className="h-4 w-4" />{t('history')}</Link>}
-          {user?.role === 'admin' && <Link className={linkClass('/admin/warnings')} to="/admin/warnings"><Icon name="warning" className="h-4 w-4" />{t('warnings')}</Link>}
+          {user?.role === 'admin' && <Link className={linkClass('/admin/warnings')} to="/admin/warnings"><Icon name="warning" className="h-4 w-4" />{t('warnings')} <span className="rounded-full bg-red-100 px-1.5 text-xs font-extrabold text-red-700">{lowStockCount}</span></Link>}
           {user?.role === 'admin' && <Link className={linkClass('/admin/finance')} to="/admin/finance"><Icon name="chart" className="h-4 w-4" />{t('finance')}</Link>}
         </nav>
         <button onClick={() => setLanguage(language === 'my' ? 'en' : 'my')} className="whitespace-nowrap rounded-xl bg-amber-50 px-3.5 py-2 text-sm font-semibold text-amber-800 ring-1 ring-amber-200">{language === 'my' ? 'EN' : 'မြန်မာ'}</button>
