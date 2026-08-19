@@ -1,6 +1,8 @@
 import { lazy, Suspense, type ComponentType } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
+import AdminCredits from './pages/AdminCredits'
+import AdminFinance from './pages/AdminFinance'
 const CHUNK_RECOVERY_KEY = 'hxu-chunk-recovery-at'
 
 type LazyPageModule = { default: ComponentType<Record<string, never>> }
@@ -52,10 +54,8 @@ const POS = lazyPage(() => import('./pages/POS'))
 const AdminProducts = lazyPage(() => import('./pages/AdminProducts'))
 const AdminEmployees = lazyPage(() => import('./pages/AdminEmployees'))
 const AdminDashboard = lazyPage(() => import('./pages/AdminDashboard'))
-const AdminCredits = lazyPage(() => import('./pages/AdminCredits'))
 const AdminSalesHistory = lazyPage(() => import('./pages/AdminSalesHistory'))
 const AdminWarnings = lazyPage(() => import('./pages/AdminWarnings'))
-const AdminFinance = lazyPage(() => import('./pages/AdminFinance'))
 import LoadingSpinner from './components/LoadingSpinner'
 import { ToastProvider } from './contexts/ToastContext'
 
