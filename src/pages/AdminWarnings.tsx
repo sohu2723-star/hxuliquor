@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import Icon from '../components/Icon'
-import { api, isProductLowStock, type Product } from '../lib/api'
+import { api, isProductLowStock, productMatchesGroup, type Product, type ProductGroup } from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useToast } from '../contexts/ToastContext'
 import { useActionLoading } from '../contexts/ActionLoadingContext'
@@ -13,6 +13,9 @@ export default function AdminWarnings() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [productGroup, setProductGroup] = useState<ProductGroup>('all')
 
   const load = useCallback(async (quiet = false): Promise<boolean> => {
     if (!quiet) setLoading(true)
@@ -42,7 +45,15 @@ export default function AdminWarnings() {
     return () => { document.removeEventListener('visibilitychange', refresh); window.clearInterval(timer) }
   }, [load])
 
-  const lowStock = products.filter(isProductLowStock)
+  const lowStock = useMemo(() => products.filter(isProductLowStock), [products])
+  const categories = useMemo(() => [...new Set(lowStock.map((product) => product.category).filter(Boolean))].sort(), [lowStock])
+  const filteredLowStock = useMemo(() => {
+    const normalized = searchQuery.trim().toLowerCase()
+    return lowStock.filter((product) => {
+      const searchable = [product.name, product.barcode, product.category, product.productColor, product.productSize].join(' ').toLowerCase()
+      return (!normalized || searchable.includes(normalized)) && (!categoryFilter || product.category === categoryFilter) && productMatchesGroup(product, productGroup)
+    })
+  }, [lowStock, searchQuery, categoryFilter, productGroup])
 
   return <div className="min-h-screen bg-slate-50">
     <AppHeader />
@@ -55,8 +66,23 @@ export default function AdminWarnings() {
         <button type="button" onClick={() => void handleRefresh()} disabled={loading || isActionLoading} className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 disabled:opacity-60"><Icon name="refresh" className="mr-1 inline h-4 w-4" />{t('refresh')}</button>
       </div>
       {error && <div className="mb-4 flex items-center gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700"><Icon name="warning" className="h-5 w-5 shrink-0" />{error}</div>}
-      {loading ? <div className="surface-card p-8 text-center text-slate-500">{t('loading')}</div> : lowStock.length === 0 ? <div className="surface-card flex flex-col items-center justify-center gap-3 p-12 text-center text-emerald-700"><Icon name="check" className="h-12 w-12" /><p className="font-semibold">{t('warningEmpty')}</p></div> : <div className="grid items-stretch gap-4 lg:grid-cols-2">
-        {lowStock.map((product) => <article key={product.id} className="surface-card grid h-full min-w-0 grid-cols-[5rem_minmax(0,1fr)] items-start gap-4 border-l-4 border-red-500 p-4 lg:grid-cols-[5rem_minmax(0,1fr)_minmax(10rem,auto)]">
+      <div className="mb-4 space-y-3">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {(['all', 'unit', 'both'] as ProductGroup[]).map((group) => {
+            const count = lowStock.filter((product) => productMatchesGroup(product, group)).length
+            return <button key={group} type="button" onClick={() => setProductGroup(group)} className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${productGroup === group ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{t(group === 'all' ? 'groupAll' : group === 'unit' ? 'groupUnit' : 'groupBoth')} ({count})</button>
+          })}
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={`${t('searchProduct')} / ${t('barcode')}`} className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+            <option value="">{t('allCategoriesShort')}</option>
+            {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+        </div>
+      </div>
+      {loading ? <div className="surface-card p-8 text-center text-slate-500">{t('loading')}</div> : filteredLowStock.length === 0 ? <div className="surface-card flex flex-col items-center justify-center gap-3 p-12 text-center text-emerald-700"><Icon name={lowStock.length === 0 ? 'check' : 'warning'} className="h-12 w-12" /><p className="font-semibold">{lowStock.length === 0 ? t('warningEmpty') : t('noProductsFound')}</p></div> : <div className="grid items-stretch gap-4 lg:grid-cols-2">
+        {filteredLowStock.map((product) => <article key={product.id} className="surface-card grid h-full min-w-0 grid-cols-[5rem_minmax(0,1fr)] items-start gap-4 border-l-4 border-red-500 p-4 lg:grid-cols-[5rem_minmax(0,1fr)_minmax(10rem,auto)]">
           <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
             {product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-400">{t('noImage')}</div>}
           </div>
