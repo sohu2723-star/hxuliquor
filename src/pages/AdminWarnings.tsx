@@ -17,8 +17,8 @@ export default function AdminWarnings() {
   const load = useCallback(async (quiet = false): Promise<boolean> => {
     if (!quiet) setLoading(true)
     try {
-      const result = await api.getProductsStaleFirst((fresh) => setProducts(fresh))
-      setProducts(result.products)
+      const freshProducts = await api.getProducts(true)
+      setProducts(freshProducts)
       setError('')
       return true
     } catch (err) {
@@ -60,7 +60,7 @@ export default function AdminWarnings() {
           <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-slate-100">
             {product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-slate-400">{t('noImage')}</div>}
           </div>
-          <div className="min-w-0 flex-1"><h2 className="truncate font-bold text-slate-950">{product.name}</h2><p className="mt-1 text-sm text-slate-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ') || t('categoryUnknown')}</p></div>
+          <div className="min-w-0 flex-1"><h2 className="break-words whitespace-normal leading-snug font-bold text-slate-950">{product.name}</h2><p className="mt-1 text-sm text-slate-500">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ') || t('categoryUnknown')}</p></div>
           <div className="shrink-0 text-right"><p className="text-xs font-semibold text-slate-500">{t('warningStock')}</p>{product.packsPerCase > 1 && product.unitsPerPack > 1 ? (() => { const caseUnits = product.packsPerCase * product.unitsPerPack; const remainder = product.stockQty % caseUnits; const fullPacks = Math.floor(remainder / product.unitsPerPack); const looseUnits = remainder % product.unitsPerPack; return <div className="mt-1 space-y-1 text-sm font-extrabold text-red-700"><p>• {t('case')} - {Math.floor(product.stockQty / caseUnits)} {t('case')}</p><p>• {t('innerPack')} - {fullPacks} {t('innerPack')}</p><p>• {t('looseUnits')} - {looseUnits} {t('unitCount')}</p><p>• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</p></div> })() : product.saleType === 'both' ? <div className="mt-1 space-y-1 text-sm font-extrabold text-red-700"><p>• {t('genericFullPacks')} - {Math.floor(product.stockQty / Math.max(1, product.unitsPerPack || 1))} {t('pack')}</p><p>• {t('genericLooseUnits')} - {product.stockQty % Math.max(1, product.unitsPerPack || 1)} {t('unitCount')}</p><p>• {t('genericTotalUnitStock')} - {product.stockQty} {t('unitCount')}</p></div> : <p className="text-lg font-extrabold text-red-700">• {t('stock')} - {product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</p>}<p className="text-xs text-slate-400">{t('threshold')}: {product.lowStockThreshold}</p></div>
         </article>)}
       </div>}

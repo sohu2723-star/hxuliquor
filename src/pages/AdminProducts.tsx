@@ -47,7 +47,7 @@ export default function AdminProducts() {
   }, [showToast, t])
 
   useEffect(() => {
-    void refreshProducts()
+    void refreshProducts(true, false)
     const refreshWhenReturning = () => {
       if (document.visibilityState === 'visible') void refreshProducts(true, false)
     }

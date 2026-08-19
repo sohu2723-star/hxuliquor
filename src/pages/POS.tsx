@@ -34,9 +34,10 @@ const readPosDraft = (): PosDraft => {
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
   const [cart, setCart] = useState<{ product: Product; quantity: number; saleUnit: SaleUnit }[]>([])
-  const [searchQuery, setSearchQuery] = useState(() => readPosDraft().searchQuery || '')
-  const [productGroup, setProductGroup] = useState<ProductGroup>(() => readPosDraft().productGroup || 'all')
-  const [categoryFilter, setCategoryFilter] = useState(() => readPosDraft().categoryFilter || '')
+  // Always reopen the POS with every product type/category visible.
+  const [searchQuery, setSearchQuery] = useState('')
+  const [productGroup, setProductGroup] = useState<ProductGroup>('all')
+  const [categoryFilter, setCategoryFilter] = useState('')
   const [showCheckout, setShowCheckout] = useState(() => readPosDraft().showCheckout === true)
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
@@ -89,7 +90,8 @@ export default function POS() {
   }, [showToast, t])
 
   useEffect(() => {
-    void loadProducts()
+    // Fetch the latest product list whenever the website/PWA page opens.
+    void loadProducts(true)
     const refreshWhenReturning = () => {
       if (document.visibilityState === 'visible') void loadProducts(false, true)
     }
@@ -374,7 +376,7 @@ export default function POS() {
                     <div className="flex justify-center mb-2">
                       <ProductImage url={product.imageUrl} name={product.name} />
                     </div>
-                    <p className="truncate font-bold">{product.name}</p>
+                    <p className="break-words whitespace-normal leading-snug font-bold">{product.name}</p>
                     <p className="text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
                   </div>
                   <div className="mt-auto pt-3 grid gap-2">

@@ -21,10 +21,8 @@ export default function AppHeader() {
     }
     let active = true
     const refreshCount = () => {
-      void api.getProductsStaleFirst((fresh) => {
+      void api.getProducts(true).then((fresh) => {
         if (active) setLowStockCount(fresh.filter(isProductLowStock).length)
-      }).then((result) => {
-        if (active) setLowStockCount(result.products.filter(isProductLowStock).length)
       }).catch(() => {})
     }
     refreshCount()

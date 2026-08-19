@@ -42,7 +42,7 @@ export default function AdminDashboard() {
     try {
       const [saleData, productData] = await Promise.all([
         api.getSalesStaleFirst(start, end, setSales).then((result) => result.sales),
-        api.getProductsStaleFirst(setProducts).then((result) => result.products),
+        api.getProducts(true).then((freshProducts) => { setProducts(freshProducts); return freshProducts }),
       ])
       setSales(saleData); setProducts(productData)
     } catch (error) { setError(error instanceof Error ? error.message : t('dashboardLoadError')) }

@@ -23,10 +23,8 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       VitePWA({
-        // Keep the current mobile page alive when the user returns from another app.
-        // A new service worker will wait for a normal/manual refresh instead of
-        // unexpectedly replacing the page and leaving a spinner on resume.
-        registerType: 'prompt',
+        // Apply the latest deployed app bundle automatically when the PWA opens.
+        registerType: 'autoUpdate',
         includeAssets: ['favicon.ico'],
         manifest: {
           name: 'HXU Liquor POS',
@@ -39,8 +37,8 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           cleanupOutdatedCaches: true,
-          clientsClaim: false,
-          skipWaiting: false,
+          clientsClaim: true,
+          skipWaiting: true,
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
           runtimeCaching: [
             {
