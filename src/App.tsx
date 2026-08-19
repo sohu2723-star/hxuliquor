@@ -1,15 +1,61 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, type ComponentType } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
-const Login = lazy(() => import('./pages/Login'))
-const POS = lazy(() => import('./pages/POS'))
-const AdminProducts = lazy(() => import('./pages/AdminProducts'))
-const AdminEmployees = lazy(() => import('./pages/AdminEmployees'))
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
-const AdminCredits = lazy(() => import('./pages/AdminCredits'))
-const AdminSalesHistory = lazy(() => import('./pages/AdminSalesHistory'))
-const AdminWarnings = lazy(() => import('./pages/AdminWarnings'))
-const AdminFinance = lazy(() => import('./pages/AdminFinance'))
+const CHUNK_RECOVERY_KEY = 'hxu-chunk-recovery-at'
+
+type LazyPageModule = { default: ComponentType<Record<string, never>> }
+
+function isChunkLoadError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return /dynamically imported module|importing a module script failed|loading chunk|chunkloaderror/i.test(message)
+}
+
+async function clearAppCaches() {
+  try {
+    if ('caches' in window) {
+      const cacheNames = await caches.keys()
+      await Promise.all(cacheNames.map((name) => caches.delete(name)))
+    }
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(registrations.map((registration) => registration.unregister()))
+    }
+  } catch {
+    // A normal reload below is still useful when cache APIs are unavailable.
+  }
+}
+
+function lazyPage(loader: () => Promise<LazyPageModule>) {
+  return lazy(async () => {
+    try {
+      const page = await loader()
+      sessionStorage.removeItem(CHUNK_RECOVERY_KEY)
+      return page
+    } catch (error) {
+      if (!isChunkLoadError(error)) throw error
+      const now = Date.now()
+      const previous = Number(sessionStorage.getItem(CHUNK_RECOVERY_KEY) || 0)
+      if (!previous || now - previous > 30000) {
+        sessionStorage.setItem(CHUNK_RECOVERY_KEY, String(now))
+        await clearAppCaches()
+        window.location.replace(`${window.location.pathname}?app-refresh=${now}${window.location.hash}`)
+        return new Promise<never>(() => {})
+      }
+      sessionStorage.removeItem(CHUNK_RECOVERY_KEY)
+      throw error
+    }
+  })
+}
+
+const Login = lazyPage(() => import('./pages/Login'))
+const POS = lazyPage(() => import('./pages/POS'))
+const AdminProducts = lazyPage(() => import('./pages/AdminProducts'))
+const AdminEmployees = lazyPage(() => import('./pages/AdminEmployees'))
+const AdminDashboard = lazyPage(() => import('./pages/AdminDashboard'))
+const AdminCredits = lazyPage(() => import('./pages/AdminCredits'))
+const AdminSalesHistory = lazyPage(() => import('./pages/AdminSalesHistory'))
+const AdminWarnings = lazyPage(() => import('./pages/AdminWarnings'))
+const AdminFinance = lazyPage(() => import('./pages/AdminFinance'))
 import LoadingSpinner from './components/LoadingSpinner'
 import { ToastProvider } from './contexts/ToastContext'
 
