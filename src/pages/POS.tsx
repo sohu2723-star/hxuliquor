@@ -197,14 +197,16 @@ export default function POS() {
 
   const productCategories = useMemo(() => [...new Set(products.map((product) => product.category).filter(Boolean))].sort(), [products])
   const matchesCategoryFilter = useCallback((product: Product) => !categoryFilter || product.category === categoryFilter, [categoryFilter])
-  const visibleProducts = useMemo(() => products.filter((product) => productMatchesGroup(product, productGroup) && matchesCategoryFilter(product)), [products, productGroup, matchesCategoryFilter])
+  const visibleProducts = useMemo(() => products
+    .filter((product) => productMatchesGroup(product, productGroup) && matchesCategoryFilter(product))
+    .sort((a, b) => Number(b.price || 0) - Number(a.price || 0)), [products, productGroup, matchesCategoryFilter])
   const filteredSearchResults = useMemo(() => {
     const normalized = searchQuery.trim().toLowerCase()
     if (normalized.length < 1) return []
     return products.filter((product) => {
       const searchable = [product.name, product.barcode, product.category, product.productColor, product.productSize].join(' ').toLowerCase()
       return searchable.includes(normalized) && productMatchesGroup(product, productGroup) && matchesCategoryFilter(product)
-    })
+    }).sort((a, b) => Number(b.price || 0) - Number(a.price || 0))
   }, [products, searchQuery, productGroup, matchesCategoryFilter])
 
   const requiresAgeCheck = cart.some((item) => item.product.requiresAgeCheck)
