@@ -190,7 +190,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
         const totalPacks = Math.floor(currentTotal / nextUnits)
         return { ...prev, saleType: nextSaleType, hasCaseLevel: false, unitsPerPack: nextUnits.toString(), packsPerCase: '1', fullCases: '', loosePacks: '', fullPacks: totalPacks.toString(), looseUnits: (currentTotal % nextUnits).toString() }
       }
-      return { ...prev, saleType: nextSaleType }
+      return { ...prev, saleType: nextSaleType, purchaseUnit: 'unit' }
     })
   }
 
@@ -427,7 +427,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                     <input type="number" name="casePrice" value={formData.casePrice} onChange={handleChange} required step="0.01" className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                   </label>}
                 </div>
-                <div className="mt-2 space-y-1 rounded-lg bg-white/80 px-3 py-2 text-sm font-semibold text-violet-800"><p>• {packPurchaseLabel} - {(costPriceValue * unitsPerPackValue).toLocaleString()} Ks</p>{hasCaseLevel && <p>• {t('casePurchasePrice')} - {(costPriceValue * unitsPerPackValue * packsPerCaseValue).toLocaleString()} Ks</p>}<p>• {packCountLabel} - {packCountPreview} {packCountUnitLabel}</p><p>• {looseUnitsLabel} - {looseUnitPreview} {stockUnitCountLabel}</p><p>• {totalUnitStockLabel} - {stockQtyValue} {stockUnitCountLabel}</p></div>
+                <div className="mt-2 space-y-1 rounded-lg bg-white/80 px-3 py-2 text-sm font-semibold text-violet-800">{purchaseUnit !== 'unit' && <><p>• {packPurchaseLabel} - {(costPriceValue * unitsPerPackValue).toLocaleString()} Ks</p>{hasCaseLevel && <><p>• {t('casePurchasePrice')} - {(costPriceValue * unitsPerPackValue * packsPerCaseValue).toLocaleString()} Ks</p><p>• {t('stickCostPrice')} - {costPriceValue.toLocaleString()} Ks</p></>}</>}<p>• {packCountLabel} - {packCountPreview} {packCountUnitLabel}</p><p>• {looseUnitsLabel} - {looseUnitPreview} {stockUnitCountLabel}</p><p>• {totalUnitStockLabel} - {stockQtyValue} {stockUnitCountLabel}</p></div>
               </div>}
 
             {formData.saleType === 'both' ? (

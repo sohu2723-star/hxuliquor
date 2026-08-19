@@ -391,7 +391,7 @@ export default function POS() {
                         const fullPacks = Math.floor(remainder / product.unitsPerPack)
                         const looseUnits = remainder % product.unitsPerPack
                         return <><span>• {t('case')} - {fullCases} {t('case')}</span><span>• {t('innerPack')} - {fullPacks} {t('innerPack')}</span><span>• {t('looseUnits')} - {looseUnits} {t('unitCount')}</span><span>• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</span></>
-                      })() : product.saleType === 'both' ? <><span>• {t('fullPacks')} - {Math.floor(product.stockQty / Math.max(1, product.unitsPerPack || 1))} {t('pack')}</span><span>• {t('looseUnits')} - {product.stockQty % Math.max(1, product.unitsPerPack || 1)} {t('unitCount')}</span><span>• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</span></> : <span>• {t('stock')} - {product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</span>}
+                      })() : product.saleType === 'both' ? <><span>• {t('genericFullPacks')} - {Math.floor(product.stockQty / Math.max(1, product.unitsPerPack || 1))} {t('pack')}</span><span>• {t('genericLooseUnits')} - {product.stockQty % Math.max(1, product.unitsPerPack || 1)} {t('unitCount')}</span><span>• {t('genericTotalUnitStock')} - {product.stockQty} {t('unitCount')}</span></> : <span>• {t('stock')} - {product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</span>}
                     </div>
                   </div>
                   <div className="mt-3 grid gap-2">
@@ -515,7 +515,9 @@ function formatSlipId(sale: Sale) {
 
 function reduceSoldStock(products: Product[], sale: Sale) {
   return products.map((product) => {
-    const sold = sale.items.filter((item) => item.productId === product.id).reduce((sum, item) => sum + item.quantity, 0)
+    const sold = sale.items
+      .filter((item) => item.productId === product.id)
+      .reduce((sum, item) => sum + item.quantity * saleUnitFactor(product, item.saleUnit), 0)
     return sold ? { ...product, stockQty: Math.max(0, product.stockQty - sold) } : product
   })
 }

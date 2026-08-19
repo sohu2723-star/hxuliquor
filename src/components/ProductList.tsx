@@ -65,9 +65,9 @@ export default function ProductList({ products, onEdit, onDelete }: ProductListP
                   <div className="text-sm">• {t('looseUnits')} - {looseUnits} {t('unitCount')}</div>
                   <div className="text-sm">• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</div>
                 </div> : product.saleType === 'both' ? <div className={`space-y-1 rounded-xl px-3 py-2 ring-1 ${isLowStock ? 'bg-red-50 text-red-800 ring-red-100' : 'bg-emerald-50 text-emerald-800 ring-emerald-100'}`}>
-                  <div>• {t('fullPacks')} - {fullPacks} {t('pack')}</div>
-                  <div className="text-sm">• {t('looseUnits')} - {looseUnits} {t('unitCount')}</div>
-                  <div className="text-sm">• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</div>
+                  <div>• {t('genericFullPacks')} - {fullPacks} {t('pack')}</div>
+                  <div className="text-sm">• {t('genericLooseUnits')} - {looseUnits} {t('unitCount')}</div>
+                  <div className="text-sm">• {t('genericTotalUnitStock')} - {product.stockQty} {t('unitCount')}</div>
                 </div> : <div>• {t('stock')} - {product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</div>}
                 {isLowStock && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">{t('low')}</span>}
               </td>
