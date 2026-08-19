@@ -39,7 +39,7 @@ export default function ProductList({ products, onEdit, onDelete }: ProductListP
             const looseUnits = product.saleType === 'both' ? remainderAfterCases % unitsPerPack : 0
             const isLowStock = isProductLowStock(product)
             return <tr key={product.id} className="hover:bg-gray-50">
-              <td className="w-24 min-w-24 px-4 py-3 whitespace-nowrap"><div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="block h-full w-full max-w-none object-cover" /> : <div className="flex h-full w-full items-center justify-center text-center text-xs text-gray-400">{t('noImage')}</div>}</div></td>
+              <td className="w-24 min-w-24 px-4 py-3 whitespace-nowrap"><div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} loading="lazy" decoding="async" className="block h-full w-full max-w-none object-cover" /> : <div className="flex h-full w-full items-center justify-center text-center text-xs text-gray-400">{t('noImage')}</div>}</div></td>
               <td className="px-4 py-3 whitespace-nowrap font-bold">{product.name}</td>
               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{product.barcode}</td>
               <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</td>

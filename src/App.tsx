@@ -1,14 +1,15 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
-import Login from './pages/Login'
-import POS from './pages/POS'
-import AdminProducts from './pages/AdminProducts'
-import AdminEmployees from './pages/AdminEmployees'
-import AdminDashboard from './pages/AdminDashboard'
-import AdminCredits from './pages/AdminCredits'
-import AdminSalesHistory from './pages/AdminSalesHistory'
-import AdminWarnings from './pages/AdminWarnings'
-import AdminFinance from './pages/AdminFinance'
+const Login = lazy(() => import('./pages/Login'))
+const POS = lazy(() => import('./pages/POS'))
+const AdminProducts = lazy(() => import('./pages/AdminProducts'))
+const AdminEmployees = lazy(() => import('./pages/AdminEmployees'))
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const AdminCredits = lazy(() => import('./pages/AdminCredits'))
+const AdminSalesHistory = lazy(() => import('./pages/AdminSalesHistory'))
+const AdminWarnings = lazy(() => import('./pages/AdminWarnings'))
+const AdminFinance = lazy(() => import('./pages/AdminFinance'))
 import LoadingSpinner from './components/LoadingSpinner'
 import { ToastProvider } from './contexts/ToastContext'
 
@@ -37,6 +38,7 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.JSX.E
 function App() {
   return (
     <ToastProvider>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><LoadingSpinner /></div>}>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route
@@ -81,6 +83,7 @@ function App() {
       />
       <Route path="/" element={<Navigate to="/pos" replace />} />
     </Routes>
+    </Suspense>
     </ToastProvider>
   )
 }
