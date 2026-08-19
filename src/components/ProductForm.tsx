@@ -16,11 +16,11 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
   const { t } = useLanguage()
   const draftKey = `${PRODUCT_FORM_DRAFT_PREFIX}${product?.id || 'new'}`
   const initialHasCaseLevel = product?.saleType === 'both' && (product?.packsPerCase || 1) > 1
-  const initialUnitsPerPack = product?.saleType === 'both' ? Math.max(2, product?.unitsPerPack || 2) : 1
+  const initialUnitsPerPack = product?.saleType === 'both' || product?.purchaseUnit === 'pack' || product?.purchaseUnit === 'case' ? Math.max(2, product?.unitsPerPack || 2) : 1
   const initialPacksPerCase = initialHasCaseLevel ? Math.max(2, product?.packsPerCase || 2) : 1
   const initialPurchaseUnit: 'unit' | 'pack' | 'case' = product?.purchaseUnit === 'case' && initialHasCaseLevel
     ? 'case'
-    : product?.purchaseUnit === 'pack' && product?.saleType === 'both'
+    : product?.purchaseUnit === 'pack'
       ? 'pack'
       : 'unit'
   const initialPurchaseMultiplier = initialPurchaseUnit === 'case'
@@ -85,7 +85,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
   const packCountUnitLabel = hasCaseLevel ? t('innerPack') : t('pack')
   const unitProfitLabel = hasCaseLevel ? t('stickProfit') : isPackAndUnit ? t('innerUnitProfit') : t('unitProfit')
   const packProfitLabel = hasCaseLevel ? t('boxProfit') : t('packProfit')
-  const unitsPerPackValue = isPackAndUnit ? Math.max(2, parseInt(formData.unitsPerPack) || 2) : Math.max(1, parseInt(formData.unitsPerPack) || 1)
+  const unitsPerPackValue = isPackAndUnit || formData.purchaseUnit === 'pack' ? Math.max(2, parseInt(formData.unitsPerPack) || 2) : Math.max(1, parseInt(formData.unitsPerPack) || 1)
   const packsPerCaseValue = hasCaseLevel ? Math.max(2, parseInt(formData.packsPerCase) || 2) : 1
   const fullCasesValue = hasCaseLevel ? Math.max(0, parseInt(formData.fullCases) || 0) : 0
   const loosePacksValue = hasCaseLevel ? Math.min(packsPerCaseValue - 1, Math.max(0, parseInt(formData.loosePacks) || 0)) : 0
@@ -98,7 +98,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       : Math.max(0, parseInt(formData.stockQty) || 0)
   const purchaseUnit: 'unit' | 'pack' | 'case' = hasCaseLevel
     ? 'case'
-    : formData.purchaseUnit === 'pack' && isPackAndUnit
+    : formData.purchaseUnit === 'pack'
       ? 'pack'
       : 'unit'
   const purchaseCostInputLabel = purchaseUnit === 'case' ? t('casePurchasePrice') : purchaseUnit === 'pack' ? t('packCostPrice') : unitCostLabel
@@ -235,10 +235,10 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
       price: parseFloat(formData.price) || 0,
       costPrice: costPriceValue,
       purchaseCost: purchaseCostValue,
-      purchaseUnit: isPackAndUnit ? purchaseUnit : 'unit',
+      purchaseUnit,
       stockQty: stockQtyValue,
       lowStockThreshold: parseInt(formData.lowStockThreshold) || 0,
-      unitsPerPack: isPackAndUnit ? Math.max(2, parseInt(formData.unitsPerPack) || 2) : Math.max(1, parseInt(formData.unitsPerPack) || 1),
+      unitsPerPack: isPackAndUnit || purchaseUnit === 'pack' ? Math.max(2, parseInt(formData.unitsPerPack) || 2) : Math.max(1, parseInt(formData.unitsPerPack) || 1),
       packsPerCase: hasCaseLevel ? Math.max(2, parseInt(formData.packsPerCase) || 2) : 1,
       packPrice: formData.saleType === 'both' || formData.saleType === 'pack' ? (parseFloat(formData.packPrice) || 0) : 0,
       casePrice: hasCaseLevel ? (parseFloat(formData.casePrice) || 0) : 0,
@@ -357,7 +357,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
             </div>
 
-            {isPackAndUnit && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+            {formData.saleType !== 'pack' && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3">
               <label className="block text-sm font-semibold text-slate-800">{t('purchaseMode')}</label>
               {hasCaseLevel ? (
                 <div className="mt-2 rounded-lg border border-primary bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">{t('purchaseByPack')}</div>
@@ -372,6 +372,11 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                 </div>
               )}
               <p className="mt-2 text-xs text-slate-600">{t('purchaseCostLabel')}</p>
+            </div>}
+
+            {purchaseUnit === 'pack' && !isPackAndUnit && <div className="mt-3 rounded-xl border border-violet-200 bg-violet-50/60 p-3">
+              <label className="block text-sm font-semibold text-slate-800">{t('genericUnitsPerPack')}</label>
+              <input type="number" name="unitsPerPack" value={formData.unitsPerPack} onChange={handleChange} required min="2" step="1" className="mt-2 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
             </div>}
 
             <div className="grid grid-cols-2 gap-4">
