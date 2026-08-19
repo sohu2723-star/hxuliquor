@@ -63,49 +63,65 @@ export default function AdminProducts() {
 
   const handleSave = async (productData: Partial<Product> & { imageFile?: File }) => {
     const savingProduct = editingProduct
-    setShowForm(false)
-    setEditingProduct(null)
+    const toFiniteNumber = (value: unknown, fallback = 0) => {
+      const number = typeof value === 'number' ? value : Number(value)
+      return Number.isFinite(number) ? number : fallback
+    }
+    const name = String(productData.name || '').trim()
+    const category = String(productData.category || '').trim()
+    const saleType: 'unit' | 'pack' | 'both' = productData.saleType === 'both' ? 'both' : productData.saleType === 'pack' ? 'pack' : 'unit'
+    const price = toFiniteNumber(productData.price)
+    const packPrice = toFiniteNumber(productData.packPrice)
+    const unitsPerPack = Math.max(1, Math.trunc(toFiniteNumber(productData.unitsPerPack, 1)))
+
+    if (!name || !category || price < 0 || (saleType !== 'unit' && (packPrice < 0 || unitsPerPack < 1))) {
+      showToast(t('productSaveError'), 'error')
+      return
+    }
+
     try {
       await runWithLoading(async () => {
-      let imageBase64: string | undefined
-      let imageFileName: string | undefined
+        let imageBase64: string | undefined
+        let imageFileName: string | undefined
 
-      if (productData.imageFile) {
-        imageBase64 = await fileToBase64(productData.imageFile, t)
-        imageFileName = productData.imageFile.name
-      }
+        if (productData.imageFile) {
+          imageBase64 = await fileToBase64(productData.imageFile, t)
+          imageFileName = productData.imageFile.name
+        }
 
-      const payload = {
-        barcode: String(productData.barcode || '').trim(),
-        name: String(productData.name || '').trim(),
-        category: String(productData.category || '').trim(),
-        productColor: String(productData.productColor || '').trim(),
-        productSize: String(productData.productSize || '').trim(),
-        price: productData.price || 0,
-        costPrice: productData.costPrice || 0,
-        purchaseCost: productData.purchaseCost || 0,
-        purchaseUnit: (productData.purchaseUnit as 'unit' | 'pack' | 'case') || 'unit',
-        stockQty: productData.stockQty || 0,
-        lowStockThreshold: productData.lowStockThreshold || 0,
-        unitsPerPack: productData.unitsPerPack || 1,
-        packsPerCase: productData.packsPerCase || 1,
-        packPrice: productData.packPrice || 0,
-        casePrice: productData.casePrice || 0,
-        saleType: productData.saleType || 'unit',
-        requiresAgeCheck: productData.requiresAgeCheck || false,
-        ...(imageBase64 && { imageBase64, imageFileName }),
-      }
+        const payload = {
+          barcode: String(productData.barcode || '').trim(),
+          name,
+          category,
+          productColor: String(productData.productColor || '').trim(),
+          productSize: String(productData.productSize || '').trim(),
+          price,
+          costPrice: toFiniteNumber(productData.costPrice),
+          purchaseCost: toFiniteNumber(productData.purchaseCost),
+          purchaseUnit: (productData.purchaseUnit as 'unit' | 'pack' | 'case') || 'unit',
+          stockQty: Math.max(0, Math.trunc(toFiniteNumber(productData.stockQty))),
+          lowStockThreshold: Math.max(0, Math.trunc(toFiniteNumber(productData.lowStockThreshold))),
+          unitsPerPack,
+          packsPerCase: Math.max(1, Math.trunc(toFiniteNumber(productData.packsPerCase, 1))),
+          packPrice,
+          casePrice: toFiniteNumber(productData.casePrice),
+          saleType,
+          requiresAgeCheck: productData.requiresAgeCheck === true,
+          ...(imageBase64 && { imageBase64, imageFileName }),
+        }
 
-      if (savingProduct) {
-        const updated = await api.updateProduct({ id: savingProduct.id, ...payload })
-        setProducts((current) => current.map((item) => item.id === updated.id ? updated : item))
-        showToast(t('productUpdated'), 'success')
-      } else {
-        const added = await api.addProduct(payload)
-        setProducts((current) => [added, ...current.filter((item) => item.id !== added.id)])
-        showToast(t('productAdded'), 'success')
-      }
+        if (savingProduct) {
+          const updated = await api.updateProduct({ id: savingProduct.id, ...payload })
+          setProducts((current) => current.map((item) => item.id === updated.id ? updated : item))
+          showToast(t('productUpdated'), 'success')
+        } else {
+          const added = await api.addProduct(payload)
+          setProducts((current) => [added, ...current.filter((item) => item.id !== added.id)])
+          showToast(t('productAdded'), 'success')
+        }
 
+        setShowForm(false)
+        setEditingProduct(null)
       })
     } catch (error) {
       showToast(getErrorMessage(error, t('productSaveError')), 'error')
