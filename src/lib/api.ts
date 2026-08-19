@@ -113,12 +113,15 @@ export function productMatchesGroup(product: Product, group: ProductGroup): bool
 }
 
 export function isProductLowStock(product: Product): boolean {
+  const threshold = Math.max(0, product.lowStockThreshold || 0)
   if (product.saleType === 'both') {
     const unitsPerPack = Math.max(2, product.unitsPerPack || 2)
     const fullPacks = Math.floor(product.stockQty / unitsPerPack)
-    return fullPacks <= 0 || product.stockQty <= product.lowStockThreshold
+    const looseUnits = product.stockQty % unitsPerPack
+    // Warn when either sale level is low: full packs or the opened pack's units.
+    return fullPacks <= threshold || looseUnits <= threshold
   }
-  return product.stockQty <= product.lowStockThreshold
+  return product.stockQty <= threshold
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

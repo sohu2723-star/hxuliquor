@@ -379,8 +379,8 @@ export default function POS() {
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 max-h-[50vh] overflow-y-auto pr-1">
                 {visibleProducts.map((product) => (
-                  <div key={product.id} className={`product-card p-3 text-left flex flex-col shadow-sm ${product.stockQty <= 0 ? 'opacity-40 grayscale' : ''}`}>
-                  <div className="text-left flex-1">
+                  <div key={product.id} className={`product-card h-fit p-3 text-left flex flex-col self-start shadow-sm ${product.stockQty <= 0 ? 'opacity-40 grayscale' : ''}`}>
+                  <div className="text-left">
                     <div className="flex justify-center mb-2">
                       <ProductImage url={product.imageUrl} name={product.name} />
                     </div>
