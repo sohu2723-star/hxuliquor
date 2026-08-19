@@ -19,6 +19,8 @@ export type Product = {
   productSize: string
   price: number
   costPrice: number
+  purchaseCost: number
+  purchaseUnit: 'unit' | 'pack' | 'case'
   stockQty: number
   lowStockThreshold: number
   unitsPerPack: number
@@ -155,6 +157,8 @@ function normalizeProduct(value: unknown): Product | null {
     productSize: asString(value.productSize ?? value.product_size),
     price: asNumber(value.price),
     costPrice: asNumber(value.costPrice ?? value.cost_price),
+    purchaseCost: asNumber(value.purchaseCost ?? value.purchase_cost ?? value.costPrice ?? value.cost_price),
+    purchaseUnit: (() => { const purchaseUnit = asString(value.purchaseUnit ?? value.purchase_unit, 'unit'); return purchaseUnit === 'pack' || purchaseUnit === 'case' ? purchaseUnit : 'unit' })(),
     stockQty: asInteger(value.stockQty ?? value.stock_qty),
     lowStockThreshold: asInteger(value.lowStockThreshold ?? value.low_stock_threshold),
     unitsPerPack: Math.max(1, asInteger(value.unitsPerPack ?? value.units_per_pack) || 1),
@@ -355,11 +359,12 @@ function productPayload(payload: Record<string, unknown>) {
   const output: Record<string, unknown> = {}
   const textFields: [string, string][] = [['barcode', 'barcode'], ['name', 'name'], ['category', 'category'], ['productColor', 'product_color'], ['productSize', 'product_size']]
   textFields.forEach(([source, target]) => { if (payload[source] !== undefined) output[target] = asString(payload[source]) })
-  const numberFields: [string, string][] = [['price', 'price'], ['costPrice', 'cost_price'], ['stockQty', 'stock_qty'], ['lowStockThreshold', 'low_stock_threshold'], ['packPrice', 'pack_price'], ['casePrice', 'case_price']]
+  const numberFields: [string, string][] = [['price', 'price'], ['costPrice', 'cost_price'], ['purchaseCost', 'purchase_cost'], ['stockQty', 'stock_qty'], ['lowStockThreshold', 'low_stock_threshold'], ['packPrice', 'pack_price'], ['casePrice', 'case_price']]
   numberFields.forEach(([source, target]) => { if (payload[source] !== undefined) output[target] = source === 'stockQty' || source === 'lowStockThreshold' ? asInteger(payload[source]) : asNumber(payload[source]) })
   if (payload.unitsPerPack !== undefined) output.units_per_pack = Math.max(1, asInteger(payload.unitsPerPack) || 1)
   if (payload.packsPerCase !== undefined) output.packs_per_case = Math.max(1, asInteger(payload.packsPerCase) || 1)
   if (payload.saleType !== undefined) output.sale_type = asString(payload.saleType, 'both')
+  if (payload.purchaseUnit !== undefined) output.purchase_unit = asString(payload.purchaseUnit, 'unit')
   if (payload.requiresAgeCheck !== undefined) output.requires_age_check = asBoolean(payload.requiresAgeCheck)
   return output
 }
@@ -376,7 +381,7 @@ async function uploadProductImage(productId: string, imageBase64: string, fileNa
 }
 
 async function fetchProducts(): Promise<Product[]> {
-  const { data, error } = await supabase.from('products').select('id,barcode,name,category,product_color,product_size,price,cost_price,stock_qty,low_stock_threshold,units_per_pack,packs_per_case,pack_price,case_price,sale_type,requires_age_check,image_url,created_at').eq('is_active', true).order('name', { ascending: true })
+  const { data, error } = await supabase.from('products').select('id,barcode,name,category,product_color,product_size,price,cost_price,purchase_cost,purchase_unit,stock_qty,low_stock_threshold,units_per_pack,packs_per_case,pack_price,case_price,sale_type,requires_age_check,image_url,created_at').eq('is_active', true).order('name', { ascending: true })
   if (error) throwDatabaseError(error)
   return (data || []).map(normalizeProduct).filter((product): product is Product => product !== null)
 }
@@ -641,7 +646,7 @@ export const api = {
     return (Array.isArray(data) ? data : []).map(normalizeCustomerLedgerEntry).filter((item): item is CustomerLedgerEntry => item !== null)
   },
 
-  async addProduct(payload: { barcode: string; name: string; category: string; productColor?: string; productSize?: string; price: number; costPrice: number; stockQty: number; lowStockThreshold: number; unitsPerPack: number; packsPerCase?: number; packPrice: number; casePrice?: number; saleType: 'unit' | 'pack' | 'both'; requiresAgeCheck: boolean; imageBase64?: string; imageFileName?: string }): Promise<Product> {
+  async addProduct(payload: { barcode: string; name: string; category: string; productColor?: string; productSize?: string; price: number; costPrice: number; purchaseCost?: number; purchaseUnit?: 'unit' | 'pack' | 'case'; stockQty: number; lowStockThreshold: number; unitsPerPack: number; packsPerCase?: number; packPrice: number; casePrice?: number; saleType: 'unit' | 'pack' | 'both'; requiresAgeCheck: boolean; imageBase64?: string; imageFileName?: string }): Promise<Product> {
     const id = crypto.randomUUID()
     const imageUrl = payload.imageBase64 ? await uploadProductImage(id, payload.imageBase64, payload.imageFileName || 'product.jpg') : ''
     const { data, error } = await supabase.from('products').insert({ id, ...productPayload(payload), image_url: imageUrl }).select().single()
@@ -652,7 +657,7 @@ export const api = {
     return product
   },
 
-  async updateProduct(payload: { id: string; barcode?: string; name?: string; category?: string; productColor?: string; productSize?: string; price?: number; costPrice?: number; stockQty?: number; lowStockThreshold?: number; unitsPerPack?: number; packsPerCase?: number; packPrice?: number; casePrice?: number; saleType?: 'unit' | 'pack' | 'both'; requiresAgeCheck?: boolean; imageBase64?: string; imageFileName?: string }): Promise<Product> {
+  async updateProduct(payload: { id: string; barcode?: string; name?: string; category?: string; productColor?: string; productSize?: string; price?: number; costPrice?: number; purchaseCost?: number; purchaseUnit?: 'unit' | 'pack' | 'case'; stockQty?: number; lowStockThreshold?: number; unitsPerPack?: number; packsPerCase?: number; packPrice?: number; casePrice?: number; saleType?: 'unit' | 'pack' | 'both'; requiresAgeCheck?: boolean; imageBase64?: string; imageFileName?: string }): Promise<Product> {
     const updates: Record<string, unknown> = productPayload(payload)
     if (payload.imageBase64) updates.image_url = await uploadProductImage(payload.id, payload.imageBase64, payload.imageFileName || 'product.jpg')
     const { data, error } = await supabase.from('products').update(updates).eq('id', payload.id).select().single()

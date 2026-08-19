@@ -83,6 +83,8 @@ export default function AdminProducts() {
         productSize: String(productData.productSize || '').trim(),
         price: productData.price || 0,
         costPrice: productData.costPrice || 0,
+        purchaseCost: productData.purchaseCost || 0,
+        purchaseUnit: (productData.purchaseUnit as 'unit' | 'pack' | 'case') || 'unit',
         stockQty: productData.stockQty || 0,
         lowStockThreshold: productData.lowStockThreshold || 0,
         unitsPerPack: productData.unitsPerPack || 1,
