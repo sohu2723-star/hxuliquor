@@ -3,7 +3,7 @@ import type { Product } from '../lib/api'
 import Scanner from './Scanner'
 import { useLanguage } from '../contexts/LanguageContext'
 
-const PRODUCT_FORM_DRAFT_PREFIX = 'hxu-product-form-draft:'
+const PRODUCT_FORM_DRAFT_PREFIX = 'hxu-product-form-draft-v2:'
 
 interface ProductFormProps {
   product: Product | null
@@ -15,14 +15,17 @@ interface ProductFormProps {
 export default function ProductForm({ product, categories, onSave, onClose }: ProductFormProps) {
   const { t } = useLanguage()
   const draftKey = `${PRODUCT_FORM_DRAFT_PREFIX}${product?.id || 'new'}`
+  const initialSaleType: 'unit' | 'pack' | 'both' = product?.saleType === 'pack' ? 'pack' : product?.saleType === 'both' ? 'both' : product ? 'unit' : 'both'
   const initialHasCaseLevel = product?.saleType === 'both' && (product?.packsPerCase || 1) > 1
-  const initialUnitsPerPack = product?.saleType === 'both' || product?.purchaseUnit === 'pack' || product?.purchaseUnit === 'case' ? Math.max(2, product?.unitsPerPack || 2) : 1
+  const initialUnitsPerPack = initialSaleType === 'both' || product?.purchaseUnit === 'pack' || product?.purchaseUnit === 'case' ? Math.max(2, product?.unitsPerPack || 2) : 1
   const initialPacksPerCase = initialHasCaseLevel ? Math.max(2, product?.packsPerCase || 2) : 1
   const initialPurchaseUnit: 'unit' | 'pack' | 'case' = product?.purchaseUnit === 'case' && initialHasCaseLevel
     ? 'case'
     : product?.purchaseUnit === 'pack'
       ? 'pack'
-      : 'unit'
+      : product
+        ? 'unit'
+        : 'pack'
   const initialPurchaseMultiplier = initialPurchaseUnit === 'case'
     ? initialUnitsPerPack * initialPacksPerCase
     : initialPurchaseUnit === 'pack'
@@ -48,10 +51,10 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     fullPacks: product?.saleType === 'both' && (product?.packsPerCase || 1) <= 1 ? Math.floor((product?.stockQty || 0) / Math.max(2, product?.unitsPerPack || 2)).toString() : '',
     looseUnits: product?.saleType === 'both' ? ((product?.stockQty || 0) % Math.max(2, product?.unitsPerPack || 2)).toString() : '',
     lowStockThreshold: product?.lowStockThreshold?.toString() || '5',
-    unitsPerPack: product?.unitsPerPack?.toString() || '1',
+    unitsPerPack: product?.unitsPerPack?.toString() || (initialSaleType === 'both' || initialPurchaseUnit === 'pack' ? '2' : '1'),
     packPrice: product?.packPrice?.toString() || '',
     casePrice: product?.casePrice?.toString() || '',
-    saleType: product?.saleType === 'pack' ? 'pack' : product?.saleType === 'both' ? 'both' : 'unit',
+    saleType: initialSaleType,
     requiresAgeCheck: product?.requiresAgeCheck || false,
   }
   const [formData, setFormData] = useState(() => {
@@ -188,7 +191,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
           ? (Math.max(0, parseInt(prev.fullCases) || 0) * previousPacksPerCase + Math.max(0, parseInt(prev.loosePacks) || 0)) * Math.max(2, parseInt(prev.unitsPerPack) || 2) + Math.max(0, parseInt(prev.looseUnits) || 0)
           : Math.max(0, parseInt(prev.stockQty) || 0)
         const totalPacks = Math.floor(currentTotal / nextUnits)
-        return { ...prev, saleType: nextSaleType, hasCaseLevel: false, unitsPerPack: nextUnits.toString(), packsPerCase: '1', fullCases: '', loosePacks: '', fullPacks: totalPacks.toString(), looseUnits: (currentTotal % nextUnits).toString() }
+        return { ...prev, saleType: nextSaleType, purchaseUnit: 'pack', hasCaseLevel: false, unitsPerPack: nextUnits.toString(), packsPerCase: '1', fullCases: '', loosePacks: '', fullPacks: totalPacks.toString(), looseUnits: (currentTotal % nextUnits).toString() }
       }
       return { ...prev, saleType: nextSaleType, purchaseUnit: 'unit' }
     })
