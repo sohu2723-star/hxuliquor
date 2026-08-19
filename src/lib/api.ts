@@ -588,6 +588,12 @@ export const api = {
     return { applied: asNumber(result.applied), depositAdded: asNumber(result.depositAdded ?? result.deposit_added), balanceDue: asNumber(result.balanceDue ?? result.balance_due) }
   },
 
+  async deleteCustomerLedger(customerName: string): Promise<void> {
+    const { error } = await supabase.rpc('delete_customer_ledger', { p_customer_name: customerName.trim() })
+    if (error) throwDatabaseError(error)
+    clearSalesCache()
+  },
+
   async getCustomerBalances(): Promise<CustomerBalance[]> {
     const { data, error } = await supabase.rpc('get_customer_balances')
     if (error) throwDatabaseError(error)

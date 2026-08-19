@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import type { Product, Sale } from '../lib/api'
 import { formatCurrency } from '../lib/format'
@@ -39,6 +39,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
     return value === 'Card' || value === 'Mobile Wallet' || value === 'Credit' ? value : 'Cash'
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const submittingRef = useRef(false)
   const [error, setError] = useState('')
   const [customerName, setCustomerName] = useState(String(draft.customerName || ''))
   const [initialPaidAmount, setInitialPaidAmount] = useState(String(draft.initialPaidAmount || '0'))
@@ -91,6 +92,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
   }, [customerName, paymentMethod])
 
   const handleSubmit = async () => {
+    if (submittingRef.current) return
     if (requiresAgeCheck && !ageVerified) {
       setError(t('ageError'))
       return
@@ -106,6 +108,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
       return
     }
 
+    submittingRef.current = true
     setIsSubmitting(true)
     const user = JSON.parse(localStorage.getItem('minimart-pos-user') || '{}')
     const payload = {
@@ -129,6 +132,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
       setError(message)
       onError?.(message)
     } finally {
+      submittingRef.current = false
       setIsSubmitting(false)
     }
   }

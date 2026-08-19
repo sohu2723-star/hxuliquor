@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import AppHeader from '../components/AppHeader'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { api, type CustomerBalance, type CustomerLedgerEntry } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import { useToast } from '../contexts/ToastContext'
@@ -25,6 +26,7 @@ export default function AdminCredits() {
   const [ledgerByCustomer, setLedgerByCustomer] = useState<Record<string, CustomerLedgerEntry[]>>({})
   const [expandedCustomer, setExpandedCustomer] = useState('')
   const [paymentCustomer, setPaymentCustomer] = useState<CustomerBalance | null>(null)
+  const [deleteCustomer, setDeleteCustomer] = useState<CustomerBalance | null>(null)
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('payment')
   const [paymentAmount, setPaymentAmount] = useState('')
   const [loading, setLoading] = useState(true)
@@ -73,6 +75,32 @@ export default function AdminCredits() {
     setPaymentCustomer(null)
     setPaymentAmount('')
     setPaymentError('')
+  }
+
+  const handleDeleteCustomer = async () => {
+    if (!deleteCustomer) return
+    const customerName = deleteCustomer.customerName
+    const result = await runWithLoading(async () => {
+      try {
+        await api.deleteCustomerLedger(customerName)
+        return { ok: true as const }
+      } catch (err) {
+        return { ok: false as const, message: err instanceof Error ? err.message : t('customerDeleteError') }
+      }
+    })
+    if (!result.ok) {
+      showToast(result.message, 'error')
+      return
+    }
+    setDeleteCustomer(null)
+    setExpandedCustomer((current) => current === customerName ? '' : current)
+    setLedgerByCustomer((current) => {
+      const next = { ...current }
+      delete next[customerName]
+      return next
+    })
+    await load(true)
+    showToast(t('customerDeletedSuccess'), 'success')
   }
 
   const submitPayment = async () => {
@@ -168,6 +196,7 @@ export default function AdminCredits() {
                   <div className="mt-4 flex flex-wrap gap-2">
                     <button onClick={() => openPayment(customer, 'payment')} className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">{t('payCustomer')}</button>
                     <button onClick={() => openPayment(customer, 'deposit')} className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-600">{t('addDeposit')}</button>
+                    <button onClick={() => setDeleteCustomer(customer)} disabled={isActionLoading} className="rounded-xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50">{t('customerDelete')}</button>
                   </div>
                 </div>
                 {expanded && <div className="border-t border-slate-100 bg-slate-50 px-4 py-4 sm:px-5">
@@ -184,6 +213,8 @@ export default function AdminCredits() {
         </section>
       )}
     </main>
+
+    {deleteCustomer && <ConfirmDialog title={t('customerDelete')} message={t('customerDeleteQuestion')} confirmLabel={t('delete')} cancelLabel={t('cancel')} onCancel={() => { if (!isActionLoading) setDeleteCustomer(null) }} onConfirm={() => void handleDeleteCustomer()} />}
 
     {paymentCustomer && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
