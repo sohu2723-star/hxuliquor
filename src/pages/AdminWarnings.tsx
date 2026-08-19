@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import AppHeader from '../components/AppHeader'
 import Icon from '../components/Icon'
-import { api, type Product } from '../lib/api'
+import { api, isProductLowStock, type Product } from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useToast } from '../contexts/ToastContext'
 import { useActionLoading } from '../contexts/ActionLoadingContext'
@@ -42,7 +42,7 @@ export default function AdminWarnings() {
     return () => { document.removeEventListener('visibilitychange', refresh); window.clearInterval(timer) }
   }, [load])
 
-  const lowStock = products.filter((product) => product.stockQty <= product.lowStockThreshold)
+  const lowStock = products.filter(isProductLowStock)
 
   return <div className="min-h-screen bg-slate-50">
     <AppHeader />

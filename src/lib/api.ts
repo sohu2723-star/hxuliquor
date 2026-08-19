@@ -108,6 +108,15 @@ export function productMatchesGroup(product: Product, group: ProductGroup): bool
   return !product.barcode.trim()
 }
 
+export function isProductLowStock(product: Product): boolean {
+  if (product.saleType === 'both') {
+    const unitsPerPack = Math.max(2, product.unitsPerPack || 2)
+    const fullPacks = Math.floor(product.stockQty / unitsPerPack)
+    return fullPacks <= 0 || product.stockQty <= product.lowStockThreshold
+  }
+  return product.stockQty <= product.lowStockThreshold
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -559,6 +568,18 @@ export const api = {
       p_customer_name: payload.customerName.trim(),
       p_amount: asNumber(payload.amount),
       p_sale_id: payload.saleId || null,
+      p_note: payload.note?.trim() || '',
+    })
+    if (error) throwDatabaseError(error)
+    clearSalesCache()
+    const result = isRecord(data) ? data : {}
+    return { applied: asNumber(result.applied), depositAdded: asNumber(result.depositAdded ?? result.deposit_added), balanceDue: asNumber(result.balanceDue ?? result.balance_due) }
+  },
+
+  async addCustomerDeposit(payload: { customerName: string; amount: number; note?: string }): Promise<{ applied: number; depositAdded: number; balanceDue: number }> {
+    const { data, error } = await supabase.rpc('add_customer_deposit', {
+      p_customer_name: payload.customerName.trim(),
+      p_amount: asNumber(payload.amount),
       p_note: payload.note?.trim() || '',
     })
     if (error) throwDatabaseError(error)

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Cart from '../components/Cart'
 import Checkout from '../components/Checkout'
 import type { Product, Sale } from '../lib/api'
-import { api, barcodeMatches, PRODUCT_GROUPS, productMatchesGroup, type ProductGroup } from '../lib/api'
+import { api, barcodeMatches, isProductLowStock, PRODUCT_GROUPS, productMatchesGroup, type ProductGroup } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import { downloadReceipt } from '../lib/receiptDownload'
 import AppHeader from '../components/AppHeader'
@@ -94,7 +94,7 @@ export default function POS() {
     }
   }, [loadProducts])
 
-  const lowStockProducts = useMemo(() => products.filter((product) => product.stockQty <= product.lowStockThreshold), [products])
+  const lowStockProducts = useMemo(() => products.filter(isProductLowStock), [products])
   useEffect(() => {
     if (!products.length) return
     setCart((current) => {
@@ -374,7 +374,7 @@ export default function POS() {
                     </div>
                     <p className="truncate font-bold">{product.name}</p>
                     <p className="text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
-                    <div className={`mt-1 flex flex-col rounded-xl px-3 py-2 text-xs font-semibold ${product.stockQty <= product.lowStockThreshold ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{product.saleType === 'both' ? <><span>• {t('fullPacks')} - {Math.floor(product.stockQty / Math.max(2, product.unitsPerPack || 2))} {t('pack')}</span><span>• {t('looseUnits')} - {product.stockQty % Math.max(2, product.unitsPerPack || 2)} {t('unitCount')}</span><span>• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</span></> : <span>• {t('stock')} - {product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</span>}</div>
+                    <div className={`mt-1 flex flex-col rounded-xl px-3 py-2 text-xs font-semibold ${isProductLowStock(product) ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{product.saleType === 'both' ? <><span>• {t('fullPacks')} - {Math.floor(product.stockQty / Math.max(2, product.unitsPerPack || 2))} {t('pack')}</span><span>• {t('looseUnits')} - {product.stockQty % Math.max(2, product.unitsPerPack || 2)} {t('unitCount')}</span><span>• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</span></> : <span>• {t('stock')} - {product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</span>}</div>
                   </div>
                   <div className="mt-3 grid gap-2">
                     {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} disabled={product.stockQty <= 0} className="w-full rounded-xl bg-primary disabled:cursor-not-allowed disabled:bg-slate-300 px-3 py-2.5 text-left text-white shadow-sm">

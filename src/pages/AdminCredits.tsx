@@ -85,11 +85,17 @@ export default function AdminCredits() {
     setPaymentError('')
     const result = await runWithLoading(async () => {
       try {
-        const response = await api.addCustomerPayment({
-          customerName: paymentCustomer.customerName,
-          amount,
-          note: paymentMode === 'deposit' ? t('deposit') : t('paymentHistory'),
-        })
+        const response = paymentMode === 'deposit'
+          ? await api.addCustomerDeposit({
+              customerName: paymentCustomer.customerName,
+              amount,
+              note: t('deposit'),
+            })
+          : await api.addCustomerPayment({
+              customerName: paymentCustomer.customerName,
+              amount,
+              note: t('paymentHistory'),
+            })
         return { ok: true as const, response }
       } catch (err) {
         return { ok: false as const, message: err instanceof Error ? err.message : t('creditPaidError') }
@@ -101,7 +107,8 @@ export default function AdminCredits() {
     }
     closePayment()
     await load(true)
-    showToast(`${t('creditPaidSuccess')} ${formatCurrency(result.response.applied)}${result.response.depositAdded > 0 ? ` · ${t('deposit')} ${formatCurrency(result.response.depositAdded)}` : ''}`, 'success')
+    const successMessage = paymentMode === 'deposit' ? t('depositAddedSuccess') : t('creditPaidSuccess')
+    showToast(`${successMessage} ${formatCurrency(paymentMode === 'deposit' ? result.response.depositAdded : result.response.applied)}`, 'success')
   }
 
   const toggleLedger = async (customerName: string) => {

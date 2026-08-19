@@ -1,4 +1,4 @@
-import type { Product } from '../lib/api'
+import { isProductLowStock, type Product } from '../lib/api'
 import { formatCurrency } from '../lib/format'
 import { useLanguage } from '../contexts/LanguageContext'
 
@@ -32,7 +32,7 @@ export default function ProductList({ products, onEdit, onDelete }: ProductListP
             const unitsPerPack = Math.max(2, product.unitsPerPack || 2)
             const fullPacks = product.saleType === 'both' ? Math.floor(product.stockQty / unitsPerPack) : 0
             const looseUnits = product.saleType === 'both' ? product.stockQty % unitsPerPack : 0
-            const isLowStock = product.stockQty <= product.lowStockThreshold
+            const isLowStock = isProductLowStock(product)
             return <tr key={product.id} className="hover:bg-gray-50">
               <td className="px-4 py-3 whitespace-nowrap">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-10 w-10 object-cover rounded-md" /> : <div className="h-10 w-10 bg-gray-200 rounded-md flex items-center justify-center text-gray-400 text-xs">{t('noImage')}</div>}</td>
               <td className="px-4 py-3 whitespace-nowrap font-bold">{product.name}</td>
@@ -53,7 +53,7 @@ export default function ProductList({ products, onEdit, onDelete }: ProductListP
                 </>}
               </td>
               <td className={`px-4 py-3 whitespace-nowrap font-bold ${isLowStock ? 'text-red-600' : 'text-emerald-700'}`}>
-                {product.saleType === 'both' ? <div className="space-y-1 rounded-xl bg-emerald-50 px-3 py-2 text-emerald-800 ring-1 ring-emerald-100">
+                {product.saleType === 'both' ? <div className={`space-y-1 rounded-xl px-3 py-2 ring-1 ${isLowStock ? 'bg-red-50 text-red-800 ring-red-100' : 'bg-emerald-50 text-emerald-800 ring-emerald-100'}`}>
                   <div>• {t('fullPacks')} - {fullPacks} {t('pack')}</div>
                   <div className="text-sm">• {t('looseUnits')} - {looseUnits} {t('unitCount')}</div>
                   <div className="text-sm">• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</div>
