@@ -98,20 +98,18 @@ export type CustomerBalance = {
   netBalance: number
 }
 
-export type ProductGroup = 'all' | 'barcode' | 'noBarcode' | 'both'
+export type ProductGroup = 'all' | 'unit' | 'both'
 
 export const PRODUCT_GROUPS: { id: ProductGroup; label: string; description: string }[] = [
   { id: 'all', label: 'အားလုံး', description: 'ပစ္စည်းအားလုံး' },
-  { id: 'barcode', label: 'ကုဒ်ရှိ', description: 'ကုဒ်ဖတ်ပြီး ရောင်းမည့်ပစ္စည်း' },
-  { id: 'noBarcode', label: 'ကုဒ်မရှိ', description: 'ပုံဖြင့် လက်ဖြင့်ရောင်းမည့်ပစ္စည်း' },
-  { id: 'both', label: 'ပါကင် + တစ်ခုချင်း', description: 'လက်ကျန်တစ်မျိုးတည်းမှ ပါကင်နှင့် တစ်ခုချင်း နှစ်မျိုးရောင်းမည့်ပစ္စည်း' },
+  { id: 'unit', label: 'တစ်ခုချင်းသာ', description: 'ဘူး/အထုပ် သို့မဟုတ် တစ်ခုချင်းသာ ရောင်းမည့်ပစ္စည်း' },
+  { id: 'both', label: 'ပါကင် + တစ်ခုချင်း', description: 'ပါကင်နှင့် ဘူး/အထုပ် နှစ်မျိုးရောင်းမည့်ပစ္စည်း' },
 ]
 
 export function productMatchesGroup(product: Product, group: ProductGroup): boolean {
   if (group === 'all') return true
   if (group === 'both') return product.saleType === 'both'
-  if (group === 'barcode') return Boolean(product.barcode.trim())
-  return !product.barcode.trim()
+  return product.saleType !== 'both'
 }
 
 export function isProductLowStock(product: Product): boolean {

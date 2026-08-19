@@ -168,7 +168,7 @@ export default function AdminProducts() {
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
           {PRODUCT_GROUPS.map((group) => {
             const count = products.filter((product) => productMatchesGroup(product, group.id)).length
-            return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{t(group.id === 'all' ? 'groupAll' : group.id === 'barcode' ? 'groupBarcode' : group.id === 'noBarcode' ? 'groupNoBarcode' : 'groupBoth')} ({count})</button>
+            return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{t(group.id === 'all' ? 'groupAll' : group.id === 'unit' ? 'groupUnit' : 'groupBoth')} ({count})</button>
           })}
         </div>
 

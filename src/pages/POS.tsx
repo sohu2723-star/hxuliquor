@@ -255,12 +255,12 @@ export default function POS() {
         <img
           src={url}
           alt={name}
-          className="h-10 w-10 object-cover rounded-md"
+            className="h-24 w-24 object-cover rounded-xl"
         />
       )
     }
     return (
-      <div className="h-10 w-10 bg-gray-200 rounded-md flex items-center justify-center text-gray-400 text-xs">
+      <div className="h-24 w-24 bg-gray-200 rounded-xl flex items-center justify-center text-center text-gray-400 text-xs">
         {t('noImage')}
       </div>
     )
@@ -348,14 +348,14 @@ export default function POS() {
             {!isLoading && products.length > 0 && <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
               {PRODUCT_GROUPS.map((group) => {
                 const count = products.filter((product) => productMatchesGroup(product, group.id)).length
-                return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-3 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{t(group.id === 'all' ? 'groupAll' : group.id === 'barcode' ? 'groupBarcode' : group.id === 'noBarcode' ? 'groupNoBarcode' : 'groupBoth')} ({count})</button>
+                return <button key={group.id} type="button" onClick={() => setProductGroup(group.id)} className={`shrink-0 rounded-full border px-3 py-2 text-sm font-semibold ${productGroup === group.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-700'}`}>{t(group.id === 'all' ? 'groupAll' : group.id === 'unit' ? 'groupUnit' : 'groupBoth')} ({count})</button>
               })}
             </div>}
             {isLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="p-3 border border-gray-200 rounded-md animate-pulse">
-                    <div className="h-10 w-10 bg-gray-200 rounded-md mb-2" />
+                    <div className="h-24 w-24 bg-gray-200 rounded-xl mb-2 mx-auto" />
                     <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
                     <div className="h-3 bg-gray-200 rounded w-1/2 mb-3" />
                     <div className="h-4 bg-gray-200 rounded w-1/3" />
@@ -405,7 +405,7 @@ export default function POS() {
                       <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-700"><Icon name="box" className="h-4 w-4" />{isThreeLevelProduct(product) ? `${t('innerPack')} (${product.unitsPerPack} ${t('unitCount')})` : product.saleType === 'pack' ? t('packPriceLabel') : t('packPriceWithUnits', { count: product.unitsPerPack })}</span><strong className="block text-base">{formatCurrency(product.packPrice)}</strong>
                     </button>}
                   </div>
-                  {!product.barcode && <span className="mt-2 text-center text-[11px] font-medium text-slate-500">{t('manualSale')}</span>}
+
                   </div>
                 ))}
               </div>

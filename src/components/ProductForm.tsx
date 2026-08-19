@@ -54,18 +54,11 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     saleType: product?.saleType === 'pack' ? 'pack' : product?.saleType === 'both' ? 'both' : 'unit',
     requiresAgeCheck: product?.requiresAgeCheck || false,
   }
-  const initialProductKind = product?.saleType === 'both' ? 'both' : product?.barcode ? 'barcode' : 'noBarcode'
   const [formData, setFormData] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(draftKey) || 'null') as { formData?: Partial<typeof initialFormData> } | null
       return saved?.formData ? { ...initialFormData, ...saved.formData } : initialFormData
     } catch { return initialFormData }
-  })
-  const [productKind, setProductKind] = useState<'barcode' | 'noBarcode' | 'both'>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(draftKey) || 'null') as { productKind?: string } | null
-      return saved?.productKind === 'barcode' || saved?.productKind === 'noBarcode' || saved?.productKind === 'both' ? saved.productKind : initialProductKind
-    } catch { return initialProductKind }
   })
   const [imageFile, setImageFile] = useState<File | undefined>()
   const [imagePreview, setImagePreview] = useState<string | null>(product?.imageUrl || null)
@@ -74,8 +67,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    try { localStorage.setItem(draftKey, JSON.stringify({ formData, productKind })) } catch { /* storage unavailable */ }
-  }, [draftKey, formData, productKind])
+    try { localStorage.setItem(draftKey, JSON.stringify({ formData })) } catch { /* storage unavailable */ }
+  }, [draftKey, formData])
 
   const isPackAndUnit = formData.saleType === 'both'
   const hasCaseLevel = isPackAndUnit && formData.hasCaseLevel === true
@@ -103,7 +96,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     : isPackAndUnit
       ? fullPacksValue * unitsPerPackValue + looseUnitsValue
       : Math.max(0, parseInt(formData.stockQty) || 0)
-  const purchaseUnit: 'unit' | 'pack' | 'case' = formData.purchaseUnit === 'case' && hasCaseLevel
+  const purchaseUnit: 'unit' | 'pack' | 'case' = hasCaseLevel
     ? 'case'
     : formData.purchaseUnit === 'pack' && isPackAndUnit
       ? 'pack'
@@ -129,8 +122,6 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
-    if (name === 'barcode') setProductKind(value.trim() ? 'barcode' : 'noBarcode')
-    if (name === 'saleType' && value === 'both') setProductKind('both')
     if (name === 'hasCaseLevel') {
       setFormData((prev) => {
         const nextHasCaseLevel = (e.target as HTMLInputElement).checked
@@ -150,7 +141,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
           loosePacks: nextHasCaseLevel ? (totalPacks % nextPacksPerCase).toString() : '',
           fullPacks: nextHasCaseLevel ? '' : totalPacks.toString(),
           looseUnits: (currentTotal % nextUnits).toString(),
-          purchaseUnit: nextHasCaseLevel || prev.purchaseUnit !== 'case' ? prev.purchaseUnit : 'pack',
+          purchaseUnit: nextHasCaseLevel ? 'case' : prev.purchaseUnit === 'case' ? 'pack' : prev.purchaseUnit,
         }
       })
       return
@@ -188,11 +179,9 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
     }))
   }
 
-  const selectProductKind = (kind: 'barcode' | 'noBarcode' | 'both') => {
-    setProductKind(kind)
+  const selectSaleType = (nextSaleType: 'unit' | 'both') => {
     setFormData((prev) => {
-      const nextSaleType = kind === 'both' ? 'both' : 'unit'
-      if (kind === 'both') {
+      if (nextSaleType === 'both') {
         const nextUnits = Math.max(2, parseInt(prev.unitsPerPack) || 2)
         const previousPacksPerCase = Math.max(1, parseInt(prev.packsPerCase) || 1)
         const currentTotal = prev.saleType === 'both'
@@ -201,7 +190,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
         const totalPacks = Math.floor(currentTotal / nextUnits)
         return { ...prev, saleType: nextSaleType, hasCaseLevel: false, unitsPerPack: nextUnits.toString(), packsPerCase: '1', fullCases: '', loosePacks: '', fullPacks: totalPacks.toString(), looseUnits: (currentTotal % nextUnits).toString() }
       }
-      return { ...prev, saleType: nextSaleType, ...(kind === 'noBarcode' ? { barcode: '' } : {}) }
+      return { ...prev, saleType: nextSaleType }
     })
   }
 
@@ -223,10 +212,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
   const handleScan = (code: string) => {
     const detected = detectProductDetails(code)
-    setProductKind(detected.barcode || code ? 'barcode' : 'noBarcode')
     setFormData((prev) => ({
       ...prev,
-      saleType: 'unit',
       barcode: detected.barcode || code,
       name: detected.name || prev.name,
       productColor: detected.productColor || prev.productColor,
@@ -285,16 +272,15 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <fieldset className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <legend className="px-1 text-sm font-semibold">{t('productType')}</legend>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <button type="button" onClick={() => selectProductKind('barcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'barcode' ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><span className="block font-semibold">{t('barcodeProduct')}</span><small>{t('barcodeProductHint')}</small></button>
-                <button type="button" onClick={() => selectProductKind('noBarcode')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'noBarcode' ? 'border-slate-500 bg-slate-50 text-slate-800' : 'bg-white'}`}><span className="block font-semibold">{t('noBarcodeProduct')}</span><small>{t('noBarcodeProductHint')}</small></button>
-                <button type="button" onClick={() => selectProductKind('both')} className={`cursor-pointer rounded-lg border p-3 text-center ${productKind === 'both' ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'bg-white'}`}><span className="block font-semibold">{t('packBothProduct')}</span><small>{t('packBothProductHint')}</small></button>
+              <legend className="px-1 text-sm font-semibold">{t('saleMode')}</legend>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <button type="button" onClick={() => selectSaleType('unit')} className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'unit' ? 'border-primary bg-amber-50 text-primary' : 'bg-white'}`}><span className="block font-semibold">{t('unitOnlyProduct')}</span><small>{t('unitOnlyProductHint')}</small></button>
+                <button type="button" onClick={() => selectSaleType('both')} className={`cursor-pointer rounded-lg border p-3 text-center ${formData.saleType === 'both' ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'bg-white'}`}><span className="block font-semibold">{t('packBothProduct')}</span><small>{t('packBothProductHint')}</small></button>
               </div>
             </fieldset>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Barcode / QR codes
+                {t('barcodeOptional')}
               </label>
               <div className="flex gap-2">
                 <input
@@ -313,6 +299,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   {isScanning ? t('cancel') : t('scan')}
                 </button>
               </div>
+              <p className="mt-1 text-xs text-slate-500">{t('barcodeOptionalHint')}</p>
               {isScanning && (
                 <div className="mt-2">
                   <Scanner onScan={handleScan} />
@@ -372,14 +359,18 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
             {isPackAndUnit && <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3">
               <label className="block text-sm font-semibold text-slate-800">{t('purchaseMode')}</label>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <button type="button" aria-pressed={purchaseUnit === 'unit'} onClick={() => setFormData((prev) => ({ ...prev, purchaseUnit: 'unit' }))} className={`min-h-11 rounded-lg border px-2 py-2 text-sm font-semibold transition ${purchaseUnit === 'unit' ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-700'}`}>
-                  {t('purchaseByUnit')}
-                </button>
-                <button type="button" aria-pressed={purchaseUnit !== 'unit'} onClick={() => setFormData((prev) => ({ ...prev, purchaseUnit: hasCaseLevel ? 'case' : 'pack' }))} className={`min-h-11 rounded-lg border px-2 py-2 text-sm font-semibold transition ${purchaseUnit !== 'unit' ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-700'}`}>
-                  {t('purchaseByPack')}
-                </button>
-              </div>
+              {hasCaseLevel ? (
+                <div className="mt-2 rounded-lg border border-primary bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">{t('purchaseByPack')}</div>
+              ) : (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button type="button" aria-pressed={purchaseUnit === 'unit'} onClick={() => setFormData((prev) => ({ ...prev, purchaseUnit: 'unit' }))} className={`min-h-11 rounded-lg border px-2 py-2 text-sm font-semibold transition ${purchaseUnit === 'unit' ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-700'}`}>
+                    {t('purchaseByUnit')}
+                  </button>
+                  <button type="button" aria-pressed={purchaseUnit === 'pack'} onClick={() => setFormData((prev) => ({ ...prev, purchaseUnit: 'pack' }))} className={`min-h-11 rounded-lg border px-2 py-2 text-sm font-semibold transition ${purchaseUnit === 'pack' ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 bg-white text-slate-700'}`}>
+                    {t('purchaseByPack')}
+                  </button>
+                </div>
+              )}
               <p className="mt-2 text-xs text-slate-600">{t('purchaseCostLabel')}</p>
             </div>}
 
