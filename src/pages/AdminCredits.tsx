@@ -103,6 +103,11 @@ export default function AdminCredits() {
     showToast(t('customerDeletedSuccess'), 'success')
   }
 
+  const enteredPaymentAmount = Number(paymentAmount)
+  const previewAmount = Number.isFinite(enteredPaymentAmount) && enteredPaymentAmount > 0 ? enteredPaymentAmount : 0
+  const previewApplied = paymentMode === 'payment' && paymentCustomer ? Math.min(previewAmount, paymentCustomer.creditDue) : 0
+  const previewDeposit = paymentMode === 'deposit' ? previewAmount : Math.max(previewAmount - previewApplied, 0)
+
   const submitPayment = async () => {
     if (!paymentCustomer) return
     const amount = Number(paymentAmount)
@@ -135,8 +140,11 @@ export default function AdminCredits() {
     }
     closePayment()
     await load(true)
+    const response = result.response
     const successMessage = paymentMode === 'deposit' ? t('depositAddedSuccess') : t('creditPaidSuccess')
-    showToast(`${successMessage} ${formatCurrency(paymentMode === 'deposit' ? result.response.depositAdded : result.response.applied)}`, 'success')
+    const appliedMessage = response.applied > 0 ? ` · ${t('creditApplied')} ${formatCurrency(response.applied)}` : ''
+    const depositMessage = response.depositAdded > 0 ? ` · ${t('deposit')} ${formatCurrency(response.depositAdded)}` : ''
+    showToast(`${successMessage}${appliedMessage}${depositMessage}`, 'success')
   }
 
   const toggleLedger = async (customerName: string) => {
@@ -221,7 +229,8 @@ export default function AdminCredits() {
         <div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-bold text-slate-950">{paymentMode === 'deposit' ? t('addDeposit') : t('payCustomer')}</h2><p className="mt-1 text-sm text-slate-500">{paymentCustomer.customerName}</p></div><button onClick={closePayment} className="text-2xl text-slate-400" aria-label={t('close')}>×</button></div>
         <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm"><div className="flex justify-between"><span>{t('creditDue')}</span><b className="text-red-700">{formatCurrency(paymentCustomer.creditDue)}</b></div><div className="mt-1 flex justify-between"><span>{t('depositBalance')}</span><b className="text-emerald-700">{formatCurrency(paymentCustomer.depositBalance)}</b></div></div>
         <label className="mt-4 block text-sm font-medium text-slate-700">{t('transactionAmount')}<input type="number" min="0" step="1" inputMode="decimal" autoFocus value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-3" /></label>
-        {paymentMode === 'deposit' && <p className="mt-2 text-xs text-amber-700">{t('depositPaymentHint')}</p>}
+        {previewAmount > 0 && <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 text-sm"><div className="flex justify-between"><span>{t('creditApplied')}</span><b className="text-red-700">{formatCurrency(previewApplied)}</b></div><div className="mt-1 flex justify-between"><span>{t('deposit')}</span><b className="text-emerald-700">{formatCurrency(previewDeposit)}</b></div></div>}
+        <p className="mt-2 text-xs text-amber-700">{t(paymentMode === 'deposit' ? 'depositOnlyHint' : 'depositPaymentHint')}</p>
         {paymentError && <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{paymentError}</p>}
         <div className="mt-5 flex gap-2"><button onClick={closePayment} disabled={isActionLoading} className="flex-1 rounded-xl bg-slate-100 px-4 py-3 font-semibold text-slate-700">{t('cancel')}</button><button onClick={() => void submitPayment()} disabled={isActionLoading} className="flex-1 rounded-xl bg-primary px-4 py-3 font-semibold text-white disabled:opacity-50">{isActionLoading ? t('processing') : t('confirm')}</button></div>
       </div>

@@ -470,7 +470,7 @@ export default function POS() {
           <div className="my-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600 print:my-2 print:rounded-none print:border-x-0 print:bg-white print:px-0">
             <p>{new Date(completedSale.createdAt).toLocaleString(language === 'my' ? 'my-MM' : 'en-GB', { timeZone: 'Asia/Yangon' })}</p>
             <p>{t('customerId')}: {formatSlipId(completedSale)}</p>
-            <p>{t('payment')}: {completedSale.paymentMethod === 'Cash' ? t('cash') : completedSale.paymentMethod === 'Card' ? t('card') : completedSale.paymentMethod === 'Mobile Wallet' ? t('mobileWallet') : t('credit')}</p>
+            <p>{t('payment')}: {completedSale.paymentMethod === 'Cash' ? t('cash') : completedSale.paymentMethod === 'MMQR Pay' || completedSale.paymentMethod === 'Mobile Wallet' ? t('mobileWallet') : completedSale.paymentMethod === 'Card' ? t('card') : t('credit')}</p>
           </div>
           <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm print:text-xs"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
           <div className="mt-4 border-t pt-3 print:mt-2 print:pt-2"><div className="flex justify-between text-lg font-bold print:text-sm"><span>{t('total')}</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800 print:text-xs">{t('credit')} · {completedSale.customerName} · {t('creditBalance')} {formatCurrency(completedSale.balanceDue)}</p>}</div>

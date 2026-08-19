@@ -69,10 +69,13 @@ export default function AdminFinance() {
 
   const summary = useMemo(() => {
     const cashReceived = sales.reduce((sum, sale) => sum + sale.paidAmount, 0)
+    const cashPayment = sales.filter((sale) => sale.paymentMethod === 'Cash').reduce((sum, sale) => sum + sale.paidAmount, 0)
+    const mmqrPayment = sales.filter((sale) => sale.paymentMethod === 'MMQR Pay' || sale.paymentMethod === 'Mobile Wallet').reduce((sum, sale) => sum + sale.paidAmount, 0)
+    const creditSalesAmount = sales.filter((sale) => sale.paymentMethod === 'Credit').reduce((sum, sale) => sum + sale.totalAmount, 0)
     const shopProfit = sales.filter((sale) => sale.paidAmount > 0).flatMap((sale) => sale.items).reduce((sum, item) => sum + item.profit, 0)
     const outsideIncome = transactions.filter((item) => item.type === 'outside_income').reduce((sum, item) => sum + item.amount, 0)
     const expenses = transactions.filter((item) => item.type === 'expense').reduce((sum, item) => sum + item.amount, 0)
-    return { cashReceived, shopProfit, outsideIncome, expenses, balance: cashReceived + outsideIncome - expenses }
+    return { cashReceived, cashPayment, mmqrPayment, creditSalesAmount, shopProfit, outsideIncome, expenses, balance: cashReceived + outsideIncome - expenses }
   }, [sales, transactions])
 
   const handleRefresh = async () => {
@@ -162,6 +165,11 @@ export default function AdminFinance() {
       </div>
 
       {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+        <Card label={t('cashPayment')} value={summary.cashPayment} className="text-emerald-700" />
+        <Card label={t('mmqrPayment')} value={summary.mmqrPayment} className="text-violet-700" />
+        <Card label={t('creditSalesAmount')} value={summary.creditSalesAmount} className="text-amber-700" />
+      </div>
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Card label={t('cashReceived')} value={summary.cashReceived} className="text-emerald-700" />
         <Card label={t('shopProfit')} value={summary.shopProfit} className="text-primary" />
