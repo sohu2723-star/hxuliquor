@@ -6,10 +6,13 @@ import { useLanguage } from '../contexts/LanguageContext'
 
 const MYANMAR_TIME_ZONE = 'Asia/Yangon'
 
-function myanmarDate(date: Date | string) {
+function myanmarDate(date: Date | string | null | undefined) {
+  if (!date) return ''
+  const parsed = new Date(date)
+  if (!Number.isFinite(parsed.getTime())) return ''
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: MYANMAR_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(new Date(date))
+  }).formatToParts(parsed)
   const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || ''
   return `${value('year')}-${value('month')}-${value('day')}`
 }

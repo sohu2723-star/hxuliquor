@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import AdminCredits from './pages/AdminCredits'
 import AdminFinance from './pages/AdminFinance'
+import AdminDashboard from './pages/AdminDashboard'
 const CHUNK_RECOVERY_KEY = 'hxu-chunk-recovery-at'
 
 type LazyPageModule = { default: ComponentType<Record<string, never>> }
@@ -53,7 +54,6 @@ const Login = lazyPage(() => import('./pages/Login'))
 const POS = lazyPage(() => import('./pages/POS'))
 const AdminProducts = lazyPage(() => import('./pages/AdminProducts'))
 const AdminEmployees = lazyPage(() => import('./pages/AdminEmployees'))
-const AdminDashboard = lazyPage(() => import('./pages/AdminDashboard'))
 const AdminSalesHistory = lazyPage(() => import('./pages/AdminSalesHistory'))
 const AdminWarnings = lazyPage(() => import('./pages/AdminWarnings'))
 import LoadingSpinner from './components/LoadingSpinner'
