@@ -62,6 +62,19 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
 
   const isPackAndUnit = formData.saleType === 'both'
   const hasCaseLevel = isPackAndUnit && formData.hasCaseLevel === true
+  const unitSaleLabel = hasCaseLevel ? t('stickSalePrice') : isPackAndUnit ? t('innerUnitSalePrice') : t('unitSalePrice')
+  const unitCostLabel = hasCaseLevel ? t('stickCostPrice') : isPackAndUnit ? t('innerUnitCostPrice') : t('unitCostPrice')
+  const packSaleLabel = hasCaseLevel ? t('boxSalePrice') : t('packSalePrice')
+  const packPurchaseLabel = hasCaseLevel ? t('boxPurchasePriceShort') : t('packPurchasePriceShort')
+  const unitsPerPackLabel = hasCaseLevel ? t('cigaretteUnitsPerPack') : t('genericUnitsPerPack')
+  const fullPacksLabel = hasCaseLevel ? t('fullPacks') : t('genericFullPacks')
+  const looseUnitsLabel = hasCaseLevel ? t('looseUnits') : t('genericLooseUnits')
+  const totalUnitStockLabel = hasCaseLevel ? t('totalUnitStock') : t('genericTotalUnitStock')
+  const packCountLabel = hasCaseLevel ? t('packCountPreview') : t('genericPackCountPreview')
+  const stockUnitCountLabel = hasCaseLevel ? t('stickUnitCount') : isPackAndUnit ? t('innerUnitCount') : t('unitCount')
+  const packCountUnitLabel = hasCaseLevel ? t('innerPack') : t('pack')
+  const unitProfitLabel = hasCaseLevel ? t('stickProfit') : isPackAndUnit ? t('innerUnitProfit') : t('unitProfit')
+  const packProfitLabel = hasCaseLevel ? t('boxProfit') : t('packProfit')
   const unitsPerPackValue = isPackAndUnit ? Math.max(2, parseInt(formData.unitsPerPack) || 2) : Math.max(1, parseInt(formData.unitsPerPack) || 1)
   const packsPerCaseValue = hasCaseLevel ? Math.max(2, parseInt(formData.packsPerCase) || 2) : 1
   const fullCasesValue = hasCaseLevel ? Math.max(0, parseInt(formData.fullCases) || 0) : 0
@@ -328,7 +341,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
                 <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">
-                  {t('unitSalePrice')}
+                  {unitSaleLabel}
                 </label>
                 <input
                   type="number"
@@ -342,7 +355,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
               </div>
               <div className="flex flex-col">
                 <label className="mb-1 flex h-14 items-end text-sm font-medium leading-5 text-gray-700">
-                  {t('unitCostPrice')}
+                  {unitCostLabel}
                 </label>
                 <input
                   type="number"
@@ -366,19 +379,19 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                   {hasCaseLevel && <label className="flex min-h-16 flex-col text-sm font-medium leading-5 text-gray-700">{t('packsPerCase')}
                     <input type="number" name="packsPerCase" min="2" value={formData.packsPerCase} onChange={handleChange} required className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                   </label>}
-                  <label className="flex min-h-16 flex-col text-sm font-medium leading-5 text-gray-700">{t('unitsPerPack')}
+                  <label className="flex min-h-16 flex-col text-sm font-medium leading-5 text-gray-700">{unitsPerPackLabel}
                     <input type="number" name="unitsPerPack" min="2" value={formData.unitsPerPack} onChange={handleChange} required className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                   </label>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-3">
-                  <label className="flex min-h-16 flex-col text-sm font-medium leading-5 text-gray-700">{t('packSalePrice')}
+                  <label className="flex min-h-16 flex-col text-sm font-medium leading-5 text-gray-700">{packSaleLabel}
                     <input type="number" name="packPrice" value={formData.packPrice} onChange={handleChange} required step="0.01" className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                   </label>
                   {hasCaseLevel && <label className="flex min-h-16 flex-col text-sm font-medium leading-5 text-gray-700">{t('caseSalePrice')}
                     <input type="number" name="casePrice" value={formData.casePrice} onChange={handleChange} required step="0.01" className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                   </label>}
                 </div>
-                <div className="mt-2 space-y-1 rounded-lg bg-white/80 px-3 py-2 text-sm font-semibold text-violet-800"><p>• {t('packPurchasePriceShort')} - {(costPriceValue * unitsPerPackValue).toLocaleString()} Ks</p>{hasCaseLevel && <p>• {t('casePurchasePrice')} - {(costPriceValue * unitsPerPackValue * packsPerCaseValue).toLocaleString()} Ks</p>}<p>• {t('packCountPreview')} - {packCountPreview} {t('pack')}</p><p>• {t('looseUnits')} - {looseUnitPreview} {t('unitCount')}</p><p>• {t('totalUnitStock')} - {stockQtyValue} {t('unitCount')}</p></div>
+                <div className="mt-2 space-y-1 rounded-lg bg-white/80 px-3 py-2 text-sm font-semibold text-violet-800"><p>• {packPurchaseLabel} - {(costPriceValue * unitsPerPackValue).toLocaleString()} Ks</p>{hasCaseLevel && <p>• {t('casePurchasePrice')} - {(costPriceValue * unitsPerPackValue * packsPerCaseValue).toLocaleString()} Ks</p>}<p>• {packCountLabel} - {packCountPreview} {packCountUnitLabel}</p><p>• {looseUnitsLabel} - {looseUnitPreview} {stockUnitCountLabel}</p><p>• {totalUnitStockLabel} - {stockQtyValue} {stockUnitCountLabel}</p></div>
               </div>}
 
             {formData.saleType === 'both' ? (
@@ -393,14 +406,14 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
                     <input type="number" name="loosePacks" min="0" max={Math.max(0, packsPerCaseValue - 1)} value={formData.loosePacks} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                   </div>
                 </> : <div className="col-span-2 flex flex-col">
-                  <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{t('fullPacks')}</label>
+                  <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{fullPacksLabel}</label>
                   <input type="number" name="fullPacks" min="0" value={formData.fullPacks} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>}
                 <div className="col-span-2 flex flex-col">
-                  <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{t('looseUnits')}</label>
+                  <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{looseUnitsLabel}</label>
                   <input type="number" name="looseUnits" min="0" max={Math.max(0, unitsPerPackValue - 1)} value={formData.looseUnits} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
-                <div className="col-span-2 space-y-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700"><p>• {t('totalUnitStock')} - {stockQtyValue} {t('unitCount')}</p>{hasCaseLevel && <p>• {t('caseCountPreview')} - {caseCountPreview} {t('case')}</p>}<p>• {t('packCountPreview')} - {packCountPreview} {t('pack')}</p></div>
+                <div className="col-span-2 space-y-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700"><p>• {totalUnitStockLabel} - {stockQtyValue} {stockUnitCountLabel}</p>{hasCaseLevel && <p>• {t('caseCountPreview')} - {caseCountPreview} {t('case')}</p>}<p>• {packCountLabel} - {packCountPreview} {packCountUnitLabel}</p></div>
                 <div className="col-span-2 flex flex-col">
                   <label className="mb-1 flex h-10 items-end text-sm font-medium leading-5 text-gray-700">{t('lowStockThreshold')}</label>
                   <input type="number" name="lowStockThreshold" value={formData.lowStockThreshold} onChange={handleChange} className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
@@ -409,7 +422,7 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col">
-                  <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{t('stockQuantity')} ({t('unitCount')})</label>
+                  <label className="mb-1 flex h-20 items-end text-sm font-medium leading-5 text-gray-700">{t('stockQuantity')} ({stockUnitCountLabel})</label>
                   <input type="number" name="stockQty" value={formData.stockQty} onChange={handleChange} required className="h-11 w-full rounded-xl border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
                 <div className="flex flex-col">
@@ -422,8 +435,8 @@ export default function ProductForm({ product, categories, onSave, onClose }: Pr
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
               <p className="font-semibold">{t('stockProfitPreview')}</p>
               <p>{t('investmentPreview')}: {stockQtyValue} × {costPriceValue.toLocaleString()} = {inventoryCostPreview.toLocaleString()} Ks</p>
-              <p>{t('unitProfit')}: {(unitProfitPreview || 0).toLocaleString()} Ks</p>
-              {formData.saleType === 'both' && <><p>{t('packProfit')}: {(packProfitPreview || 0).toLocaleString()} Ks</p><p>{t('caseProfit')}: {(caseProfitPreview || 0).toLocaleString()} Ks</p></>}
+              <p>{unitProfitLabel}: {(unitProfitPreview || 0).toLocaleString()} Ks</p>
+              {formData.saleType === 'both' && <><p>{packProfitLabel}: {(packProfitPreview || 0).toLocaleString()} Ks</p><p>{t('caseProfit')}: {(caseProfitPreview || 0).toLocaleString()} Ks</p></>}
             </div>
 
             <div className="flex items-center">
