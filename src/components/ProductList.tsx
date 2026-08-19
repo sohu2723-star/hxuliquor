@@ -18,7 +18,7 @@ export default function ProductList({ products, onEdit, onDelete }: ProductListP
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50"><tr>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('image')}</th>
+          <th className="w-24 min-w-24 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('image')}</th>
           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('name')}</th>
           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('barcode')}</th>
           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{t('category')}</th>
@@ -39,7 +39,7 @@ export default function ProductList({ products, onEdit, onDelete }: ProductListP
             const looseUnits = product.saleType === 'both' ? remainderAfterCases % unitsPerPack : 0
             const isLowStock = isProductLowStock(product)
             return <tr key={product.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3 whitespace-nowrap">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-16 w-16 object-cover rounded-lg" /> : <div className="h-16 w-16 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400 text-xs">{t('noImage')}</div>}</td>
+              <td className="w-24 min-w-24 px-4 py-3 whitespace-nowrap"><div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="block h-full w-full max-w-none object-cover" /> : <div className="flex h-full w-full items-center justify-center text-center text-xs text-gray-400">{t('noImage')}</div>}</div></td>
               <td className="px-4 py-3 whitespace-nowrap font-bold">{product.name}</td>
               <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{product.barcode}</td>
               <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</td>
