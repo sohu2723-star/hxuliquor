@@ -6,7 +6,7 @@ import { useActionLoading } from '../contexts/ActionLoadingContext'
 import { useLanguage } from '../contexts/LanguageContext'
 
 interface CheckoutProps {
-  cart: { product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]
+  cart: { product: Product; quantity: number; saleUnit: 'unit' | 'pack' | 'case' }[]
   requiresAgeCheck: boolean
   onClose: () => void
   onSuccess: (sale: Sale) => void
@@ -54,10 +54,8 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
     } catch { /* storage unavailable */ }
   }, [ageVerified, paymentMethod, customerName, initialPaidAmount])
 
-  const total = useMemo(() => cart.reduce(
-    (sum, item) => sum + (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity,
-    0
-  ), [cart])
+  const saleUnitPrice = (product: Product, saleUnit: 'unit' | 'pack' | 'case') => saleUnit === 'case' ? product.casePrice : saleUnit === 'pack' ? product.packPrice : product.price
+  const total = useMemo(() => cart.reduce((sum, item) => sum + saleUnitPrice(item.product, item.saleUnit) * item.quantity, 0), [cart])
   const paidNow = numericValue(initialPaidAmount)
   const depositApplied = Math.min(depositBalance, Math.max(total - paidNow, 0))
   const balanceDue = Math.max(total - paidNow - depositApplied, 0)
@@ -151,8 +149,8 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
               <h3 className="mb-2 font-semibold">{t('items')}</h3>
               {cart.map(({ product, quantity, saleUnit }) => (
                 <div key={`${product.id}-${saleUnit}`} className="mb-1 flex justify-between text-sm">
-                  <span>{product.name} ({saleUnit === 'pack' ? (product.saleType === 'pack' ? t('pack') : `${t('pack')} × ${product.unitsPerPack}`) : t('unit')}) × {quantity}</span>
-                  <span>{formatCurrency((saleUnit === 'pack' ? product.packPrice : product.price) * quantity)}</span>
+                  <span>{product.name} ({saleUnit === 'case' ? t('case') : saleUnit === 'pack' ? (product.saleType === 'pack' ? t('pack') : `${t('pack')} × ${product.unitsPerPack}`) : t('unit')}) × {quantity}</span>
+                  <span>{formatCurrency(saleUnitPrice(product, saleUnit) * quantity)}</span>
                 </div>
               ))}
               <div className="mt-2 flex justify-between border-t pt-2 font-bold">

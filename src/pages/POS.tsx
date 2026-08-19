@@ -15,8 +15,17 @@ import { useActionLoading } from '../contexts/ActionLoadingContext'
 
 const WELCOME_SESSION_KEY = 'hxu_show_welcome'
 const POS_DRAFT_KEY = 'hxu-pos-draft'
-type CartDraftItem = { productId: string; quantity: number; saleUnit: 'unit' | 'pack' }
+type SaleUnit = 'unit' | 'pack' | 'case'
+type CartDraftItem = { productId: string; quantity: number; saleUnit: SaleUnit }
 type PosDraft = { cart?: CartDraftItem[]; searchQuery?: string; productGroup?: ProductGroup; categoryFilter?: string; showCheckout?: boolean }
+
+const saleUnitFactor = (product: Product, saleUnit: SaleUnit) => {
+  if (saleUnit === 'case') return Math.max(1, product.unitsPerPack) * Math.max(1, product.packsPerCase)
+  if (saleUnit === 'pack' && product.saleType !== 'pack') return Math.max(1, product.unitsPerPack)
+  return 1
+}
+
+const isThreeLevelProduct = (product: Product) => product.packsPerCase > 1 && product.unitsPerPack > 1
 
 const readPosDraft = (): PosDraft => {
   try { return JSON.parse(localStorage.getItem(POS_DRAFT_KEY) || '{}') as PosDraft } catch { return {} }
@@ -24,7 +33,7 @@ const readPosDraft = (): PosDraft => {
 
 export default function POS() {
   const [products, setProducts] = useState<Product[]>([])
-  const [cart, setCart] = useState<{ product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]>([])
+  const [cart, setCart] = useState<{ product: Product; quantity: number; saleUnit: SaleUnit }[]>([])
   const [searchQuery, setSearchQuery] = useState(() => readPosDraft().searchQuery || '')
   const [productGroup, setProductGroup] = useState<ProductGroup>(() => readPosDraft().productGroup || 'all')
   const [categoryFilter, setCategoryFilter] = useState(() => readPosDraft().categoryFilter || '')
@@ -98,16 +107,16 @@ export default function POS() {
   useEffect(() => {
     if (!products.length) return
     setCart((current) => {
-      const source = cartHydrated.current ? current.map((item) => ({ ...item })) : savedCartDraft.current.map((item) => ({ product: products.find((product) => product.id === item.productId), quantity: item.quantity, saleUnit: item.saleUnit })).filter((item): item is { product: Product; quantity: number; saleUnit: 'unit' | 'pack' } => Boolean(item.product))
+      const source = cartHydrated.current ? current.map((item) => ({ ...item })) : savedCartDraft.current.map((item) => ({ product: products.find((product) => product.id === item.productId), quantity: item.quantity, saleUnit: item.saleUnit })).filter((item): item is { product: Product; quantity: number; saleUnit: SaleUnit } => Boolean(item.product))
       cartHydrated.current = true
       savedCartDraft.current = []
       return source.map((item) => {
         const freshProduct = products.find((product) => product.id === item.product.id)
         if (!freshProduct) return null
-        const unitsPerSale = item.saleUnit === 'pack' && freshProduct.saleType !== 'pack' ? Math.max(1, freshProduct.unitsPerPack) : 1
+        const unitsPerSale = saleUnitFactor(freshProduct, item.saleUnit)
         const maxQuantity = Math.floor(freshProduct.stockQty / unitsPerSale)
         return maxQuantity > 0 ? { product: freshProduct, quantity: Math.min(item.quantity, maxQuantity), saleUnit: item.saleUnit } : null
-      }).filter((item): item is { product: Product; quantity: number; saleUnit: 'unit' | 'pack' } => Boolean(item))
+      }).filter((item): item is { product: Product; quantity: number; saleUnit: SaleUnit } => Boolean(item))
     })
   }, [products])
 
@@ -123,15 +132,15 @@ export default function POS() {
     } catch { /* storage unavailable */ }
   }, [cart, searchQuery, productGroup, categoryFilter, showCheckout])
 
-  const addToCart = useCallback((product: Product, saleUnit: 'unit' | 'pack' = 'unit') => {
-    const stockUnits = saleUnit === 'pack' && product.saleType !== 'pack' ? product.unitsPerPack : 1
+  const addToCart = useCallback((product: Product, saleUnit: SaleUnit = 'unit') => {
+    const stockUnits = saleUnitFactor(product, saleUnit)
     if (product.stockQty <= 0) {
       showToast(t('productStockOut', { name: product.name }), 'error')
       return
     }
     setCart((prev) => {
       const reservedStock = prev.filter((item) => item.product.id === product.id)
-        .reduce((sum, item) => sum + item.quantity * (item.saleUnit === 'pack' && product.saleType !== 'pack' ? product.unitsPerPack : 1), 0)
+        .reduce((sum, item) => sum + item.quantity * saleUnitFactor(product, item.saleUnit), 0)
       const existing = prev.find((item) => item.product.id === product.id && item.saleUnit === saleUnit)
       if (reservedStock + stockUnits > product.stockQty) {
         showToast(t('stockLow'), 'error')
@@ -146,21 +155,21 @@ export default function POS() {
       }
       return [...prev, { product, quantity: 1, saleUnit }]
     })
-    showToast(t('addedToCart', { name: product.name, unit: saleUnit === 'pack' ? t('pack') : t('unit') }), 'success')
+    showToast(t('addedToCart', { name: product.name, unit: saleUnit === 'case' ? t('case') : saleUnit === 'pack' ? t('pack') : t('unit') }), 'success')
   }, [showToast, t])
 
-  const removeFromCart = (productId: string, saleUnit: 'unit' | 'pack') => {
+  const removeFromCart = (productId: string, saleUnit: SaleUnit) => {
     setCart((prev) => prev.filter((item) => item.product.id !== productId || item.saleUnit !== saleUnit))
   }
 
-  const updateQuantity = (productId: string, saleUnit: 'unit' | 'pack', delta: number) => {
+  const updateQuantity = (productId: string, saleUnit: SaleUnit, delta: number) => {
     setCart((prev) => {
       const target = prev.find((item) => item.product.id === productId && item.saleUnit === saleUnit)
       if (!target) return prev
       const nextQuantity = target.quantity + delta
       const reservedByOthers = prev.filter((item) => item.product.id === productId && item.saleUnit !== saleUnit)
-        .reduce((sum, item) => sum + item.quantity * (item.saleUnit === 'pack' && item.product.saleType !== 'pack' ? item.product.unitsPerPack : 1), 0)
-      const requested = Math.max(0, nextQuantity) * (saleUnit === 'pack' && target.product.saleType !== 'pack' ? target.product.unitsPerPack : 1)
+        .reduce((sum, item) => sum + item.quantity * saleUnitFactor(item.product, item.saleUnit), 0)
+      const requested = Math.max(0, nextQuantity) * saleUnitFactor(target.product, saleUnit)
       if (requested + reservedByOthers > target.product.stockQty) return prev
       return prev.map((item) => item === target ? { ...item, quantity: nextQuantity } : item).filter((item) => item.quantity > 0)
     })
@@ -374,14 +383,26 @@ export default function POS() {
                     </div>
                     <p className="truncate font-bold">{product.name}</p>
                     <p className="text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
-                    <div className={`mt-1 flex flex-col rounded-xl px-3 py-2 text-xs font-semibold ${isProductLowStock(product) ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{product.saleType === 'both' ? <><span>• {t('fullPacks')} - {Math.floor(product.stockQty / Math.max(2, product.unitsPerPack || 2))} {t('pack')}</span><span>• {t('looseUnits')} - {product.stockQty % Math.max(2, product.unitsPerPack || 2)} {t('unitCount')}</span><span>• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</span></> : <span>• {t('stock')} - {product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</span>}</div>
+                    <div className={`mt-1 flex flex-col rounded-xl px-3 py-2 text-xs font-semibold ${isProductLowStock(product) ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {isThreeLevelProduct(product) ? (() => {
+                        const caseUnits = product.unitsPerPack * product.packsPerCase
+                        const fullCases = Math.floor(product.stockQty / caseUnits)
+                        const remainder = product.stockQty % caseUnits
+                        const fullPacks = Math.floor(remainder / product.unitsPerPack)
+                        const looseUnits = remainder % product.unitsPerPack
+                        return <><span>• {t('case')} - {fullCases} {t('case')}</span><span>• {t('innerPack')} - {fullPacks} {t('innerPack')}</span><span>• {t('looseUnits')} - {looseUnits} {t('unitCount')}</span><span>• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</span></>
+                      })() : product.saleType === 'both' ? <><span>• {t('fullPacks')} - {Math.floor(product.stockQty / Math.max(1, product.unitsPerPack || 1))} {t('pack')}</span><span>• {t('looseUnits')} - {product.stockQty % Math.max(1, product.unitsPerPack || 1)} {t('unitCount')}</span><span>• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</span></> : <span>• {t('stock')} - {product.stockQty} {product.saleType === 'pack' ? t('packCount') : t('unitCount')}</span>}
+                    </div>
                   </div>
                   <div className="mt-3 grid gap-2">
                     {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} disabled={product.stockQty <= 0} className="w-full rounded-xl bg-primary disabled:cursor-not-allowed disabled:bg-slate-300 px-3 py-2.5 text-left text-white shadow-sm">
                       <span className="flex items-center gap-1 text-[11px] font-medium text-white/80"><Icon name="bottle" className="h-4 w-4" />{t('unitPriceLabel')}</span><strong className="block text-base">{formatCurrency(product.price)}</strong>
                     </button>}
+                    {product.saleType !== 'unit' && isThreeLevelProduct(product) && product.casePrice > 0 && <button onClick={() => addToCart(product, 'case')} disabled={product.stockQty < saleUnitFactor(product, 'case')} className="w-full rounded-xl border-2 border-amber-400 bg-amber-50 px-3 py-2.5 text-left text-amber-950 shadow-sm disabled:opacity-40">
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-700"><Icon name="box" className="h-4 w-4" />{t('caseSalePrice')}</span><strong className="block text-base">{formatCurrency(product.casePrice)}</strong>
+                    </button>}
                     {product.saleType !== 'unit' && (product.saleType === 'pack' || product.unitsPerPack > 1) && product.packPrice > 0 && <button onClick={() => addToCart(product, 'pack')} disabled={product.stockQty < (product.saleType === 'pack' ? 1 : product.unitsPerPack)} className="w-full rounded-xl border-2 border-violet-400 bg-violet-50 px-3 py-2.5 text-left text-violet-950 shadow-sm disabled:opacity-40">
-                      <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-700"><Icon name="box" className="h-4 w-4" />{product.saleType === 'pack' ? t('packPriceLabel') : t('packPriceWithUnits', { count: product.unitsPerPack })}</span><strong className="block text-base">{formatCurrency(product.packPrice)}</strong>
+                      <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-700"><Icon name="box" className="h-4 w-4" />{isThreeLevelProduct(product) ? `${t('innerPack')} (${product.unitsPerPack} ${t('unitCount')})` : product.saleType === 'pack' ? t('packPriceLabel') : t('packPriceWithUnits', { count: product.unitsPerPack })}</span><strong className="block text-base">{formatCurrency(product.packPrice)}</strong>
                     </button>}
                   </div>
                   {!product.barcode && <span className="mt-2 text-center text-[11px] font-medium text-slate-500">{t('manualSale')}</span>}

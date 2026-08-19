@@ -29,9 +29,14 @@ export default function ProductList({ products, onEdit, onDelete }: ProductListP
         </tr></thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {products.map((product) => {
-            const unitsPerPack = Math.max(2, product.unitsPerPack || 2)
-            const fullPacks = product.saleType === 'both' ? Math.floor(product.stockQty / unitsPerPack) : 0
-            const looseUnits = product.saleType === 'both' ? product.stockQty % unitsPerPack : 0
+            const unitsPerPack = Math.max(1, product.unitsPerPack || 1)
+            const packsPerCase = Math.max(1, product.packsPerCase || 1)
+            const isThreeLevel = packsPerCase > 1 && unitsPerPack > 1
+            const caseUnits = unitsPerPack * packsPerCase
+            const fullCases = isThreeLevel ? Math.floor(product.stockQty / caseUnits) : 0
+            const remainderAfterCases = isThreeLevel ? product.stockQty % caseUnits : product.stockQty
+            const fullPacks = product.saleType === 'both' ? Math.floor(remainderAfterCases / unitsPerPack) : 0
+            const looseUnits = product.saleType === 'both' ? remainderAfterCases % unitsPerPack : 0
             const isLowStock = isProductLowStock(product)
             return <tr key={product.id} className="hover:bg-gray-50">
               <td className="px-4 py-3 whitespace-nowrap">{product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-10 w-10 object-cover rounded-md" /> : <div className="h-10 w-10 bg-gray-200 rounded-md flex items-center justify-center text-gray-400 text-xs">{t('noImage')}</div>}</td>
@@ -47,13 +52,19 @@ export default function ProductList({ products, onEdit, onDelete }: ProductListP
                   <div className="mt-1 text-gray-500">{t('unitCostPrice')}: {formatCurrency(product.costPrice)}</div>
                   <div className="mt-1 font-semibold text-violet-700">{t('packSalePrice')}: {formatCurrency(product.packPrice)}</div>
                   <div className="mt-1 text-slate-500">{t('packPurchasePriceShort')}: {formatCurrency(product.costPrice * unitsPerPack)}</div>
+                  {isThreeLevel && <><div className="mt-1 font-semibold text-amber-700">{t('caseSalePrice')}: {formatCurrency(product.casePrice)}</div><div className="mt-1 text-amber-700">{t('casePurchasePrice')}: {formatCurrency(product.costPrice * caseUnits)}</div></>}
                 </> : <>
                   <div className="font-semibold text-emerald-700">{t('unitSalePrice')}: {formatCurrency(product.price)}</div>
                   <div className="mt-1 text-gray-500">{t('unitCostPrice')}: {formatCurrency(product.costPrice)}</div>
                 </>}
               </td>
               <td className={`px-4 py-3 whitespace-nowrap font-bold ${isLowStock ? 'text-red-600' : 'text-emerald-700'}`}>
-                {product.saleType === 'both' ? <div className={`space-y-1 rounded-xl px-3 py-2 ring-1 ${isLowStock ? 'bg-red-50 text-red-800 ring-red-100' : 'bg-emerald-50 text-emerald-800 ring-emerald-100'}`}>
+                {isThreeLevel ? <div className={`space-y-1 rounded-xl px-3 py-2 ring-1 ${isLowStock ? 'bg-red-50 text-red-800 ring-red-100' : 'bg-emerald-50 text-emerald-800 ring-emerald-100'}`}>
+                  <div>• {t('case')} - {fullCases} {t('case')}</div>
+                  <div className="text-sm">• {t('innerPack')} - {fullPacks} {t('innerPack')}</div>
+                  <div className="text-sm">• {t('looseUnits')} - {looseUnits} {t('unitCount')}</div>
+                  <div className="text-sm">• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</div>
+                </div> : product.saleType === 'both' ? <div className={`space-y-1 rounded-xl px-3 py-2 ring-1 ${isLowStock ? 'bg-red-50 text-red-800 ring-red-100' : 'bg-emerald-50 text-emerald-800 ring-emerald-100'}`}>
                   <div>• {t('fullPacks')} - {fullPacks} {t('pack')}</div>
                   <div className="text-sm">• {t('looseUnits')} - {looseUnits} {t('unitCount')}</div>
                   <div className="text-sm">• {t('totalUnitStock')} - {product.stockQty} {t('unitCount')}</div>

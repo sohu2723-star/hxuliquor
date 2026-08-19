@@ -4,10 +4,12 @@ import { formatCurrency } from '../lib/format'
 import Icon from './Icon'
 import { useLanguage } from '../contexts/LanguageContext'
 
+type SaleUnit = 'unit' | 'pack' | 'case'
+
 interface CartProps {
-  items: { product: Product; quantity: number; saleUnit: 'unit' | 'pack' }[]
-  onUpdateQuantity: (productId: string, saleUnit: 'unit' | 'pack', delta: number) => void
-  onRemove: (productId: string, saleUnit: 'unit' | 'pack') => void
+  items: { product: Product; quantity: number; saleUnit: SaleUnit }[]
+  onUpdateQuantity: (productId: string, saleUnit: SaleUnit, delta: number) => void
+  onRemove: (productId: string, saleUnit: SaleUnit) => void
   onCheckout: () => void
   requiresAgeCheck: boolean
 }
@@ -22,10 +24,13 @@ export default function Cart({
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null)
   const { t } = useLanguage()
 
-  const total = items.reduce(
-    (sum, item) => sum + (item.saleUnit === 'pack' ? item.product.packPrice : item.product.price) * item.quantity,
-    0
-  )
+  const saleUnitFactor = (product: Product, saleUnit: SaleUnit) => saleUnit === 'case'
+    ? Math.max(1, product.unitsPerPack) * Math.max(1, product.packsPerCase)
+    : saleUnit === 'pack' && product.saleType !== 'pack'
+      ? Math.max(1, product.unitsPerPack)
+      : 1
+  const saleUnitPrice = (product: Product, saleUnit: SaleUnit) => saleUnit === 'case' ? product.casePrice : saleUnit === 'pack' ? product.packPrice : product.price
+  const total = items.reduce((sum, item) => sum + saleUnitPrice(item.product, item.saleUnit) * item.quantity, 0)
 
   return (
     <div className="h-full flex flex-col">
@@ -45,9 +50,9 @@ export default function Cart({
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <p className="font-medium">{product.name}</p>
-                  <p className="flex items-center gap-1 text-sm font-medium text-gray-500"><Icon name={saleUnit === 'pack' ? 'box' : 'bottle'} className="h-4 w-4" />{saleUnit === 'pack' ? (product.saleType === 'pack' ? t('pack') : `${t('pack')} (${product.unitsPerPack} ${t('unitCount')})`) : t('unit')}</p>
+                  <p className="flex items-center gap-1 text-sm font-medium text-gray-500"><Icon name={saleUnit === 'unit' ? 'bottle' : 'box'} className="h-4 w-4" />{saleUnit === 'case' ? t('case') : saleUnit === 'pack' ? (product.saleType === 'pack' ? t('pack') : `${t('pack')} (${product.unitsPerPack} ${t('unitCount')})`) : t('unit')}</p>
                   <p className="font-semibold text-primary mt-1">
-                    {formatCurrency(saleUnit === 'pack' ? product.packPrice : product.price)}
+                    {formatCurrency(saleUnitPrice(product, saleUnit))}
                   </p>
                 </div>
                 {pendingRemoveId === lineId ? (
@@ -89,14 +94,14 @@ export default function Cart({
                   <span className="w-8 text-center font-medium">{quantity}</span>
                   <button
                     onClick={() => onUpdateQuantity(product.id, saleUnit, 1)}
-                    disabled={quantity * (saleUnit === 'pack' && product.saleType !== 'pack' ? product.unitsPerPack : 1) >= product.stockQty}
+                    disabled={quantity * saleUnitFactor(product, saleUnit) >= product.stockQty}
                     className="w-8 h-8 rounded-md bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold disabled:opacity-50"
                   >
                     +
                   </button>
                 </div>
                 <span className="font-semibold">
-                  {formatCurrency((saleUnit === 'pack' ? product.packPrice : product.price) * quantity)}
+                  {formatCurrency(saleUnitPrice(product, saleUnit) * quantity)}
                 </span>
               </div>
             </div>
