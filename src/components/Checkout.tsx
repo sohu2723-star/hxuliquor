@@ -13,7 +13,7 @@ interface CheckoutProps {
   onError?: (message: string) => void
 }
 
-type PaymentMethod = 'Cash' | 'MMQR Pay' | 'Credit'
+type PaymentMethod = 'Cash' | 'MMQR Pay' | 'Wave Pay' | 'KPay' | 'Credit'
 
 const CHECKOUT_DRAFT_KEY = 'hxu-checkout-draft'
 
@@ -36,7 +36,7 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
   const [ageVerified, setAgeVerified] = useState(draft.ageVerified === true)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(() => {
     const value = draft.paymentMethod
-    return value === 'MMQR Pay' || value === 'Credit' ? value : 'Cash'
+    return value === 'MMQR Pay' || value === 'Wave Pay' || value === 'KPay' || value === 'Credit' ? value : 'Cash'
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const submittingRef = useRef(false)
@@ -185,6 +185,8 @@ export default function Checkout({ cart, requiresAgeCheck, onClose, onSuccess, o
               <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)} className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary">
                 <option value="Cash">{t('cash')}</option>
                 <option value="MMQR Pay">{t('mobileWallet')}</option>
+                <option value="Wave Pay">{t('wavePay')}</option>
+                <option value="KPay">{t('kPay')}</option>
                 <option value="Credit">{t('credit')}</option>
               </select>
             </div>

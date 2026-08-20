@@ -73,12 +73,14 @@ export default function AdminFinance() {
     const cashReceived = sales.reduce((sum, sale) => sum + sale.paidAmount, 0)
     const cashPayment = sales.filter((sale) => sale.paymentMethod === 'Cash').reduce((sum, sale) => sum + sale.paidAmount, 0)
     const mmqrPayment = sales.filter((sale) => sale.paymentMethod === 'MMQR Pay' || sale.paymentMethod === 'Mobile Wallet').reduce((sum, sale) => sum + sale.paidAmount, 0)
+    const wavePay = sales.filter((sale) => sale.paymentMethod === 'Wave Pay').reduce((sum, sale) => sum + sale.paidAmount, 0)
+    const kPay = sales.filter((sale) => sale.paymentMethod === 'KPay').reduce((sum, sale) => sum + sale.paidAmount, 0)
     // Show only the currently outstanding credit. A sale can keep paymentMethod="Credit" after it is fully settled, so totalAmount would incorrectly keep showing old credit.
     const creditSalesAmount = sales.reduce((sum, sale) => sum + Math.max(0, sale.balanceDue), 0)
     const shopProfit = sales.filter((sale) => sale.paidAmount > 0).flatMap((sale) => sale.items).reduce((sum, item) => sum + item.profit, 0)
     const outsideIncome = transactions.filter((item) => item.type === 'outside_income').reduce((sum, item) => sum + item.amount, 0)
     const expenses = transactions.filter((item) => item.type === 'expense').reduce((sum, item) => sum + item.amount, 0)
-    return { cashReceived, cashPayment, mmqrPayment, creditSalesAmount, shopProfit, outsideIncome, expenses, balance: cashReceived + outsideIncome - expenses }
+    return { cashReceived, cashPayment, mmqrPayment, wavePay, kPay, creditSalesAmount, shopProfit, outsideIncome, expenses, balance: cashReceived + outsideIncome - expenses }
   }, [sales, transactions])
 
   const handleRefresh = async () => {
@@ -168,9 +170,11 @@ export default function AdminFinance() {
       </div>
 
       {error && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Card label={t('cashPayment')} value={summary.cashPayment} className="text-emerald-700" />
         <Card label={t('mmqrPayment')} value={summary.mmqrPayment} className="text-violet-700" />
+        <Card label={t('wavePay')} value={summary.wavePay} className="text-sky-700" />
+        <Card label={t('kPay')} value={summary.kPay} className="text-indigo-700" />
         <Card label={t('creditSalesAmount')} value={summary.creditSalesAmount} className="text-amber-700" />
       </div>
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">

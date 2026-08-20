@@ -6,6 +6,7 @@ import { api, barcodeMatches, PRODUCT_GROUPS, productMatchesGroup, type ProductG
 import { formatCurrency } from '../lib/format'
 import { sortCategories } from '../lib/category'
 import { downloadReceipt } from '../lib/receiptDownload'
+import { connectBluetoothPrinter, connectedBluetoothPrinterName, isBluetoothPrinterConnected, printSaleToBluetooth } from '../lib/bluetoothPrinter'
 import AppHeader from '../components/AppHeader'
 import Scanner from '../components/Scanner'
 import Icon from '../components/Icon'
@@ -44,6 +45,7 @@ export default function POS() {
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
   const [receiptSaving, setReceiptSaving] = useState(false)
+  const [bluetoothPrinterName, setBluetoothPrinterName] = useState(() => connectedBluetoothPrinterName())
   const [welcomeOpen, setWelcomeOpen] = useState(() => window.sessionStorage.getItem(WELCOME_SESSION_KEY) === '1')
   const lastHandledScan = useRef({ code: '', time: 0 })
   const productsRefreshing = useRef(false)
@@ -231,10 +233,29 @@ export default function POS() {
     }
   }
 
+  const handleConnectBluetoothPrinter = async () => {
+    try {
+      const name = await connectBluetoothPrinter()
+      setBluetoothPrinterName(name)
+      showToast(`${name} ${t('bluetoothConnected')}`, 'success')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : t('bluetoothPrintError'), 'error')
+    }
+  }
+
   const handlePrintReceipt = async () => {
     if (!completedSale || receiptSaving) return
     const saved = await saveReceiptArchive()
     if (!saved) return
+    if (isBluetoothPrinterConnected()) {
+      try {
+        await printSaleToBluetooth(completedSale)
+        showToast(t('bluetoothPrintSuccess'), 'success')
+        return
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : t('bluetoothPrintError'), 'error')
+      }
+    }
     showToast(t('receiptSaved'), 'success')
     window.print()
   }
@@ -473,18 +494,18 @@ export default function POS() {
         <div className="receipt-slip max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl print:max-h-none print:w-[80mm] print:overflow-visible print:rounded-none print:p-3 print:shadow-none">
           <div className="text-center">
             <ReceiptLogo className="mx-auto mb-2 h-16 w-16 print:h-12 print:w-12" />
-            <h2 className="text-2xl font-extrabold tracking-tight print:text-lg">HXU Liquor Mini Store</h2>
+            <h2 className="text-2xl font-extrabold tracking-tight print:text-lg">Hsu Myat San Mini Store</h2>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700 print:text-[10px]">{t('saleReceipt')}</p>
           </div>
           <div className="my-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600 print:my-2 print:rounded-none print:border-x-0 print:bg-white print:px-0">
             <p>{new Date(completedSale.createdAt).toLocaleString(language === 'my' ? 'my-MM' : 'en-GB', { timeZone: 'Asia/Yangon' })}</p>
             <p>{t('customerId')}: {formatSlipId(completedSale)}</p>
-            <p>{t('payment')}: {completedSale.paymentMethod === 'Cash' ? t('cash') : completedSale.paymentMethod === 'MMQR Pay' || completedSale.paymentMethod === 'Mobile Wallet' ? t('mobileWallet') : completedSale.paymentMethod === 'Card' ? t('card') : t('credit')}</p>
+            <p>{t('payment')}: {completedSale.paymentMethod === 'Cash' ? t('cash') : completedSale.paymentMethod === 'MMQR Pay' || completedSale.paymentMethod === 'Mobile Wallet' ? t('mobileWallet') : completedSale.paymentMethod === 'Wave Pay' ? t('wavePay') : completedSale.paymentMethod === 'KPay' ? t('kPay') : completedSale.paymentMethod === 'Card' ? t('card') : t('credit')}</p>
           </div>
           <div className="space-y-2">{completedSale.items.map((item) => <div key={item.id} className="flex justify-between gap-2 text-sm print:text-xs"><span>{item.productName} × {item.saleQuantity}</span><b>{formatCurrency(item.subtotal)}</b></div>)}</div>
           <div className="mt-4 border-t pt-3 print:mt-2 print:pt-2"><div className="flex justify-between text-lg font-bold print:text-sm"><span>{t('total')}</span><span>{formatCurrency(completedSale.totalAmount)}</span></div>{completedSale.isCredit && <p className="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-800 print:text-xs">{t('credit')} · {completedSale.customerName} · {t('creditBalance')} {formatCurrency(completedSale.balanceDue)}</p>}</div>
           <p className="mt-4 text-center text-xs text-slate-500 print:mt-2">{t('thankYou')}</p>
-          <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3 print:hidden"><button onClick={() => void handlePrintReceipt()} disabled={receiptSaving} className="rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-800 shadow-sm disabled:opacity-60">{receiptSaving ? t('saving') : t('printSlip')}</button><button onClick={() => void handleDownloadReceipt()} disabled={receiptSaving} className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 font-semibold text-violet-800 shadow-sm disabled:opacity-60">{t('downloadReceipt')}</button><button onClick={() => setCompletedSale(null)} className="rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm">{t('done')}</button></div>
+          <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2 print:hidden"><button onClick={() => void handlePrintReceipt()} disabled={receiptSaving} className="rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-800 shadow-sm disabled:opacity-60">{receiptSaving ? t('saving') : t('printSlip')}</button><button onClick={() => void handleConnectBluetoothPrinter()} disabled={receiptSaving} className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 font-semibold text-sky-800 shadow-sm disabled:opacity-60">{bluetoothPrinterName ? `${t('bluetoothPrinter')}: ${bluetoothPrinterName}` : t('connectBluetooth')}</button><button onClick={() => void handleDownloadReceipt()} disabled={receiptSaving} className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 font-semibold text-violet-800 shadow-sm disabled:opacity-60">{t('downloadReceipt')}</button><button onClick={() => setCompletedSale(null)} className="rounded-xl bg-primary px-4 py-3 font-semibold text-white shadow-sm">{t('done')}</button></div>
         </div>
       </div>}
     </div>
