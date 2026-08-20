@@ -4,6 +4,7 @@ import Checkout from '../components/Checkout'
 import type { Product, Sale } from '../lib/api'
 import { api, barcodeMatches, PRODUCT_GROUPS, productMatchesGroup, type ProductGroup } from '../lib/api'
 import { formatCurrency } from '../lib/format'
+import { sortCategories } from '../lib/category'
 import { downloadReceipt } from '../lib/receiptDownload'
 import AppHeader from '../components/AppHeader'
 import Scanner from '../components/Scanner'
@@ -195,7 +196,7 @@ export default function POS() {
 
   const handleSearch = (query: string) => setSearchQuery(query)
 
-  const productCategories = useMemo(() => [...new Set(products.map((product) => product.category).filter(Boolean))].sort(), [products])
+  const productCategories = useMemo(() => sortCategories(products.map((product) => product.category), language), [products, language])
   const matchesCategoryFilter = useCallback((product: Product) => !categoryFilter || product.category === categoryFilter, [categoryFilter])
   const visibleProducts = useMemo(() => products
     .filter((product) => productMatchesGroup(product, productGroup) && matchesCategoryFilter(product))

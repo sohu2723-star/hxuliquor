@@ -3,11 +3,12 @@ import AppHeader from '../components/AppHeader'
 import Icon from '../components/Icon'
 import { api, isProductLowStock, productMatchesGroup, type Product, type ProductGroup } from '../lib/api'
 import { useLanguage } from '../contexts/LanguageContext'
+import { sortCategories } from '../lib/category'
 import { useToast } from '../contexts/ToastContext'
 import { useActionLoading } from '../contexts/ActionLoadingContext'
 
 export default function AdminWarnings() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const { showToast } = useToast()
   const { isLoading: isActionLoading, runWithLoading } = useActionLoading()
   const [products, setProducts] = useState<Product[]>([])
@@ -50,7 +51,7 @@ export default function AdminWarnings() {
   }, [load])
 
   const lowStock = useMemo(() => products.filter(isProductLowStock), [products])
-  const categories = useMemo(() => [...new Set(lowStock.map((product) => product.category).filter(Boolean))].sort(), [lowStock])
+  const categories = useMemo(() => sortCategories(lowStock.map((product) => product.category), language), [lowStock, language])
   const filteredLowStock = useMemo(() => {
     const normalized = searchQuery.trim().toLowerCase()
     return lowStock.filter((product) => {

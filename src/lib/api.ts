@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { sortCategories, type CategoryLocale } from './category'
 
 export const AUTH_TOKEN_KEY = 'supabase-auth-session'
 
@@ -444,8 +445,8 @@ export const api = {
     return products.filter((product) => product.name.toLowerCase().includes(normalized) || product.category.toLowerCase().includes(normalized) || product.barcode.toLowerCase().includes(normalized))
   },
 
-  async getCategories(): Promise<string[]> {
-    return [...new Set((await this.getProducts()).map((product) => product.category).filter(Boolean))].sort()
+  async getCategories(locale: CategoryLocale = 'my'): Promise<string[]> {
+    return sortCategories((await this.getProducts()).map((product) => product.category), locale)
   },
 
   async getSales(startDate?: string, endDate?: string, forceRefresh = false): Promise<Sale[]> {

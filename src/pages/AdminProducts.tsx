@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, PRODUCT_GROUPS, productMatchesGroup, type ProductGroup } from '../lib/api'
+import { sortCategories } from '../lib/category'
 import type { Product } from '../lib/api'
 import ProductList from '../components/ProductList'
 import ProductForm from '../components/ProductForm'
@@ -26,7 +27,7 @@ export default function AdminProducts() {
 
   const { showToast } = useToast()
   const { isLoading: isActionLoading, runWithLoading } = useActionLoading()
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
 
   useEffect(() => {
     try { localStorage.setItem(ADMIN_PRODUCTS_VIEW_KEY, JSON.stringify({ searchQuery, categoryFilter, productGroup })) } catch { /* storage unavailable */ }
@@ -159,7 +160,7 @@ export default function AdminProducts() {
     setShowForm(true)
   }
 
-  const categories = useMemo(() => [...new Set(products.map((product) => product.category).filter(Boolean))].sort(), [products])
+  const categories = useMemo(() => sortCategories(products.map((product) => product.category), language), [products, language])
 
   const filteredProducts = products.filter((p) => {
     const matchesSearch = String(p.name).toLowerCase().includes(searchQuery.toLowerCase()) ||
