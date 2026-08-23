@@ -8,7 +8,7 @@ import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import './index.css'
 
-const PWA_CACHE_VERSION = '2026-08-23-walkprint-receipt-v2'
+const PWA_CACHE_VERSION = '2026-08-23-yhk-direct-print-v3'
 
 async function purgeStalePwaCaches() {
   try {
@@ -29,8 +29,6 @@ async function purgeStalePwaCaches() {
   }
 }
 
-void purgeStalePwaCaches()
-
 window.addEventListener('error', (event) => {
   console.error('Global error:', event.error)
 })
@@ -39,7 +37,9 @@ window.addEventListener('unhandledrejection', (event) => {
   console.error('Unhandled promise rejection:', event.reason)
 })
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+async function startApp() {
+  await purgeStalePwaCaches()
+  ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
@@ -53,4 +53,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,
-)
+  )
+}
+
+void startApp()
