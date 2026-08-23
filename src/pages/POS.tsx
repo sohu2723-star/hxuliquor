@@ -7,7 +7,7 @@ import { formatCurrency } from '../lib/format'
 import { sortCategories } from '../lib/category'
 import { downloadReceipt } from '../lib/receiptDownload'
 import { createReceiptImage, receiptImageFilename } from '../lib/receiptImage'
-import { connectBluetoothPrinter, connectedBluetoothPrinterName, isBluetoothPrinterConnected, printSaleToBluetooth } from '../lib/bluetoothPrinter'
+import { connectBluetoothPrinter, connectedBluetoothPrinterName, printSaleToBluetooth } from '../lib/bluetoothPrinter'
 import AppHeader from '../components/AppHeader'
 import Scanner from '../components/Scanner'
 import Icon from '../components/Icon'
@@ -250,18 +250,16 @@ export default function POS() {
     const saved = await saveReceiptArchive()
     if (!saved) return
 
-    // YHK-xxxx is a WalkPrint printer. It may pair over BLE but does not
-    // accept generic ESC/POS bytes, so send the receipt image to WalkPrint.
-    const isWalkPrintDevice = /^(YHK-|WalkPrint)/i.test(bluetoothPrinterName.trim())
-    // Keep direct printing only for a non-WalkPrint BLE ESC/POS printer.
-    if (!isWalkPrintDevice && isBluetoothPrinterConnected()) {
-      try {
-        await printSaleToBluetooth(completedSale)
-        showToast(t('bluetoothPrintSuccess'), 'success')
-        return
-      } catch (error) {
-        const message = error instanceof Error ? error.message : ''
-        showToast(/Classic Bluetooth|No BLE|not supported/i.test(message) ? t('bluetoothBleOnly') : (message || t('bluetoothPrintError')), 'error')
+    // YHK-1EEC uses its own bitmap protocol. Try Bluetooth direct printing
+    // first; if the browser/device cannot print directly, use image sharing.
+    try {
+      await printSaleToBluetooth(completedSale)
+      showToast(t('bluetoothPrintSuccess'), 'success')
+      return
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ''
+      if (/Classic Bluetooth|No BLE|not supported/i.test(message)) {
+        showToast(t('bluetoothBleOnly'), 'error')
       }
     }
 

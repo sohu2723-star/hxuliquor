@@ -23,6 +23,8 @@ const PRINTER_WRITE_UUIDS = [
 
 const PRINTER_DEVICE_KEY = 'hxu-bluetooth-printer-name'
 const PAPER_WIDTH_PX = 384
+const YHK_DRAW_BITMAP = 0xa2
+const YHK_FEED_PAPER = 0xa1
 
 type BluetoothCharacteristicLike = {
   properties: { write?: boolean; writeWithoutResponse?: boolean }
@@ -50,6 +52,12 @@ type BluetoothDeviceLike = EventTarget & {
 
 type BluetoothApiLike = {
   requestDevice: (options: { acceptAllDevices: boolean; optionalServices: string[] }) => Promise<BluetoothDeviceLike>
+}
+
+type ReceiptBitmap = {
+  width: number
+  height: number
+  pixels: Uint8Array
 }
 
 let connectedDevice: BluetoothDeviceLike | null = null
@@ -114,30 +122,38 @@ function wrapText(context: CanvasRenderingContext2D, value: string, maxWidth: nu
 
 async function loadLogoImage() {
   const image = new Image()
-  const source = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(LOGO_SVG)}`
   await new Promise<void>((resolve, reject) => {
     image.onload = () => resolve()
     image.onerror = () => reject(new Error('Receipt logo could not be prepared.'))
-    image.src = source
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(LOGO_SVG)}`
   })
   return image
 }
 
-async function renderReceiptRaster(sale: Sale) {
+async function renderReceiptBitmap(sale: Sale): Promise<ReceiptBitmap> {
   const canvas = document.createElement('canvas')
   canvas.width = PAPER_WIDTH_PX
-  canvas.height = 2400
+  canvas.height = 2200
   const context = canvas.getContext('2d')
-  if (!context) throw new Error('Receipt canvas is not available in this browser.')
+  if (!context) throw new Error('Receipt image is not available in this browser.')
 
   context.fillStyle = '#ffffff'
   context.fillRect(0, 0, canvas.width, canvas.height)
   context.fillStyle = '#000000'
   context.textBaseline = 'top'
   context.textAlign = 'center'
-
   let y = 18
-  const center = (value: string, font: string, gap = 34) => {
+
+  try {
+    const logo = await loadLogoImage()
+    context.drawImage(logo, 140, y, 104, 104)
+    y += 116
+  } catch {
+    // Receipt printing remains available if the browser blocks SVG rasterization.
+  }
+
+  const center = (value: string, font: string, gap: number) => {
+    context.textAlign = 'center'
     context.font = font
     context.fillText(value, PAPER_WIDTH_PX / 2, y)
     y += gap
@@ -149,28 +165,20 @@ async function renderReceiptRaster(sale: Sale) {
     context.moveTo(12, y + 4)
     context.lineTo(PAPER_WIDTH_PX - 12, y + 4)
     context.stroke()
-    y += 18
+    y += 20
   }
-  const left = (value: string, font = '22px "Noto Sans Myanmar", Arial, sans-serif', gap = 31) => {
+  const left = (value: string, font = '22px "Noto Sans Myanmar", Arial, sans-serif') => {
     context.textAlign = 'left'
     context.font = font
     wrapText(context, value, PAPER_WIDTH_PX - 28).forEach((line) => {
       context.fillText(line, 14, y)
-      y += gap
+      y += 31
     })
     context.textAlign = 'center'
   }
 
-  try {
-    const logo = await loadLogoImage()
-    context.drawImage(logo, (PAPER_WIDTH_PX - 104) / 2, y, 104, 104)
-    y += 116
-  } catch {
-    // The receipt remains printable if the logo cannot be rasterized.
-  }
-
   center('Hsu Myat San Mini Store', 'bold 28px Arial, sans-serif', 38)
-  center('အရောင်းဘောင်ချာ', 'bold 22px "Noto Sans Myanmar", Arial, sans-serif', 35)
+  center('အရောင်းဘောင်ချာ', 'bold 22px "Noto Sans Myanmar", Arial, sans-serif', 36)
   separator()
   left(new Date(sale.createdAt).toLocaleString('my-MM', { timeZone: 'Asia/Yangon' }))
   left(`Customer ID: ${String(sale.id || '').slice(-12).toUpperCase()}`)
@@ -210,31 +218,60 @@ async function renderReceiptRaster(sale: Sale) {
     context.fillText(formatAmount(sale.balanceDue), PAPER_WIDTH_PX - 14, y)
     y += 36
   }
-  center('ကျေးဇူးတင်ပါသည်', '22px "Noto Sans Myanmar", Arial, sans-serif', 36)
-  y += 16
+  center('ကျေးဇူးတင်ပါသည်', '22px "Noto Sans Myanmar", Arial, sans-serif', 38)
+  y += 12
 
   const output = document.createElement('canvas')
   output.width = PAPER_WIDTH_PX
   output.height = Math.max(80, y)
   const outputContext = output.getContext('2d')
-  if (!outputContext) throw new Error('Receipt output canvas is not available.')
+  if (!outputContext) throw new Error('Receipt image output is not available.')
   outputContext.drawImage(canvas, 0, 0, PAPER_WIDTH_PX, output.height, 0, 0, PAPER_WIDTH_PX, output.height)
 
-  const pixels = outputContext.getImageData(0, 0, output.width, output.height).data
+  const image = outputContext.getImageData(0, 0, output.width, output.height).data
   const widthBytes = Math.ceil(output.width / 8)
-  const raster = new Uint8Array(widthBytes * output.height)
+  const pixels = new Uint8Array(widthBytes * output.height)
   for (let row = 0; row < output.height; row += 1) {
     for (let column = 0; column < output.width; column += 1) {
       const pixel = (row * output.width + column) * 4
-      const darkness = (pixels[pixel] * 0.299) + (pixels[pixel + 1] * 0.587) + (pixels[pixel + 2] * 0.114)
-      if (darkness < 190) raster[row * widthBytes + Math.floor(column / 8)] |= 0x80 >> (column % 8)
+      const darkness = (image[pixel] * 0.299) + (image[pixel + 1] * 0.587) + (image[pixel + 2] * 0.114)
+      if (darkness < 190) pixels[row * widthBytes + Math.floor(column / 8)] |= 0x80 >> (column % 8)
     }
   }
-
-  return joinBytes([bytes(0x1d, 0x76, 0x30, 0x00, widthBytes & 0xff, (widthBytes >> 8) & 0xff, output.height & 0xff, (output.height >> 8) & 0xff), raster])
+  return { width: output.width, height: output.height, pixels }
 }
 
-async function writeChunk(characteristic: BluetoothCharacteristicLike, data: Uint8Array) {
+function crc8(data: Uint8Array) {
+  let crc = 0
+  for (const value of data) {
+    crc ^= value
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc & 0x80) ? ((crc << 1) ^ 0x07) & 0xff : (crc << 1) & 0xff
+    }
+  }
+  return crc
+}
+
+function yhkMessage(command: number, data: Uint8Array) {
+  return joinBytes([
+    bytes(0x51, 0x78, command, 0x00, data.length & 0xff, (data.length >> 8) & 0xff),
+    data,
+    bytes(crc8(data), 0xff),
+  ])
+}
+
+function delay(milliseconds: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds))
+}
+
+async function writePacket(characteristic: BluetoothCharacteristicLike, data: Uint8Array, wait = 32) {
+  // The YHK firmware is sensitive to packet speed; response writes plus a pause
+  // prevent the printer from making a sound while silently dropping the image.
+  await characteristic.writeValue(data)
+  await delay(wait)
+}
+
+async function writeEscPosChunk(characteristic: BluetoothCharacteristicLike, data: Uint8Array) {
   const chunkSize = 180
   for (let offset = 0; offset < data.length; offset += chunkSize) {
     const chunk = data.slice(offset, Math.min(offset + chunkSize, data.length))
@@ -243,8 +280,25 @@ async function writeChunk(characteristic: BluetoothCharacteristicLike, data: Uin
     } else {
       await characteristic.writeValue(chunk)
     }
-    await new Promise((resolve) => window.setTimeout(resolve, 18))
+    await delay(18)
   }
+}
+
+async function printYhkBitmap(characteristic: BluetoothCharacteristicLike, sale: Sale) {
+  const bitmap = await renderReceiptBitmap(sale)
+  const widthBytes = Math.ceil(bitmap.width / 8)
+  for (let row = 0; row < bitmap.height; row += 1) {
+    const rowData = bitmap.pixels.slice(row * widthBytes, (row + 1) * widthBytes)
+    await writePacket(characteristic, yhkMessage(YHK_DRAW_BITMAP, rowData), 24)
+    await writePacket(characteristic, yhkMessage(YHK_FEED_PAPER, bytes(0x70, 0x00)), 24)
+  }
+  for (let line = 0; line < 8; line += 1) {
+    await writePacket(characteristic, yhkMessage(YHK_FEED_PAPER, bytes(0x70, 0x00)), 24)
+  }
+}
+
+function isYhkPrinterName(name: string) {
+  return /^(YHK-|WalkPrint)/i.test(name.trim())
 }
 
 async function findWritableCharacteristic(server: BluetoothServerLike) {
@@ -308,13 +362,35 @@ export function connectedBluetoothPrinterName() {
   return connectedDevice?.name || localStorage.getItem(PRINTER_DEVICE_KEY) || ''
 }
 
+export function isWalkPrintPrinterName(name: string) {
+  return isYhkPrinterName(name)
+}
+
 export async function printSaleToBluetooth(sale: Sale) {
   assertBluetoothSupported()
   if (!connectedDevice || !writeCharacteristic || !connectedDevice.gatt?.connected) {
     await connectBluetoothPrinter()
   }
   if (!writeCharacteristic) throw new Error('Bluetooth printer is not connected.')
-  const raster = await renderReceiptRaster(sale)
-  const parts = [bytes(0x1b, 0x40), bytes(0x1b, 0x61, 0x01), raster, bytes(0x1b, 0x64, 0x04), bytes(0x1d, 0x56, 0x00)]
-  await writeChunk(writeCharacteristic, joinBytes(parts))
+
+  if (isYhkPrinterName(connectedDevice?.name || '')) {
+    await printYhkBitmap(writeCharacteristic, sale)
+    return
+  }
+
+  const raster = await renderReceiptBitmap(sale)
+  const widthBytes = Math.ceil(raster.width / 8)
+  const escPosRaster = joinBytes([
+    bytes(0x1b, 0x40),
+    bytes(0x1b, 0x61, 0x01),
+    bytes(0x1d, 0x76, 0x30, 0x00, widthBytes & 0xff, (widthBytes >> 8) & 0xff, raster.height & 0xff, (raster.height >> 8) & 0xff),
+    raster.pixels,
+    bytes(0x1b, 0x64, 0x04),
+    bytes(0x1d, 0x56, 0x00),
+  ])
+  await writeEscPosChunk(writeCharacteristic, escPosRaster)
+}
+
+export function receiptPaymentLabel(method: string) {
+  return paymentLabel(method)
 }
