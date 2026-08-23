@@ -6,6 +6,7 @@ import { api, barcodeMatches, PRODUCT_GROUPS, productMatchesGroup, type ProductG
 import { formatCurrency } from '../lib/format'
 import { sortCategories } from '../lib/category'
 import { downloadReceipt } from '../lib/receiptDownload'
+import { createReceiptImage, receiptImageFilename } from '../lib/receiptImage'
 import { connectBluetoothPrinter, connectedBluetoothPrinterName, isBluetoothPrinterConnected, printSaleToBluetooth } from '../lib/bluetoothPrinter'
 import AppHeader from '../components/AppHeader'
 import Scanner from '../components/Scanner'
@@ -248,6 +249,9 @@ export default function POS() {
     if (!completedSale || receiptSaving) return
     const saved = await saveReceiptArchive()
     if (!saved) return
+
+    // WalkPrint accepts a receipt image through Android's share sheet. If a
+    // BLE ESC/POS printer is already connected, keep the one-tap direct path.
     if (isBluetoothPrinterConnected()) {
       try {
         await printSaleToBluetooth(completedSale)
@@ -257,16 +261,39 @@ export default function POS() {
         const message = error instanceof Error ? error.message : ''
         showToast(/Classic Bluetooth|No BLE|not supported/i.test(message) ? t('bluetoothBleOnly') : (message || t('bluetoothPrintError')), 'error')
       }
-    } else {
-      try {
-        await printSaleToBluetooth(completedSale)
-        showToast(t('bluetoothPrintSuccess'), 'success')
-        return
-      } catch (error) {
-        const message = error instanceof Error ? error.message : ''
-        showToast(/Classic Bluetooth|No BLE|not supported/i.test(message) ? t('bluetoothBleOnly') : (message || t('bluetoothPrintError')), 'error')
-      }
     }
+
+    try {
+      const image = await createReceiptImage(completedSale)
+      const file = new File([image], receiptImageFilename(completedSale), { type: 'image/png' })
+      const shareNavigator = navigator as Navigator & {
+        canShare?: (data: ShareData) => boolean
+        share?: (data: ShareData) => Promise<void>
+      }
+      if (shareNavigator.share && (!shareNavigator.canShare || shareNavigator.canShare({ files: [file] }))) {
+        await shareNavigator.share({
+          files: [file],
+          title: 'Hsu Myat San Mini Store',
+          text: t('walkPrintShareText'),
+        })
+        showToast(t('walkPrintShareSuccess'), 'success')
+        return
+      }
+      const url = URL.createObjectURL(image)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = receiptImageFilename(completedSale)
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      showToast(t('receiptImageSaved'), 'success')
+      return
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      showToast(error instanceof Error ? error.message : t('receiptDownloadError'), 'error')
+    }
+
     showToast(t('receiptSaved'), 'success')
     window.print()
   }
