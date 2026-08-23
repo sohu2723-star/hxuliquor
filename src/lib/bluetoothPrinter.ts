@@ -1,8 +1,9 @@
 import type { Sale } from './api'
 
 const PRINTER_SERVICE_UUIDS = [
-  '000018f0-0000-1000-8000-00805f9b34fb',
   '0000ae30-0000-1000-8000-00805f9b34fb',
+  '0000af30-0000-1000-8000-00805f9b34fb',
+  '000018f0-0000-1000-8000-00805f9b34fb',
   '0000ff00-0000-1000-8000-00805f9b34fb',
   '0000ffe0-0000-1000-8000-00805f9b34fb',
   '0000ffe5-0000-1000-8000-00805f9b34fb',
@@ -271,11 +272,20 @@ function delay(milliseconds: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds))
 }
 
-async function writePacket(characteristic: BluetoothCharacteristicLike, data: Uint8Array, wait = 32) {
-  // The YHK firmware is sensitive to packet speed; response writes plus a pause
-  // prevent the printer from making a sound while silently dropping the image.
-  await characteristic.writeValue(data)
-  await delay(wait)
+async function writeYhkStream(characteristic: BluetoothCharacteristicLike, packets: Uint8Array[]) {
+  // Browser Web Bluetooth does not expose the negotiated ATT MTU. YHK devices
+  // commonly use a 20-byte payload, so stream the complete job in safe chunks.
+  const data = joinBytes(packets)
+  const chunkSize = 20
+  for (let offset = 0; offset < data.length; offset += chunkSize) {
+    const chunk = data.slice(offset, Math.min(offset + chunkSize, data.length))
+    if (characteristic.properties.writeWithoutResponse && characteristic.writeValueWithoutResponse) {
+      await characteristic.writeValueWithoutResponse(chunk)
+    } else {
+      await characteristic.writeValue(chunk)
+    }
+    await delay(22)
+  }
 }
 
 async function writeEscPosChunk(characteristic: BluetoothCharacteristicLike, data: Uint8Array) {
@@ -331,7 +341,7 @@ async function printYhkBitmap(characteristic: BluetoothCharacteristicLike, sale:
     yhkLatticeEnd(),
     yhkMessage(YHK_GET_DEVICE_STATE, bytes(0x00)),
   )
-  for (const packet of packets) await writePacket(characteristic, packet, 22)
+  await writeYhkStream(characteristic, packets)
 }
 
 function isYhkPrinterName(name: string) {
