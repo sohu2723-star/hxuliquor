@@ -23,8 +23,15 @@ const PRINTER_WRITE_UUIDS = [
 
 const PRINTER_DEVICE_KEY = 'hxu-bluetooth-printer-name'
 const PAPER_WIDTH_PX = 384
+const YHK_GET_DEVICE_STATE = 0xa3
+const YHK_SET_QUALITY = 0xa4
+const YHK_SET_ENERGY = 0xaf
+const YHK_APPLY_ENERGY = 0xbe
+const YHK_LATTICE = 0xa6
 const YHK_DRAW_BITMAP = 0xa2
-const YHK_FEED_PAPER = 0xa1
+const YHK_SET_PAPER = 0xa1
+const YHK_FEED_PAPER = 0xbd
+const YHK_IMAGE_WIDTH = 384
 
 type BluetoothCharacteristicLike = {
   properties: { write?: boolean; writeWithoutResponse?: boolean }
@@ -284,17 +291,47 @@ async function writeEscPosChunk(characteristic: BluetoothCharacteristicLike, dat
   }
 }
 
+function yhkSetEnergy(value = 0xffff) {
+  return yhkMessage(YHK_SET_ENERGY, bytes((value >> 8) & 0xff, value & 0xff))
+}
+
+function yhkLatticeStart() {
+  return yhkMessage(YHK_LATTICE, bytes(0xaa, 0x55, 0x17, 0x38, 0x44, 0x5f, 0x5f, 0x5f, 0x44, 0x38, 0x2c))
+}
+
+function yhkLatticeEnd() {
+  return yhkMessage(YHK_LATTICE, bytes(0xaa, 0x55, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x17, 0x11))
+}
+
 async function printYhkBitmap(characteristic: BluetoothCharacteristicLike, sale: Sale) {
   const bitmap = await renderReceiptBitmap(sale)
   const widthBytes = Math.ceil(bitmap.width / 8)
+  if (bitmap.width !== YHK_IMAGE_WIDTH || widthBytes !== 48) {
+    throw new Error('The receipt image width is not compatible with this YHK printer.')
+  }
+
+  // YHK printers do not use ESC/POS and do not feed after each row. They
+  // expect one complete bitmap job wrapped in their 0x51 0x78 protocol.
+  const packets: Uint8Array[] = [
+    yhkMessage(YHK_GET_DEVICE_STATE, bytes(0x00)),
+    yhkMessage(YHK_SET_QUALITY, bytes(0x32)),
+    yhkSetEnergy(),
+    yhkMessage(YHK_APPLY_ENERGY, bytes(0x01)),
+    yhkLatticeStart(),
+  ]
   for (let row = 0; row < bitmap.height; row += 1) {
     const rowData = bitmap.pixels.slice(row * widthBytes, (row + 1) * widthBytes)
-    await writePacket(characteristic, yhkMessage(YHK_DRAW_BITMAP, rowData), 24)
-    await writePacket(characteristic, yhkMessage(YHK_FEED_PAPER, bytes(0x70, 0x00)), 24)
+    packets.push(yhkMessage(YHK_DRAW_BITMAP, rowData))
   }
-  for (let line = 0; line < 8; line += 1) {
-    await writePacket(characteristic, yhkMessage(YHK_FEED_PAPER, bytes(0x70, 0x00)), 24)
-  }
+  packets.push(
+    yhkMessage(YHK_FEED_PAPER, bytes(0x19)),
+    yhkMessage(YHK_SET_PAPER, bytes(0x30, 0x00)),
+    yhkMessage(YHK_SET_PAPER, bytes(0x30, 0x00)),
+    yhkMessage(YHK_SET_PAPER, bytes(0x30, 0x00)),
+    yhkLatticeEnd(),
+    yhkMessage(YHK_GET_DEVICE_STATE, bytes(0x00)),
+  )
+  for (const packet of packets) await writePacket(characteristic, packet, 22)
 }
 
 function isYhkPrinterName(name: string) {
