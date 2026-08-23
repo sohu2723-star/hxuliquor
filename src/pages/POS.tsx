@@ -239,7 +239,8 @@ export default function POS() {
       setBluetoothPrinterName(name)
       showToast(`${name} ${t('bluetoothConnected')}`, 'success')
     } catch (error) {
-      showToast(error instanceof Error ? error.message : t('bluetoothPrintError'), 'error')
+      const message = error instanceof Error ? error.message : ''
+      showToast(/Classic Bluetooth|No BLE|not supported/i.test(message) ? t('bluetoothBleOnly') : (message || t('bluetoothPrintError')), 'error')
     }
   }
 
@@ -253,7 +254,17 @@ export default function POS() {
         showToast(t('bluetoothPrintSuccess'), 'success')
         return
       } catch (error) {
-        showToast(error instanceof Error ? error.message : t('bluetoothPrintError'), 'error')
+        const message = error instanceof Error ? error.message : ''
+        showToast(/Classic Bluetooth|No BLE|not supported/i.test(message) ? t('bluetoothBleOnly') : (message || t('bluetoothPrintError')), 'error')
+      }
+    } else {
+      try {
+        await printSaleToBluetooth(completedSale)
+        showToast(t('bluetoothPrintSuccess'), 'success')
+        return
+      } catch (error) {
+        const message = error instanceof Error ? error.message : ''
+        showToast(/Classic Bluetooth|No BLE|not supported/i.test(message) ? t('bluetoothBleOnly') : (message || t('bluetoothPrintError')), 'error')
       }
     }
     showToast(t('receiptSaved'), 'success')
