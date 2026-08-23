@@ -250,9 +250,11 @@ export default function POS() {
     const saved = await saveReceiptArchive()
     if (!saved) return
 
-    // WalkPrint accepts a receipt image through Android's share sheet. If a
-    // BLE ESC/POS printer is already connected, keep the one-tap direct path.
-    if (isBluetoothPrinterConnected()) {
+    // YHK-xxxx is a WalkPrint printer. It may pair over BLE but does not
+    // accept generic ESC/POS bytes, so send the receipt image to WalkPrint.
+    const isWalkPrintDevice = /^(YHK-|WalkPrint)/i.test(bluetoothPrinterName.trim())
+    // Keep direct printing only for a non-WalkPrint BLE ESC/POS printer.
+    if (!isWalkPrintDevice && isBluetoothPrinterConnected()) {
       try {
         await printSaleToBluetooth(completedSale)
         showToast(t('bluetoothPrintSuccess'), 'success')

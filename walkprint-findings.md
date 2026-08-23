@@ -1,0 +1,12 @@
+WalkPrint research (2026-08-23)
+
+Official WalkPrint site: https://walkprint.net/
+
+The official site describes WalkPrint as a mobile printing app for mini thermal printers and says users connect a printer in the app, then choose a document/photo/note and press print. It says documents, pictures, labels, and web pages are supported. The setup instructions say printers commonly appear as YHK-XXXX and require in-app pairing. The FAQ says sharing documents from other apps has limitations and recommends opening documents directly within WalkPrint or using its built-in browser. This means a website can generate a receipt image and offer Android sharing, but it cannot guarantee that WalkPrint will open automatically or accept the shared image without user action. A reliable one-tap website-to-printer flow would require a WalkPrint-supported deep link/share target or a native Android print bridge.
+
+User manual image confirms the app name WalkPrint, wireless connection, thermal-paper-only operation, and a generic mini thermal printer form factor.
+
+Implementation implication: provide a receipt PNG generation and Android Web Share fallback; if WalkPrint appears in the Android share sheet and accepts image files, the user can select it and then press Print. The website must not claim guaranteed automatic app opening because the official FAQ documents sharing limitations.
+Additional research: Google Play lists WalkPrint as a mobile printing app that prints pictures and documents through its own workflow. User reviews include reports that sharing documents from other apps is not supported and that some printers work only with WalkPrint. The official WalkPrint website recommends opening content directly in WalkPrint and says external sharing has limitations. An independent ESC/POS print service can receive image/text share intents, but that applies to ESC/POS printers and does not establish compatibility with the user's WalkPrint-only YHK-1EEC device.
+
+Current observation: after pairing YHK-1EEC, the printer makes a sound but no paper exits. This strongly indicates the Bluetooth link is active but the device does not accept the ESC/POS raster command used by the website, or its protocol requires WalkPrint-specific framing. The app should not show a definitive success message for this printer unless bytes are actually acknowledged; Bluetooth write completion only confirms delivery to the GATT characteristic, not physical printing.
