@@ -21,6 +21,19 @@ const POS_DRAFT_KEY = 'hxu-pos-draft'
 type SaleUnit = 'unit' | 'pack' | 'case'
 type CartDraftItem = { productId: string; quantity: number; saleUnit: SaleUnit }
 type PosDraft = { cart?: CartDraftItem[]; searchQuery?: string; productGroup?: ProductGroup; categoryFilter?: string; showCheckout?: boolean }
+type SpeechRecognitionResultLike = { [index: number]: { transcript: string } }
+type SpeechRecognitionEventLike = Event & { results: { [index: number]: SpeechRecognitionResultLike } }
+type SpeechRecognitionLike = {
+  lang: string
+  interimResults: boolean
+  maxAlternatives: number
+  start: () => void
+  stop: () => void
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null
+  onerror: (() => void) | null
+  onend: (() => void) | null
+}
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
 
 const saleUnitFactor = (product: Product, saleUnit: SaleUnit) => {
   if (saleUnit === 'case') return Math.max(1, product.unitsPerPack) * Math.max(1, product.packsPerCase)
@@ -29,6 +42,26 @@ const saleUnitFactor = (product: Product, saleUnit: SaleUnit) => {
 }
 
 const isThreeLevelProduct = (product: Product) => product.packsPerCase > 1 && product.unitsPerPack > 1
+
+function normalizeSearchText(value: string) {
+  return String(value || '').toLocaleLowerCase().normalize('NFKC').replace(/[|:;,_\-\s]+/g, '')
+}
+
+function searchProductScore(product: Product, query: string) {
+  const normalizedQuery = normalizeSearchText(query)
+  if (!normalizedQuery) return 0
+  const fields = [product.name, product.barcode, product.category, product.productColor, product.productSize]
+    .map(normalizeSearchText)
+    .filter(Boolean)
+  if (fields.some((field) => field === normalizedQuery)) return 100
+  if (fields.some((field) => field.startsWith(normalizedQuery))) return 80
+  if (fields.some((field) => field.includes(normalizedQuery))) return 60
+  const queryTokens = normalizedQuery.match(/[a-z0-9]+|[\u1000-\u109f]+/g) || [normalizedQuery]
+  const matchedTokens = queryTokens.filter((token) => fields.some((field) => field.includes(token)))
+  if (matchedTokens.length === queryTokens.length) return 50
+  if (matchedTokens.length > 0) return 20 + matchedTokens.length
+  return 0
+}
 
 const readPosDraft = (): PosDraft => {
   try { return JSON.parse(localStorage.getItem(POS_DRAFT_KEY) || '{}') as PosDraft } catch { return {} }
@@ -45,6 +78,7 @@ export default function POS() {
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
   const [isToolsOpen, setIsToolsOpen] = useState(false)
+  const [isVoiceSearching, setIsVoiceSearching] = useState(false)
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
   const [receiptSaving, setReceiptSaving] = useState(false)
   const [bluetoothPrinterName, setBluetoothPrinterName] = useState(() => connectedBluetoothPrinterName())
@@ -201,6 +235,33 @@ export default function POS() {
 
   const handleSearch = (query: string) => setSearchQuery(query)
 
+  const handleVoiceSearch = () => {
+    const speechWindow = window as typeof window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor }
+    const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition
+    if (!Recognition) {
+      showToast(language === 'my' ? 'ဤ browser တွင် အသံဖြင့်ရှာဖွေမှု မထောက်ပံ့ပါ။ Chrome ကိုသုံးပါ။' : 'Voice search is not supported in this browser. Try Chrome.', 'error')
+      return
+    }
+    const recognition = new Recognition()
+    recognition.lang = language === 'my' ? 'my-MM' : 'en-US'
+    recognition.interimResults = false
+    recognition.maxAlternatives = 3
+    setIsVoiceSearching(true)
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript?.trim() || ''
+      if (transcript) {
+        setSearchQuery(transcript)
+        window.setTimeout(() => searchPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+      }
+    }
+    recognition.onerror = () => {
+      setIsVoiceSearching(false)
+      showToast(language === 'my' ? 'အသံကို မဖမ်းနိုင်ပါ။ ထပ်စမ်းကြည့်ပါ။' : 'I could not hear that. Please try again.', 'error')
+    }
+    recognition.onend = () => setIsVoiceSearching(false)
+    try { recognition.start() } catch { setIsVoiceSearching(false) }
+  }
+
   const productCategories = useMemo(() => sortCategories(products.map((product) => product.category), language), [products, language])
   const matchesCategoryFilter = useCallback((product: Product) => !categoryFilter || product.category === categoryFilter, [categoryFilter])
   const visibleProducts = useMemo(() => products
@@ -209,10 +270,8 @@ export default function POS() {
   const filteredSearchResults = useMemo(() => {
     const normalized = searchQuery.trim().toLowerCase()
     if (normalized.length < 1) return []
-    return products.filter((product) => {
-      const searchable = [product.name, product.barcode, product.category, product.productColor, product.productSize].join(' ').toLowerCase()
-      return searchable.includes(normalized) && productMatchesGroup(product, productGroup) && matchesCategoryFilter(product)
-    }).sort((a, b) => Number(b.price || 0) - Number(a.price || 0))
+    return products.filter((product) => productMatchesGroup(product, productGroup) && matchesCategoryFilter(product) && searchProductScore(product, normalized) > 0)
+      .sort((a, b) => searchProductScore(b, normalized) - searchProductScore(a, normalized) || Number(b.price || 0) - Number(a.price || 0))
   }, [products, searchQuery, productGroup, matchesCategoryFilter])
 
   const requiresAgeCheck = cart.some((item) => item.product.requiresAgeCheck)
@@ -352,7 +411,12 @@ export default function POS() {
           <div ref={searchPanelRef} className="surface-card scroll-mt-20 p-3 sm:p-4">
             <h2 className="mb-2 text-base font-semibold">{t('searchProduct')}</h2>
             <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-              <input type="text" placeholder={t('searchPlaceholder')} value={searchQuery} onChange={(event) => handleSearch(event.target.value)} onFocus={() => window.setTimeout(() => searchPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              <div className="relative">
+                <input type="text" placeholder={t('searchPlaceholder')} value={searchQuery} onChange={(event) => handleSearch(event.target.value)} onFocus={() => window.setTimeout(() => searchPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)} className="w-full rounded-lg border border-gray-300 py-2 pl-3 pr-11 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                <button type="button" onClick={handleVoiceSearch} disabled={isVoiceSearching} className={`absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md ${isVoiceSearching ? 'bg-red-100 text-red-700' : 'text-slate-500 hover:bg-slate-100 hover:text-primary'}`} aria-label={language === 'my' ? 'အသံဖြင့်ရှာရန်' : 'Search by voice'} title={language === 'my' ? 'အသံဖြင့်ရှာရန်' : 'Search by voice'}>
+                  <Icon name="microphone" className={`h-5 w-5 ${isVoiceSearching ? 'animate-pulse' : ''}`} />
+                </button>
+              </div>
               <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="min-w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-violet-700 focus:outline-none focus:ring-2 focus:ring-primary">
                 <option value="">{t('allCategories')}</option>
                 {productCategories.map((category) => <option key={category} value={category}>{category}</option>)}

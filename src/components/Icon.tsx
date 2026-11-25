@@ -1,4 +1,4 @@
-type IconName = 'scan' | 'bottle' | 'box' | 'cart' | 'products' | 'users' | 'chart' | 'logout' | 'user' | 'mail' | 'shield' | 'monitor' | 'check' | 'warning' | 'camera' | 'target' | 'flash' | 'refresh'
+type IconName = 'scan' | 'bottle' | 'box' | 'cart' | 'products' | 'users' | 'chart' | 'logout' | 'user' | 'mail' | 'shield' | 'monitor' | 'check' | 'warning' | 'camera' | 'target' | 'flash' | 'refresh' | 'microphone'
 
 const paths: Record<IconName, React.ReactNode> = {
   scan: <><path d="M4 7V4h3M17 4h3v3M20 17v3h-3M7 20H4v-3"/><path d="M7 12h10"/></>,
@@ -19,6 +19,7 @@ const paths: Record<IconName, React.ReactNode> = {
   target: <><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></>,
   flash: <path d="M13 2 4 14h7l-1 8 10-13h-7l1-7Z"/>,
   refresh: <><path d="M20 11a8 8 0 0 0-14.8-4L3 10"/><path d="M3 5v5h5"/><path d="M4 13a8 8 0 0 0 14.8 4L21 14"/><path d="M21 19v-5h-5"/></>,
+  microphone: <><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></>,
 }
 
 export default function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {
