@@ -44,6 +44,7 @@ export default function POS() {
   const [showCheckout, setShowCheckout] = useState(() => readPosDraft().showCheckout === true)
   const [isLoading, setIsLoading] = useState(true)
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
+  const [isToolsOpen, setIsToolsOpen] = useState(false)
   const [completedSale, setCompletedSale] = useState<Sale | null>(null)
   const [receiptSaving, setReceiptSaving] = useState(false)
   const [bluetoothPrinterName, setBluetoothPrinterName] = useState(() => connectedBluetoothPrinterName())
@@ -321,12 +322,12 @@ export default function POS() {
         <img
           src={url}
           alt={name}
-            className="h-24 w-24 object-cover rounded-xl"
+            className="h-28 w-28 object-cover rounded-2xl"
         />
       )
     }
     return (
-      <div className="h-24 w-24 bg-gray-200 rounded-xl flex items-center justify-center text-center text-gray-400 text-xs">
+      <div className="h-28 w-28 bg-gray-200 rounded-2xl flex items-center justify-center text-center text-gray-400 text-xs">
         {t('noImage')}
       </div>
     )
@@ -345,55 +346,7 @@ export default function POS() {
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
 
-          <div className="surface-card p-4 sm:p-5">
-            <h2 className="text-lg font-semibold">{t('scanProduct')}</h2>
-            <Scanner onScan={handleScan} />
-          </div>
-
-          <div className="surface-card p-4 sm:p-5">
-            <h2 className="text-lg font-semibold mb-3">{t('searchProduct')}</h2>
-            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-              <input
-                type="text"
-                placeholder={t('searchPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="min-w-40 rounded-md border border-gray-300 px-3 py-2 font-semibold text-violet-700 focus:outline-none focus:ring-2 focus:ring-primary">
-                <option value="">{t('allCategories')}</option>
-                {productCategories.map((category) => <option key={category} value={category}>{category}</option>)}
-              </select>
-            </div>
-            {filteredSearchResults.length > 0 && (
-              <div className="mt-3 space-y-2 max-h-60 overflow-y-auto">
-                {filteredSearchResults.map((product) => (
-                  <button
-                    key={product.id}
-                    onClick={() => {
-                      addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit')
-                      setSearchQuery('')
-                    }}
-                    className="w-full text-left p-3 border border-gray-200 rounded-md hover:bg-gray-50 flex justify-between items-center"
-                  >
-                    <div className="flex items-center gap-3">
-                      <ProductImage url={product.imageUrl} name={product.name} />
-                      <div>
-                        <p className="font-bold">{product.name}</p>
-                        <p className="text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
-                      </div>
-                    </div>
-                    <span className="font-semibold text-primary">
-                      {formatCurrency(product.price)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {searchQuery.trim().length >= 1 && filteredSearchResults.length === 0 && (
-              <p className="mt-3 text-sm text-gray-500">{t('noProductsFound')}</p>
-            )}
-          </div>
+          {/* Scanner and search are available from the floating tools button. */}
 
           <div className="surface-card p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3 mb-3">
@@ -431,24 +384,24 @@ export default function POS() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 items-stretch gap-3 sm:grid-cols-3 md:grid-cols-4 max-h-[50vh] overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 items-stretch gap-4 sm:grid-cols-3 md:grid-cols-4 max-h-[58vh] overflow-y-auto pr-1">
                 {visibleProducts.map((product) => (
-                  <div key={product.id} className={`product-card h-full p-3 text-left flex flex-col shadow-sm ${product.stockQty <= 0 ? 'opacity-40 grayscale' : ''}`}>
+                  <div key={product.id} className={`product-card h-full p-4 text-left flex flex-col shadow-sm ${product.stockQty <= 0 ? 'opacity-40 grayscale' : ''}`}>
                   <div className="text-left">
-                    <div className="flex justify-center mb-2">
+                    <div className="flex justify-center mb-3">
                       <ProductImage url={product.imageUrl} name={product.name} />
                     </div>
-                    <p className="break-words whitespace-normal leading-snug font-bold">{product.name}</p>
+                    <p className="break-words whitespace-normal leading-snug text-base font-bold">{product.name}</p>
                     <p className="text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p>
                   </div>
                   <div className="mt-auto pt-3 grid gap-2">
-                    {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} disabled={product.stockQty <= 0} className="w-full rounded-xl bg-primary disabled:cursor-not-allowed disabled:bg-slate-300 px-3 py-2.5 text-left text-white shadow-sm">
+                    {product.saleType !== 'pack' && <button onClick={() => addToCart(product, 'unit')} disabled={product.stockQty <= 0} className="w-full rounded-xl bg-primary disabled:cursor-not-allowed disabled:bg-slate-300 px-3 py-3 text-left text-white shadow-sm">
                       <span className="flex items-center gap-1 text-[11px] font-medium text-white/80"><Icon name="bottle" className="h-4 w-4" />{t(isThreeLevelProduct(product) ? 'stickSalePrice' : 'unitPriceLabel')}</span><strong className="block text-base">{formatCurrency(product.price)}</strong>
                     </button>}
-                    {product.saleType !== 'unit' && isThreeLevelProduct(product) && product.casePrice > 0 && <button onClick={() => addToCart(product, 'case')} disabled={product.stockQty < saleUnitFactor(product, 'case')} className="w-full rounded-xl border-2 border-amber-400 bg-amber-50 px-3 py-2.5 text-left text-amber-950 shadow-sm disabled:opacity-40">
+                    {product.saleType !== 'unit' && isThreeLevelProduct(product) && product.casePrice > 0 && <button onClick={() => addToCart(product, 'case')} disabled={product.stockQty < saleUnitFactor(product, 'case')} className="w-full rounded-xl border-2 border-amber-400 bg-amber-50 px-3 py-3 text-left text-amber-950 shadow-sm disabled:opacity-40">
                       <span className="flex items-center gap-1 text-[11px] font-semibold text-amber-700"><Icon name="box" className="h-4 w-4" />{t('caseSalePrice')}</span><strong className="block text-base">{formatCurrency(product.casePrice)}</strong>
                     </button>}
-                    {product.saleType !== 'unit' && (product.saleType === 'pack' || product.unitsPerPack > 1) && product.packPrice > 0 && <button onClick={() => addToCart(product, 'pack')} disabled={product.stockQty < (product.saleType === 'pack' ? 1 : product.unitsPerPack)} className="w-full rounded-xl border-2 border-violet-400 bg-violet-50 px-3 py-2.5 text-left text-violet-950 shadow-sm disabled:opacity-40">
+                    {product.saleType !== 'unit' && (product.saleType === 'pack' || product.unitsPerPack > 1) && product.packPrice > 0 && <button onClick={() => addToCart(product, 'pack')} disabled={product.stockQty < (product.saleType === 'pack' ? 1 : product.unitsPerPack)} className="w-full rounded-xl border-2 border-violet-400 bg-violet-50 px-3 py-3 text-left text-violet-950 shadow-sm disabled:opacity-40">
                       <span className="flex items-center gap-1 text-[11px] font-semibold text-violet-700"><Icon name="box" className="h-4 w-4" />{isThreeLevelProduct(product) ? t('boxPriceWithUnits', { count: product.unitsPerPack }) : product.saleType === 'pack' ? t('packPriceLabel') : t('packPriceWithUnits', { count: product.unitsPerPack })}</span><strong className="block text-base">{formatCurrency(product.packPrice)}</strong>
                     </button>}
                   </div>
@@ -460,26 +413,24 @@ export default function POS() {
           </div>
         </div>
 
-        {/* Desktop sidebar */}
-        <div className="hidden lg:block lg:w-96 bg-white shadow-lg p-4 lg:p-6">
-          <Cart
-            items={cart}
-            onUpdateQuantity={updateQuantity}
-            onRemove={removeFromCart}
-            onCheckout={() => setShowCheckout(true)}
-            requiresAgeCheck={requiresAgeCheck}
-          />
+        {/* Floating bubbles keep scan/search and cart out of the way until needed. */}
+        <div className="fixed bottom-4 left-4 z-40">
+          <button
+            type="button"
+            onClick={() => setIsToolsOpen(true)}
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-white shadow-xl ring-4 ring-white/80 transition hover:scale-105 hover:bg-slate-800"
+            aria-label={t('scanProduct')}
+          >
+            <Icon name="scan" className="h-7 w-7" />
+          </button>
         </div>
-
-        {/* Mobile floating cart button */}
-        <div className="lg:hidden fixed bottom-4 right-4 z-40">
+        <div className="fixed bottom-4 right-4 z-40">
           <button
             onClick={() => setIsMobileCartOpen(true)}
-            className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors relative"
+            className="relative flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-xl ring-4 ring-white/80 transition hover:scale-105 hover:bg-primary/90"
+            aria-label={t('cart')}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
+            <Icon name="cart" className="h-7 w-7" />
             {cart.length > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                 {cart.reduce((sum, item) => sum + item.quantity, 0)}
@@ -488,11 +439,40 @@ export default function POS() {
           </button>
         </div>
 
-        {/* Mobile cart bottom sheet */}
+        {/* Scanner/search drawer: hidden until the left bubble is tapped. */}
+        {isToolsOpen && (
+          <div className="fixed inset-0 z-50 bg-slate-950/40" onClick={() => setIsToolsOpen(false)}>
+            <div className="absolute bottom-0 left-0 right-0 max-h-[88vh] overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:bottom-4 sm:left-4 sm:right-auto sm:w-[min(32rem,calc(100vw-2rem))] sm:rounded-3xl" onClick={(event) => event.stopPropagation()}>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div><p className="text-lg font-extrabold text-slate-950">{t('scanProduct')}</p><p className="text-sm text-slate-500">{t('searchProduct')}</p></div>
+                <button type="button" onClick={() => setIsToolsOpen(false)} className="rounded-full px-3 py-1 text-2xl text-slate-400 hover:bg-slate-100" aria-label={t('close')}>×</button>
+              </div>
+              <Scanner onScan={handleScan} />
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <input type="text" placeholder={t('searchPlaceholder')} value={searchQuery} onChange={(e) => handleSearch(e.target.value)} className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary" autoFocus />
+                  <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="min-w-40 rounded-xl border border-gray-300 px-3 py-3 font-semibold text-violet-700 focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="">{t('allCategories')}</option>
+                    {productCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+                  </select>
+                </div>
+                {filteredSearchResults.length > 0 && <div className="mt-3 max-h-60 space-y-2 overflow-y-auto">
+                  {filteredSearchResults.map((product) => <button key={product.id} onClick={() => { addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit'); setSearchQuery('') }} className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 p-3 text-left hover:bg-gray-50">
+                    <div className="flex min-w-0 items-center gap-3"><ProductImage url={product.imageUrl} name={product.name} /><div className="min-w-0"><p className="truncate font-bold">{product.name}</p><p className="truncate text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p></div></div>
+                    <span className="shrink-0 font-semibold text-primary">{formatCurrency(product.price)}</span>
+                  </button>)}
+                </div>}
+                {searchQuery.trim().length >= 1 && filteredSearchResults.length === 0 && <p className="mt-3 text-sm text-gray-500">{t('noProductsFound')}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cart drawer: the cart is shown only after the right bubble is tapped. */}
         {isMobileCartOpen && (
-          <div className="lg:hidden fixed inset-0 z-50">
+          <div className="fixed inset-0 z-50">
             <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setIsMobileCartOpen(false)} />
-            <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-xl shadow-xl max-h-[85vh] flex flex-col">
+            <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] rounded-t-3xl bg-white shadow-xl sm:bottom-4 sm:left-auto sm:right-4 sm:w-[min(28rem,calc(100vw-2rem))] sm:rounded-3xl">
               <div className="p-4 border-b flex justify-between items-center">
                 <h2 className="text-xl font-bold">{t('cart')} ({cart.length})</h2>
                 <button
