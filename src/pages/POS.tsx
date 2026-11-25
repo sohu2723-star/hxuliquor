@@ -346,7 +346,24 @@ export default function POS() {
       <div className="flex flex-col lg:flex-row">
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
 
-          {/* Scanner and search are available from the floating tools button. */}
+          {/* The scanner is floating; product search and category filtering stay visible for quick POS use. */}
+          <div className="surface-card p-4 sm:p-5">
+            <h2 className="mb-3 text-lg font-semibold">{t('searchProduct')}</h2>
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+              <input type="text" placeholder={t('searchPlaceholder')} value={searchQuery} onChange={(event) => handleSearch(event.target.value)} className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary" />
+              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="min-w-40 rounded-xl border border-gray-300 px-3 py-3 font-semibold text-violet-700 focus:outline-none focus:ring-2 focus:ring-primary">
+                <option value="">{t('allCategories')}</option>
+                {productCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+            </div>
+            {filteredSearchResults.length > 0 && <div className="mt-3 max-h-60 space-y-2 overflow-y-auto">
+              {filteredSearchResults.map((product) => <button key={product.id} onClick={() => { addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit'); setSearchQuery('') }} className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 p-3 text-left hover:bg-gray-50">
+                <div className="flex min-w-0 items-center gap-3"><ProductImage url={product.imageUrl} name={product.name} /><div className="min-w-0"><p className="truncate font-bold">{product.name}</p><p className="truncate text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p></div></div>
+                <span className="shrink-0 font-semibold text-primary">{formatCurrency(product.price)}</span>
+              </button>)}
+            </div>}
+            {searchQuery.trim().length >= 1 && filteredSearchResults.length === 0 && <p className="mt-3 text-sm text-gray-500">{t('noProductsFound')}</p>}
+          </div>
 
           <div className="surface-card p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3 mb-3">
@@ -413,7 +430,7 @@ export default function POS() {
           </div>
         </div>
 
-        {/* Floating bubbles keep scan/search and cart out of the way until needed. */}
+        {/* Floating bubbles keep the scanner and cart out of the way until needed. */}
         <div className="fixed bottom-4 left-4 z-40">
           <button
             type="button"
@@ -439,31 +456,15 @@ export default function POS() {
           </button>
         </div>
 
-        {/* Scanner/search drawer: hidden until the left bubble is tapped. */}
+        {/* Scanner drawer: hidden until the left bubble is tapped. */}
         {isToolsOpen && (
           <div className="fixed inset-0 z-50 bg-slate-950/40" onClick={() => setIsToolsOpen(false)}>
             <div className="absolute bottom-0 left-0 right-0 max-h-[88vh] overflow-y-auto rounded-t-3xl bg-white p-4 shadow-2xl sm:bottom-4 sm:left-4 sm:right-auto sm:w-[min(32rem,calc(100vw-2rem))] sm:rounded-3xl" onClick={(event) => event.stopPropagation()}>
               <div className="mb-4 flex items-center justify-between gap-3">
-                <div><p className="text-lg font-extrabold text-slate-950">{t('scanProduct')}</p><p className="text-sm text-slate-500">{t('searchProduct')}</p></div>
+                <div><p className="text-lg font-extrabold text-slate-950">{t('scanProduct')}</p><p className="text-sm text-slate-500">{t('scanProduct')}</p></div>
                 <button type="button" onClick={() => setIsToolsOpen(false)} className="rounded-full px-3 py-1 text-2xl text-slate-400 hover:bg-slate-100" aria-label={t('close')}>×</button>
               </div>
               <Scanner onScan={handleScan} />
-              <div className="mt-4 border-t border-slate-100 pt-4">
-                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <input type="text" placeholder={t('searchPlaceholder')} value={searchQuery} onChange={(e) => handleSearch(e.target.value)} className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary" autoFocus />
-                  <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="min-w-40 rounded-xl border border-gray-300 px-3 py-3 font-semibold text-violet-700 focus:outline-none focus:ring-2 focus:ring-primary">
-                    <option value="">{t('allCategories')}</option>
-                    {productCategories.map((category) => <option key={category} value={category}>{category}</option>)}
-                  </select>
-                </div>
-                {filteredSearchResults.length > 0 && <div className="mt-3 max-h-60 space-y-2 overflow-y-auto">
-                  {filteredSearchResults.map((product) => <button key={product.id} onClick={() => { addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit'); setSearchQuery('') }} className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 p-3 text-left hover:bg-gray-50">
-                    <div className="flex min-w-0 items-center gap-3"><ProductImage url={product.imageUrl} name={product.name} /><div className="min-w-0"><p className="truncate font-bold">{product.name}</p><p className="truncate text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p></div></div>
-                    <span className="shrink-0 font-semibold text-primary">{formatCurrency(product.price)}</span>
-                  </button>)}
-                </div>}
-                {searchQuery.trim().length >= 1 && filteredSearchResults.length === 0 && <p className="mt-3 text-sm text-gray-500">{t('noProductsFound')}</p>}
-              </div>
             </div>
           </div>
         )}
