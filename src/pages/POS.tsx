@@ -565,8 +565,8 @@ export default function POS() {
         {isMobileCartOpen && (
           <div className="fixed inset-0 z-50">
             <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setIsMobileCartOpen(false)} />
-            <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] rounded-t-3xl bg-white shadow-xl sm:bottom-4 sm:left-auto sm:right-4 sm:w-[min(28rem,calc(100vw-2rem))] sm:rounded-3xl">
-              <div className="p-4 border-b flex justify-between items-center">
+            <div className="absolute bottom-0 left-0 right-0 flex h-[min(85vh,42rem)] flex-col overflow-hidden rounded-t-3xl bg-white shadow-xl sm:bottom-4 sm:left-auto sm:right-4 sm:w-[min(28rem,calc(100vw-2rem))] sm:rounded-3xl">
+              <div className="flex shrink-0 items-center justify-between border-b p-4">
                 <h2 className="text-xl font-bold">{t('cart')} ({cart.length})</h2>
                 <button
                   onClick={() => setIsMobileCartOpen(false)}
@@ -575,7 +575,7 @@ export default function POS() {
                   ×
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto p-4">
+              <div className="min-h-0 flex-1 overflow-hidden p-4">
                 <Cart
                   items={cart}
                   onUpdateQuantity={updateQuantity}
