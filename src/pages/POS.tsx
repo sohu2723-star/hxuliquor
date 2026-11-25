@@ -23,6 +23,7 @@ type CartDraftItem = { productId: string; quantity: number; saleUnit: SaleUnit }
 type PosDraft = { cart?: CartDraftItem[]; searchQuery?: string; productGroup?: ProductGroup; categoryFilter?: string; showCheckout?: boolean }
 type SpeechRecognitionResultLike = { [index: number]: { transcript: string } }
 type SpeechRecognitionEventLike = Event & { results: { [index: number]: SpeechRecognitionResultLike } }
+type SpeechRecognitionErrorEventLike = Event & { error?: string; message?: string }
 type SpeechRecognitionLike = {
   lang: string
   interimResults: boolean
@@ -30,7 +31,7 @@ type SpeechRecognitionLike = {
   start: () => void
   stop: () => void
   onresult: ((event: SpeechRecognitionEventLike) => void) | null
-  onerror: (() => void) | null
+  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null
   onend: (() => void) | null
 }
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
@@ -235,12 +236,21 @@ export default function POS() {
 
   const handleSearch = (query: string) => setSearchQuery(query)
 
-  const handleVoiceSearch = () => {
+  const handleVoiceSearch = async () => {
     const speechWindow = window as typeof window & { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor }
     const Recognition = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition
     if (!Recognition) {
       showToast(language === 'my' ? 'ဤ browser တွင် အသံဖြင့်ရှာဖွေမှု မထောက်ပံ့ပါ။ Chrome ကိုသုံးပါ။' : 'Voice search is not supported in this browser. Try Chrome.', 'error')
       return
+    }
+    if (navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        stream.getTracks().forEach((track) => track.stop())
+      } catch {
+        showToast(language === 'my' ? 'Microphone ခွင့်ပြုချက်မရပါ။ Browser Settings ထဲမှာ Microphone ကို Allow လုပ်ပါ။' : 'Microphone permission was denied. Allow microphone access in browser settings.', 'error')
+        return
+      }
     }
     const recognition = new Recognition()
     recognition.lang = language === 'my' ? 'my-MM' : 'en-US'
@@ -254,9 +264,25 @@ export default function POS() {
         window.setTimeout(() => searchPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
       }
     }
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
       setIsVoiceSearching(false)
-      showToast(language === 'my' ? 'အသံကို မဖမ်းနိုင်ပါ။ ထပ်စမ်းကြည့်ပါ။' : 'I could not hear that. Please try again.', 'error')
+      const code = event.error || ''
+      const message = language === 'my'
+        ? code === 'not-allowed' || code === 'audio-capture'
+          ? 'Microphone ခွင့်ပြုချက်မရပါ။ Browser Settings ထဲမှာ Microphone ကို Allow လုပ်ပြီး ပြန်စမ်းပါ။'
+          : code === 'language-not-supported'
+            ? 'ဒီ Browser မှာ မြန်မာအသံရှာဖွေမှု မထောက်ပံ့သေးပါ။ EN ပြောင်းပြီး English နာမည်ဖြင့် စမ်းပါ။'
+            : code === 'network' || code === 'service-not-allowed'
+              ? 'အသံရှာဖွေမှု service ချိတ်ဆက်မရပါ။ Internet ဖွင့်ပြီး Chrome နဲ့ ပြန်စမ်းပါ။'
+              : 'အသံကို မဖမ်းနိုင်ပါ။ Microphone ကို Allow လုပ်ပြီး ထပ်စမ်းကြည့်ပါ။'
+        : code === 'not-allowed' || code === 'audio-capture'
+          ? 'Microphone permission is blocked. Allow it in browser settings and try again.'
+          : code === 'language-not-supported'
+            ? 'This browser does not support the selected voice language. Try EN mode.'
+            : code === 'network' || code === 'service-not-allowed'
+              ? 'Voice service is unavailable. Check your internet connection and try Chrome.'
+              : 'I could not hear that. Check microphone access and try again.'
+      showToast(message, 'error')
     }
     recognition.onend = () => setIsVoiceSearching(false)
     try { recognition.start() } catch { setIsVoiceSearching(false) }
