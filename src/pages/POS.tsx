@@ -50,6 +50,7 @@ export default function POS() {
   const [bluetoothPrinterName, setBluetoothPrinterName] = useState(() => connectedBluetoothPrinterName())
   const [welcomeOpen, setWelcomeOpen] = useState(() => window.sessionStorage.getItem(WELCOME_SESSION_KEY) === '1')
   const lastHandledScan = useRef({ code: '', time: 0 })
+  const searchPanelRef = useRef<HTMLDivElement>(null)
   const productsRefreshing = useRef(false)
   const cartHydrated = useRef(false)
   const savedCartDraft = useRef(readPosDraft().cart || [])
@@ -316,18 +317,19 @@ export default function POS() {
     void loadProducts(false, true)
   }
 
-  const ProductImage = ({ url, name }: { url: string; name: string }) => {
+  const ProductImage = ({ url, name, small = false }: { url: string; name: string; small?: boolean }) => {
+    const imageClass = small ? 'h-12 w-12 rounded-lg' : 'h-28 w-28 rounded-2xl'
     if (url) {
       return (
         <img
           src={url}
           alt={name}
-            className="h-28 w-28 object-cover rounded-2xl"
+            className={`${imageClass} object-cover`}
         />
       )
     }
     return (
-      <div className="h-28 w-28 bg-gray-200 rounded-2xl flex items-center justify-center text-center text-gray-400 text-xs">
+      <div className={`${imageClass} flex items-center justify-center bg-gray-200 text-center text-xs text-gray-400`}>
         {t('noImage')}
       </div>
     )
@@ -347,18 +349,18 @@ export default function POS() {
         <div className="flex-1 p-4 lg:p-6 space-y-5 max-w-5xl mx-auto w-full">
 
           {/* The scanner is floating; product search and category filtering stay visible for quick POS use. */}
-          <div className="surface-card p-4 sm:p-5">
-            <h2 className="mb-3 text-lg font-semibold">{t('searchProduct')}</h2>
+          <div ref={searchPanelRef} className="surface-card scroll-mt-20 p-3 sm:p-4">
+            <h2 className="mb-2 text-base font-semibold">{t('searchProduct')}</h2>
             <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-              <input type="text" placeholder={t('searchPlaceholder')} value={searchQuery} onChange={(event) => handleSearch(event.target.value)} className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary" />
-              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="min-w-40 rounded-xl border border-gray-300 px-3 py-3 font-semibold text-violet-700 focus:outline-none focus:ring-2 focus:ring-primary">
+              <input type="text" placeholder={t('searchPlaceholder')} value={searchQuery} onChange={(event) => handleSearch(event.target.value)} onFocus={() => window.setTimeout(() => searchPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+              <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="min-w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-violet-700 focus:outline-none focus:ring-2 focus:ring-primary">
                 <option value="">{t('allCategories')}</option>
                 {productCategories.map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
             </div>
-            {filteredSearchResults.length > 0 && <div className="mt-3 max-h-60 space-y-2 overflow-y-auto">
-              {filteredSearchResults.map((product) => <button key={product.id} onClick={() => { addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit'); setSearchQuery('') }} className="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 p-3 text-left hover:bg-gray-50">
-                <div className="flex min-w-0 items-center gap-3"><ProductImage url={product.imageUrl} name={product.name} /><div className="min-w-0"><p className="truncate font-bold">{product.name}</p><p className="truncate text-sm font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p></div></div>
+            {filteredSearchResults.length > 0 && <div className="mt-2 max-h-[min(16rem,calc(100dvh-10rem))] space-y-2 overflow-y-auto overscroll-contain">
+              {filteredSearchResults.map((product) => <button key={product.id} onClick={() => { addToCart(product, product.saleType === 'pack' ? 'pack' : 'unit'); setSearchQuery('') }} className="flex min-h-[4.5rem] w-full items-center justify-between gap-3 rounded-xl border border-gray-200 p-2.5 text-left active:bg-gray-100 hover:bg-gray-50">
+                <div className="flex min-w-0 items-center gap-3"><ProductImage url={product.imageUrl} name={product.name} small /><div className="min-w-0"><p className="truncate text-sm font-bold">{product.name}</p><p className="truncate text-xs font-semibold text-violet-700">{[product.category, product.productColor, product.productSize].filter(Boolean).join(' · ')}</p></div></div>
                 <span className="shrink-0 font-semibold text-primary">{formatCurrency(product.price)}</span>
               </button>)}
             </div>}
@@ -403,7 +405,7 @@ export default function POS() {
             ) : (
               <div className="grid grid-cols-2 items-stretch gap-4 sm:grid-cols-3 md:grid-cols-4 max-h-[58vh] overflow-y-auto pr-1">
                 {visibleProducts.map((product) => (
-                  <div key={product.id} className={`product-card h-full p-4 text-left flex flex-col shadow-sm ${product.stockQty <= 0 ? 'opacity-40 grayscale' : ''}`}>
+                  <div key={product.id} className={`product-card min-h-[330px] h-full p-4 text-left flex flex-col shadow-sm ${product.stockQty <= 0 ? 'opacity-40 grayscale' : ''}`}>
                   <div className="text-left">
                     <div className="flex justify-center mb-3">
                       <ProductImage url={product.imageUrl} name={product.name} />
